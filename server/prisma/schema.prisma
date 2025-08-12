@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model userInfo {
+  id          Int             @id @default(autoincrement())
+  firstname   String
+  lastname    String
+  email       String          @unique
+  dob         String
+  city        String
+  contact     String          @unique
+
+  footballProfile footballProfile?
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model footballProfile {
+  id         Int         @id @default(autoincrement())
+  userId     Int         @unique
+  nickname   String
+  role       String
+  experience String
+
+  user       userInfo    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdTeams footballTeam[] @relation("CreatedTeams")
+  memberTeams  footballTeamMember[]
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model footballTeam {
+  id          Int                   @id @default(autoincrement())
+  name        String
+  location    String
+  maxPlayers  Int
+  createdById Int
+
+  createdBy   footballProfile       @relation("CreatedTeams", fields: [createdById], references: [id])
+  members     footballTeamMember[]
+
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+}
+
+model footballTeamMember {
+  id               Int               @id @default(autoincrement())
+  footballProfileId Int
+  footballTeamId   Int
+
+  footballProfile  footballProfile   @relation(fields: [footballProfileId], references: [id])
+  footballTeam     footballTeam      @relation(fields: [footballTeamId], references: [id])
+
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([footballProfileId, footballTeamId])
+}
