@@ -26,9 +26,7 @@ import Animated, {
 import { useRouter } from "expo-router";
 
 import { countryCodes, CountryCodeWithCities} from './../../data/countryCodeswithCities';
-
-import { useRecoilState } from "recoil";
-import { signUpAtom } from "./../../atoms/atoms";
+import signUpStore from "./../../store/signUpStore"
 type FormData = {
   phone: string;
 };
@@ -41,7 +39,7 @@ export default function InfoRegisterScreen() {
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.5);
   const router = useRouter();
-
+  const { signUpDetails, addSignUpDetails } = signUpStore();
 
   const {
     control,
@@ -55,6 +53,8 @@ export default function InfoRegisterScreen() {
   });
 
   useEffect(() => {
+    console.log(signUpDetails);
+    
     scale.value = withRepeat(
       withSequence(
         withTiming(1.05, { duration: 800, easing: Easing.out(Easing.exp) }),

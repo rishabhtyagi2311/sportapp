@@ -24,8 +24,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { useRouter } from "expo-router";
-import { useSetRecoilState } from "recoil";
-import { signUpAtom } from "./../../atoms/atoms";
+import signUpStore from "./../../store/signUpStore"
 
 
 type FormData = {
@@ -39,7 +38,7 @@ type FormData = {
 
 export default function InfoRegisterScreen() {
   
-
+  const { signUpDetails, addSignUpDetails } = signUpStore();
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.5);
   const router = useRouter()
@@ -88,8 +87,19 @@ export default function InfoRegisterScreen() {
 
   const onSubmit = async (data: FormData) => {
 
+  const first = data.firstName
+  const last = data.lastName
+  const email = data.email
+  console.log(first,last,email);
+  
+  addSignUpDetails({
+    first,
+    last,
+    email
 
-
+  })
+  console.log(signUpDetails);
+  
   router.push("./basicInfoRegisterTwo")
 
 
