@@ -39,7 +39,7 @@ export default function InfoRegisterScreen() {
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.5);
   const router = useRouter();
-  const { signUpDetails, addSignUpDetails } = signUpStore();
+  const { firstName, lastName, email} = signUpStore();
 
   const {
     control,
@@ -53,7 +53,7 @@ export default function InfoRegisterScreen() {
   });
 
   useEffect(() => {
-    console.log(signUpDetails);
+    console.log(firstName, lastName, email);
     
     scale.value = withRepeat(
       withSequence(

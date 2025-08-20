@@ -38,7 +38,7 @@ type FormData = {
 
 export default function InfoRegisterScreen() {
   
-  const { signUpDetails, addSignUpDetails } = signUpStore();
+  const { setFirstName, setLastName, setEmail} = signUpStore();
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.5);
   const router = useRouter()
@@ -87,18 +87,10 @@ export default function InfoRegisterScreen() {
 
   const onSubmit = async (data: FormData) => {
 
-  const first = data.firstName
-  const last = data.lastName
-  const email = data.email
-  console.log(first,last,email);
   
-  addSignUpDetails({
-    first,
-    last,
-    email
-
-  })
-  console.log(signUpDetails);
+  setFirstName(data.firstName)
+  setLastName(data.lastName)
+  setEmail(data.email)
   
   router.push("./basicInfoRegisterTwo")
 
