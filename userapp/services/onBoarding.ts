@@ -6,18 +6,18 @@ const backend_url = process.env.EXPO_PUBLIC_BACKEND_URL
 
 class onboardingService {
 
-    async  basicInfoRegister(data: any) {
-        console.log(data);
+    async  basicInfoRegister(firstName:string, lastName : string, email : string, contact : string, city : string, dob : string) {
+       
         console.log(backend_url);
       
       try{
         const newUser = await axios.post(`${backend_url}/api/v1/onboarding/basicInfo` , {
-            firstname : data.firstname,
-            lastname : data.lastname,
-            dob :data.dob,
-            city : data.city,
-            contact : data.contact,
-            email : data.email
+            firstname : firstName,
+            lastname : lastName,
+            dob :dob,
+            city : city,
+            contact : contact,
+            email : email
         })
         if(newUser)
         {

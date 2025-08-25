@@ -2,19 +2,14 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { Platform } from 'react-native';
+
 
 export default function TabLayout() {
   return (
     <Tabs
       initialRouteName="index"
       screenOptions={({ route }) => ({
-        headerStyle: {
-          backgroundColor: '#1f2937', // Header: slate-800
-        },
-        headerTitleStyle: {
-          color: '#f1f5f9', // Light text
-        },
+       headerShown : false,
         tabBarStyle: {
           position: 'absolute',
           bottom: 0,
@@ -46,8 +41,8 @@ export default function TabLayout() {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'sports') {
             iconName = focused ? 'trophy' : 'trophy-outline';
-          } else if (route.name === 'Book') {
-            iconName = focused ? 'calendar' : 'calendar-clear-outline';
+          } else if (route.name === 'academy') {
+            iconName = focused ? 'apps' : 'apps-outline';
           }
 
           return <Ionicons name={iconName} size={22} color={color} />;
@@ -55,8 +50,10 @@ export default function TabLayout() {
       })}
     >
       <Tabs.Screen
+        
         name="sports"
         options={{
+          
           title: 'Sports & Activities',
         }}
       />
@@ -67,9 +64,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="Book"
+        name="academy"
         options={{
-          title: 'Venue',
+          title: 'Academy',
         }}
       />
     </Tabs>

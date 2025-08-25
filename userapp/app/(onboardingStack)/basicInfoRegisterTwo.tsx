@@ -39,7 +39,7 @@ export default function InfoRegisterScreen() {
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.5);
   const router = useRouter();
-  const { firstName, lastName, email} = signUpStore();
+  const {setContact} = signUpStore();
 
   const {
     control,
@@ -53,7 +53,7 @@ export default function InfoRegisterScreen() {
   });
 
   useEffect(() => {
-    console.log(firstName, lastName, email);
+  
     
     scale.value = withRepeat(
       withSequence(
@@ -81,6 +81,7 @@ export default function InfoRegisterScreen() {
 
   const onSubmit = async (data: FormData) => {
 
+    setContact(data.phone)
  
     router.push("./basicInfoRegisterThree");
   };

@@ -13,10 +13,10 @@ import {
 } from "react-native";
 import { useForm, Controller } from "react-hook-form";
 import { useRouter } from "expo-router";
+import signUpStore from "./../../store/signUpStore"
+import { onBoardingService } from "@/services/onBoarding";
 
-import { useRecoilState } from "recoil";
-import { signUpAtom } from "./../../atoms/atoms";
-import { onBoardingService } from "./../../services/onBoarding";
+
 type FormData = {
   city: string;
   dob: string;
@@ -24,6 +24,7 @@ type FormData = {
 
 export default function InfoRegisterScreen() {
   const router = useRouter();
+  const {firstName, lastName, email, contact, setDob, setCity} = signUpStore()
   
   const {
     control,
@@ -36,12 +37,24 @@ export default function InfoRegisterScreen() {
     },
   });
 
-  const onSubmit = (data: FormData) => {
+  const onSubmit = async (data: FormData) => {
     
+    setCity(data.city)
+    setDob(data.dob)
 
-   
-    router.push("./../(homeScreenTabs)");
-    
+  //   const response =  await onBoardingService.basicInfoRegister(
+  //   firstName,lastName,email, contact, data.city, data.dob
+  //  )
+  //  console.log(response);
+  //   if(response!== null)
+  //   {
+  //     router.push("./../(homeScreenTabs)");
+  //   }
+  //   else{
+  //     alert("Server Issue, Try again ")
+  //   }
+
+   router.push("./../(homeScreenTabs)");
   }
 
   return (
