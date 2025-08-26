@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import Svg, { Defs, ClipPath, Path, Image as SvgImage } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
@@ -21,6 +22,10 @@ export default function Academy() {
   const handlePress = (action: string): void => {
     console.log(`${action} pressed`);
     // Add your navigation logic here
+    if(action === 'Register')
+    {
+      router.navigate('./../(academy)/registerAcademy')
+    }
   };
 
   interface ButtonProps {
