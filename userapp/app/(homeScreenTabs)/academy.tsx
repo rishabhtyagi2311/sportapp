@@ -26,6 +26,10 @@ export default function Academy() {
     {
       router.navigate('./../(academy)/registerAcademy')
     }
+    else if(action === "Explore")
+    {
+      router.navigate('./../(academy)/browseAcademy')
+    }
   };
 
   interface ButtonProps {

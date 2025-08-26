@@ -1,28 +1,24 @@
-import { Stack } from "expo-router";
+import React from 'react';
+import { Stack } from 'expo-router';
 
-export default function Layout() {
+export default function AcademyLayout(){
   return (
     <Stack
       screenOptions={{
-        headerShown: false,       
-        animation: "slide_from_right", 
-        gestureEnabled: true,     
+        headerShown: false,
+        animation: 'slide_from_right',
       }}
     >
-      {/* Optional: customize specific screens */}
-      <Stack.Screen
-        name="index"
+      <Stack.Screen 
+        name="index" 
         options={{
-          headerShown: true,
-          title: "Academy Home",
-          headerStyle: { backgroundColor: "#0f172a" }, // slate-900
-          headerTintColor: "#fff",
+          title: 'Browse Academies',
         }}
       />
-      <Stack.Screen
-        name="register"
+      <Stack.Screen 
+        name="academy-detail" 
         options={{
-          headerShown: false, // since we built a custom header in your form
+          title: 'Academy Details',
         }}
       />
     </Stack>
