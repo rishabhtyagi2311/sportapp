@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 type Academy = {
+  id: string;  // Added unique ID
   academyName: string;
   sportType: string;
   address: string;
@@ -17,11 +18,13 @@ type AcademyStore = {
   addAcademy: (academy: Academy) => void;
   getAcademies: () => Academy[];
   clearAcademies: () => void;
+  getAcademyById: (id: string) => Academy | undefined;  // Added helper method
 };
 
 export const useAcademyStore = create<AcademyStore>((set, get) => ({
   academies: [
     {
+      id: "001",
       academyName: "Rising Stars Cricket Academy",
       sportType: "Cricket",
       address: "Sector 21, Near Sports Complex",
@@ -33,6 +36,7 @@ export const useAcademyStore = create<AcademyStore>((set, get) => ({
       monthlyFee: "1500",
     },
     {
+      id: "002", 
       academyName: "Football United Academy",
       sportType: "Football",
       address: "MG Road, Near City Park",
@@ -44,19 +48,21 @@ export const useAcademyStore = create<AcademyStore>((set, get) => ({
       monthlyFee: "2000",
     },
     {
-      academyName: "Hoops Basketball Academy",
+      id: "003",
+      academyName: "Hoops Basketball Academy", 
       sportType: "Basketball",
       address: "Andheri West, Near Metro Station",
       city: "Mumbai",
-      coachName: "Michael D’Souza",
+      coachName: "Michael D'Souza",
       contactNumber: "9988776655",
       facilities: "Indoor court, Wooden flooring, Fitness training",
       feeStructure: "quarterly",
       monthlyFee: "4500",
     },
     {
+      id: "004",
       academyName: "Smash Badminton Academy",
-      sportType: "Badminton",
+      sportType: "Badminton", 
       address: "Sector 14, Near Market",
       city: "Chandigarh",
       coachName: "Priya Verma",
@@ -66,9 +72,10 @@ export const useAcademyStore = create<AcademyStore>((set, get) => ({
       monthlyFee: "1200",
     },
     {
+      id: "005",
       academyName: "Grand Slam Tennis Academy",
       sportType: "Tennis",
-      address: "Beside Sports Authority Ground",
+      address: "Beside Sports Authority Ground", 
       city: "Hyderabad",
       coachName: "Sanjay Kapoor",
       contactNumber: "9911223344",
@@ -77,10 +84,11 @@ export const useAcademyStore = create<AcademyStore>((set, get) => ({
       monthlyFee: "18000",
     },
     {
+      id: "006",
       academyName: "Blue Waves Swimming Academy",
       sportType: "Swimming",
       address: "Near Lakeside Club",
-      city: "Pune",
+      city: "Pune", 
       coachName: "Meera Joshi",
       contactNumber: "9876501234",
       facilities: "Olympic pool, Training pool, Diving board",
@@ -88,13 +96,11 @@ export const useAcademyStore = create<AcademyStore>((set, get) => ({
       monthlyFee: "2500",
     },
   ],
-
   addAcademy: (academy) =>
     set((state) => ({
       academies: [...state.academies, academy],
     })),
-
   getAcademies: () => get().academies,
-
+  getAcademyById: (id) => get().academies.find(academy => academy.id === id),
   clearAcademies: () => set({ academies: [] }),
 }));

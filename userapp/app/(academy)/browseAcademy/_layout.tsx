@@ -16,9 +16,10 @@ export default function AcademyLayout(){
         }}
       />
       <Stack.Screen 
-        name="academy-detail" 
+        name="academy-details/[id]" 
         options={{
           title: 'Academy Details',
+           headerShown: false,
         }}
       />
     </Stack>

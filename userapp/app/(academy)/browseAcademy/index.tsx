@@ -19,6 +19,7 @@ const { width } = Dimensions.get('window');
 const cardWidth = width - 32; // 16px margin on each side
 
 type Academy = {
+  id : string;
   academyName: string;
   sportType: string;
   address: string;
@@ -111,6 +112,8 @@ export default function BrowseAcademies() {
     
     return (
       <TouchableOpacity 
+       onPress={() => router.push(`/browseAcademy/academy-details/${academy.id}`)}
+
         className="bg-white rounded-2xl shadow-lg mb-4 overflow-hidden border border-gray-100"
         style={{ width: cardWidth }}
         activeOpacity={0.9}
