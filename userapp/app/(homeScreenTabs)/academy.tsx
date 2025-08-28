@@ -30,6 +30,10 @@ export default function Academy() {
     {
       router.navigate('./../(academy)/browseAcademy')
     }
+    else if(action==="Manage")
+    {
+      router.navigate('./../(academy)/manageAcademy')
+    }
   };
 
   interface ButtonProps {

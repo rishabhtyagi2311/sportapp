@@ -1,21 +1,21 @@
 import { Stack } from "expo-router";
 
-export default function Layout() {
- 
-return (
+export default function AcademyLayout() {
+  return (
     <Stack
       screenOptions={{
-        headerShown: false,        // hide default header
-        animation: "slide_from_right", // smooth stack animation
-        gestureEnabled: true,     // allow swipe back on iOS
+        headerShown: false, // hides headers globally
       }}
     >
-      {/* Optional: customize specific screens */}
+      <Stack.Screen name="index" options={{ title: "My Academies" }} />
+      <Stack.Screen name="[id]/index" options={{ title: "Academy Details" }} />
+      <Stack.Screen name="[id]/edit" options={{ title: "Edit Academy" }} />
+      <Stack.Screen name="[id]/students" options={{ title: "Students" }} />
+      <Stack.Screen name="[id]/attendance" options={{ title: "Attendance" }} />
       <Stack.Screen
-        name="index"
-        
+        name="[id]/certificates"
+        options={{ title: "Certificates" }}
       />
-      
     </Stack>
   );
 }

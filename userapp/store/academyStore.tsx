@@ -1,106 +1,113 @@
-import { create } from "zustand";
+import { create } from 'zustand';
+import { Academy, Student, Attendance, Certificate, Coach } from '../types';
+import { dummyAcademies, dummyStudents } from '../constants/dummyData';
 
-type Academy = {
-  id: string;  // Added unique ID
-  academyName: string;
-  sportType: string;
-  address: string;
-  coachName: string;
-  contactNumber: string;
-  facilities: string;
-  feeStructure: string;
-  monthlyFee: string;
-  city: string;
-};
-
-type AcademyStore = {
+interface AcademyStore {
   academies: Academy[];
+  students: Student[];
+  attendance: Attendance[];
+  certificates: Certificate[];
+  
+  // Academy actions
+  updateAcademy: (academy: Academy) => void;
   addAcademy: (academy: Academy) => void;
   getAcademies: () => Academy[];
   clearAcademies: () => void;
-  getAcademyById: (id: string) => Academy | undefined;  // Added helper method
-};
+  getAcademyById: (id: string) => Academy | undefined;
+
+  // Student actions
+  addStudent: (student: Student) => void;
+  getStudentsByAcademy: (academyId: string) => Student[];
+  
+  // Attendance actions
+  markAttendance: (studentId: string, date: string, present: boolean) => void;
+  getAttendanceStatus: (studentId: string, date: string) => boolean | undefined;
+  
+  // Certificate actions
+  addCertificate: (certificate: Certificate) => void;
+  getCertificatesByAcademy: (academyId: string) => Certificate[];
+
+  // Coach actions
+  addCoach: (academyId: string, coach: Coach) => void;
+  removeCoach: (academyId: string, coachId: string) => void;
+}
 
 export const useAcademyStore = create<AcademyStore>((set, get) => ({
-  academies: [
-    {
-      id: "001",
-      academyName: "Rising Stars Cricket Academy",
-      sportType: "Cricket",
-      address: "Sector 21, Near Sports Complex",
-      city: "Delhi",
-      coachName: "Rahul Sharma",
-      contactNumber: "9876543210",
-      facilities: "Turf pitch, Bowling machine, Indoor nets",
-      feeStructure: "monthly",
-      monthlyFee: "1500",
-    },
-    {
-      id: "002", 
-      academyName: "Football United Academy",
-      sportType: "Football",
-      address: "MG Road, Near City Park",
-      city: "Bangalore",
-      coachName: "Arjun Nair",
-      contactNumber: "9123456789",
-      facilities: "Grass field, Artificial turf, Goal posts",
-      feeStructure: "monthly",
-      monthlyFee: "2000",
-    },
-    {
-      id: "003",
-      academyName: "Hoops Basketball Academy", 
-      sportType: "Basketball",
-      address: "Andheri West, Near Metro Station",
-      city: "Mumbai",
-      coachName: "Michael D'Souza",
-      contactNumber: "9988776655",
-      facilities: "Indoor court, Wooden flooring, Fitness training",
-      feeStructure: "quarterly",
-      monthlyFee: "4500",
-    },
-    {
-      id: "004",
-      academyName: "Smash Badminton Academy",
-      sportType: "Badminton", 
-      address: "Sector 14, Near Market",
-      city: "Chandigarh",
-      coachName: "Priya Verma",
-      contactNumber: "9090909090",
-      facilities: "Indoor courts, Wooden floor, Synthetic mats",
-      feeStructure: "monthly",
-      monthlyFee: "1200",
-    },
-    {
-      id: "005",
-      academyName: "Grand Slam Tennis Academy",
-      sportType: "Tennis",
-      address: "Beside Sports Authority Ground", 
-      city: "Hyderabad",
-      coachName: "Sanjay Kapoor",
-      contactNumber: "9911223344",
-      facilities: "Clay court, Hard court, Indoor training",
-      feeStructure: "annually",
-      monthlyFee: "18000",
-    },
-    {
-      id: "006",
-      academyName: "Blue Waves Swimming Academy",
-      sportType: "Swimming",
-      address: "Near Lakeside Club",
-      city: "Pune", 
-      coachName: "Meera Joshi",
-      contactNumber: "9876501234",
-      facilities: "Olympic pool, Training pool, Diving board",
-      feeStructure: "monthly",
-      monthlyFee: "2500",
-    },
-  ],
+  academies: dummyAcademies,
+  students: dummyStudents,
+  attendance: [],
+  certificates: [],
+
   addAcademy: (academy) =>
     set((state) => ({
       academies: [...state.academies, academy],
     })),
   getAcademies: () => get().academies,
-  getAcademyById: (id) => get().academies.find(academy => academy.id === id),
+  getAcademyById: (id) => get().academies.find((academy) => academy.id === id),
   clearAcademies: () => set({ academies: [] }),
+  
+  updateAcademy: (academy) =>
+    set((state) => ({
+      academies: state.academies.map((a) => (a.id === academy.id ? academy : a)),
+    })),
+  
+  addStudent: (student) =>
+    set((state) => ({
+      students: [...state.students, student],
+    })),
+  
+  getStudentsByAcademy: (academyId) => {
+    return get().students.filter((student) => student.academyId === academyId);
+  },
+  
+  markAttendance: (studentId, date, present) =>
+    set((state) => {
+      const existing = state.attendance.findIndex(
+        (a) => a.studentId === studentId && a.date === date
+      );
+      if (existing >= 0) {
+        const updated = [...state.attendance];
+        updated[existing] = { studentId, date, present };
+        return { attendance: updated };
+      }
+      return { attendance: [...state.attendance, { studentId, date, present }] };
+    }),
+  
+  getAttendanceStatus: (studentId, date) => {
+    const record = get().attendance.find(
+      (a) => a.studentId === studentId && a.date === date
+    );
+    return record?.present;
+  },
+  
+  addCertificate: (certificate) =>
+    set((state) => ({
+      certificates: [...state.certificates, certificate],
+    })),
+  
+  getCertificatesByAcademy: (academyId) => {
+    const students = get().getStudentsByAcademy(academyId);
+    return get().certificates.filter((cert) =>
+      students.some((student) => student.id === cert.studentId)
+    );
+  },
+
+  // --- Coach actions ---
+  addCoach: (academyId, coach) =>
+    set((state) => ({
+      academies: state.academies.map((a) =>
+        a.id === academyId
+          ? { ...a, coaches: [...(a.coaches || []), coach] }
+          : a
+      ),
+    })),
+
+  removeCoach: (academyId, coachId) =>
+    set((state) => ({
+      academies: state.academies.map((a) =>
+        a.id === academyId
+          ? { ...a, coaches: a.coaches?.filter((c) => c.id !== coachId) }
+          : a
+      ),
+    })),
 }));
