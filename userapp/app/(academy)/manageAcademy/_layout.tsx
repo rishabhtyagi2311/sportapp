@@ -12,6 +12,7 @@ export default function AcademyLayout() {
       <Stack.Screen name="[id]/edit" options={{ title: "Edit Academy" }} />
       <Stack.Screen name="[id]/students" options={{ title: "Students" }} />
       <Stack.Screen name="[id]/attendance" options={{ title: "Attendance" }} />
+       <Stack.Screen name="[id]/studentAttendance" options={{ title: "studentAttendance" }} />
       <Stack.Screen
         name="[id]/certificates"
         options={{ title: "Certificates" }}

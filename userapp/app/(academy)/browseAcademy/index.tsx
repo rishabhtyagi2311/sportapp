@@ -27,7 +27,7 @@ type Academy = {
   contactNumber: string;
   facilities: string;
   feeStructure: string;
-  monthlyFee: string;
+  Fee: string;
   city: string;
 };
 
@@ -136,7 +136,7 @@ export default function BrowseAcademies() {
           {/* Fee Badge */}
           <View className="absolute top-3 right-3 bg-white px-3 py-1 rounded-full shadow-sm">
             <Text className="text-slate-900 text-xs font-bold">
-              ₹{academy.monthlyFee}
+              ₹{academy.Fee}
               /{academy.feeStructure === 'monthly' ? 'mo' : academy.feeStructure === 'quarterly' ? 'qtr' : 'yr'}
             </Text>
           </View>
