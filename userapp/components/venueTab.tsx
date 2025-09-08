@@ -43,15 +43,15 @@ const VenueTab: React.FC = () => {
   }, [filters]);
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 ">
       {/* Search and Filter Header */}
-      <View className="bg-white px-4 py-3 border-b border-gray-300">
+      <View className="bg-gray-300 px-4 py-3 border-b border-gray-300 ">
         <View className="flex-row items-center space-x-3">
           {/* Search Input */}
-          <View className="flex-1 flex-row items-center bg-gray-100 rounded-lg px-3 py-2">
-            <Ionicons name="search" size={20} color="#6b7280" />
+          <View className="flex-1 flex-row items-center bg-slate-900 rounded-lg px-3 py-2 mx-2">
+            <Ionicons name="search" size={20} color="#ffffff" />
             <TextInput
-              className="flex-1 ml-2 text-gray-700"
+              className="flex-1 ml-2 text-white text-xl"
               placeholder="Search venues..."
               placeholderTextColor="#9ca3af"
               value={searchQuery}
@@ -107,7 +107,7 @@ const VenueTab: React.FC = () => {
 
       {/* Venues List */}
       <ScrollView 
-        className="flex-1"
+        className="flex-1 bg-gray-300"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
       >
