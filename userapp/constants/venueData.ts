@@ -34,12 +34,69 @@ export const masterAmenities: Amenity[] = [
   { id: 'photography', name: 'Photography Service', category: 'services', icon: '📸', description: 'Professional photography for events' },
 ];
 
-// Master sports list
+// Master sports list with varieties
 export const masterSports: Sport[] = [
   {
     id: 'cricket',
     name: 'Cricket',
     category: 'outdoor',
+    basePrice: 800,
+    varieties: [
+      {
+        id: 'box_cricket',
+        name: 'Box Cricket',
+        description: 'Fast-paced cricket in a confined box arena',
+        specifications: {
+          dimensions: '30x30 feet',
+          capacity: 12,
+          surface: 'Artificial Turf',
+          overLimit: 6,
+          boundaryHeight: '12 feet'
+        },
+        basePrice: 600,
+        isAvailable: true
+      },
+      {
+        id: 'turf_6x6',
+        name: '6x6 Turf',
+        description: 'Medium-sized cricket turf for casual games',
+        specifications: {
+          dimensions: '60x60 feet',
+          capacity: 12,
+          surface: 'Artificial Turf',
+          pitchLength: '16 yards'
+        },
+        basePrice: 800,
+        isAvailable: true
+      },
+      {
+        id: 'turf_7x7',
+        name: '7x7 Turf',
+        description: 'Larger cricket turf for competitive matches',
+        specifications: {
+          dimensions: '70x70 feet',
+          capacity: 14,
+          surface: 'Artificial Turf',
+          pitchLength: '18 yards'
+        },
+        basePrice: 1000,
+        isAvailable: true
+      },
+      {
+        id: 'full_ground',
+        name: 'Full Ground',
+        description: 'Professional cricket ground for serious matches',
+        specifications: {
+          dimensions: '22 yards pitch',
+          capacity: 22,
+          surface: 'Natural Grass',
+          format: 'T20/ODI/Test'
+        },
+        basePrice: 2000,
+        isAvailable: true
+      }
+    ],
+    // Keep details for backward compatibility
     details: [
       {
         id: 'box_cricket',
@@ -69,6 +126,51 @@ export const masterSports: Sport[] = [
     id: 'football',
     name: 'Football',
     category: 'outdoor',
+    basePrice: 1200,
+    varieties: [
+      {
+        id: 'football_5x5',
+        name: '5v5 Football',
+        description: 'Small-sided football for quick matches',
+        specifications: {
+          dimensions: '40x20 meters',
+          capacity: 10,
+          surface: 'Artificial Turf',
+          goalSize: '3x2 meters',
+          matchDuration: '20 minutes'
+        },
+        basePrice: 800,
+        isAvailable: true
+      },
+      {
+        id: 'football_7x7',
+        name: '7v7 Football',
+        description: 'Medium-sized football matches',
+        specifications: {
+          dimensions: '50x30 meters',
+          capacity: 14,
+          surface: 'Artificial Turf',
+          goalSize: '12x6 feet',
+          matchDuration: '30 minutes'
+        },
+        basePrice: 1200,
+        isAvailable: true
+      },
+      {
+        id: 'football_11x11',
+        name: '11v11 Football',
+        description: 'Full-size professional football',
+        specifications: {
+          dimensions: '100x50 meters',
+          capacity: 22,
+          surface: 'Natural Grass',
+          goalSize: '24x8 feet',
+          matchDuration: '90 minutes'
+        },
+        basePrice: 2000,
+        isAvailable: true
+      }
+    ],
     details: [
       {
         id: 'football_7x7',
@@ -96,6 +198,37 @@ export const masterSports: Sport[] = [
     id: 'badminton',
     name: 'Badminton',
     category: 'indoor',
+    basePrice: 400,
+    varieties: [
+      {
+        id: 'single_court',
+        name: 'Single Court',
+        description: 'Individual badminton court for singles play',
+        specifications: {
+          dimensions: '13.4x5.18 meters',
+          capacity: 2,
+          surface: 'Wooden/PVC',
+          netHeight: '1.55 meters',
+          gameFormat: 'Best of 3'
+        },
+        basePrice: 400,
+        isAvailable: true
+      },
+      {
+        id: 'double_court',
+        name: 'Double Court',
+        description: 'Badminton court optimized for doubles play',
+        specifications: {
+          dimensions: '13.4x6.1 meters',
+          capacity: 4,
+          surface: 'Wooden/PVC',
+          netHeight: '1.55 meters',
+          gameFormat: 'Best of 3'
+        },
+        basePrice: 500,
+        isAvailable: true
+      }
+    ],
     details: [
       {
         id: 'badminton_singles',
@@ -123,6 +256,35 @@ export const masterSports: Sport[] = [
     id: 'tennis',
     name: 'Tennis',
     category: 'outdoor',
+    basePrice: 600,
+    varieties: [
+      {
+        id: 'tennis_singles',
+        name: 'Singles Court',
+        description: 'Tennis court for singles matches',
+        specifications: {
+          dimensions: '23.77x8.23 meters',
+          capacity: 2,
+          surface: 'Hard Court',
+          netHeight: '0.914 meters'
+        },
+        basePrice: 600,
+        isAvailable: true
+      },
+      {
+        id: 'tennis_doubles',
+        name: 'Doubles Court',
+        description: 'Tennis court for doubles matches',
+        specifications: {
+          dimensions: '23.77x10.97 meters',
+          capacity: 4,
+          surface: 'Hard Court',
+          netHeight: '0.914 meters'
+        },
+        basePrice: 800,
+        isAvailable: true
+      }
+    ],
     details: [
       {
         id: 'tennis_singles',
@@ -140,6 +302,50 @@ export const masterSports: Sport[] = [
     id: 'basketball',
     name: 'Basketball',
     category: 'outdoor',
+    basePrice: 800,
+    varieties: [
+      {
+        id: 'half_court',
+        name: 'Half Court',
+        description: 'Half basketball court for casual games',
+        specifications: {
+          dimensions: '14x15 meters',
+          capacity: 6,
+          surface: 'Concrete/Wooden',
+          hoopHeight: '3.05 meters'
+        },
+        basePrice: 500,
+        isAvailable: true
+      },
+      {
+        id: 'full_court',
+        name: 'Full Court',
+        description: 'Full basketball court for competitive games',
+        specifications: {
+          dimensions: '28x15 meters',
+          capacity: 10,
+          surface: 'Wooden/Synthetic',
+          hoopHeight: '3.05 meters',
+          gameDuration: '48 minutes'
+        },
+        basePrice: 800,
+        isAvailable: true
+      },
+      {
+        id: 'streetball_court',
+        name: '3x3 Court',
+        description: '3x3 basketball court for street-style games',
+        specifications: {
+          dimensions: '15x11 meters',
+          capacity: 6,
+          surface: 'Concrete',
+          hoopHeight: '3.05 meters',
+          gameDuration: '21 points'
+        },
+        basePrice: 400,
+        isAvailable: true
+      }
+    ],
     details: [
       {
         id: 'basketball_full',
@@ -165,16 +371,16 @@ export const masterSports: Sport[] = [
   }
 ];
 
-// Time slots templates
-const generateTimeSlots = (basePrice: number): TimeSlot[] => [
-  { id: 'slot_6_8', startTime: '06:00', endTime: '08:00', isAvailable: true, price: basePrice * 0.8, priceType: 'per_hour' },
-  { id: 'slot_8_10', startTime: '08:00', endTime: '10:00', isAvailable: true, price: basePrice, priceType: 'per_hour' },
-  { id: 'slot_10_12', startTime: '10:00', endTime: '12:00', isAvailable: true, price: basePrice * 1.2, priceType: 'per_hour' },
-  { id: 'slot_12_14', startTime: '12:00', endTime: '14:00', isAvailable: false, price: basePrice * 1.1, priceType: 'per_hour' },
-  { id: 'slot_14_16', startTime: '14:00', endTime: '16:00', isAvailable: true, price: basePrice * 1.1, priceType: 'per_hour' },
-  { id: 'slot_16_18', startTime: '16:00', endTime: '18:00', isAvailable: true, price: basePrice * 1.3, priceType: 'per_hour' },
-  { id: 'slot_18_20', startTime: '18:00', endTime: '20:00', isAvailable: true, price: basePrice * 1.5, priceType: 'per_hour' },
-  { id: 'slot_20_22', startTime: '20:00', endTime: '22:00', isAvailable: true, price: basePrice * 1.4, priceType: 'per_hour' },
+// Time slots templates with sport variety references
+const generateTimeSlots = (basePrice: number, sportId: string, varietyId: string): TimeSlot[] => [
+  { id: `slot_${sportId}_${varietyId}_6_8`, sportId, sportVarietyId: varietyId, startTime: '06:00', endTime: '08:00', isAvailable: true, price: basePrice * 0.8, priceType: 'per_hour' },
+  { id: `slot_${sportId}_${varietyId}_8_10`, sportId, sportVarietyId: varietyId, startTime: '08:00', endTime: '10:00', isAvailable: true, price: basePrice, priceType: 'per_hour' },
+  { id: `slot_${sportId}_${varietyId}_10_12`, sportId, sportVarietyId: varietyId, startTime: '10:00', endTime: '12:00', isAvailable: true, price: basePrice * 1.2, priceType: 'per_hour' },
+  { id: `slot_${sportId}_${varietyId}_12_14`, sportId, sportVarietyId: varietyId, startTime: '12:00', endTime: '14:00', isAvailable: false, price: basePrice * 1.1, priceType: 'per_hour' },
+  { id: `slot_${sportId}_${varietyId}_14_16`, sportId, sportVarietyId: varietyId, startTime: '14:00', endTime: '16:00', isAvailable: true, price: basePrice * 1.1, priceType: 'per_hour' },
+  { id: `slot_${sportId}_${varietyId}_16_18`, sportId, sportVarietyId: varietyId, startTime: '16:00', endTime: '18:00', isAvailable: true, price: basePrice * 1.3, priceType: 'per_hour' },
+  { id: `slot_${sportId}_${varietyId}_18_20`, sportId, sportVarietyId: varietyId, startTime: '18:00', endTime: '20:00', isAvailable: true, price: basePrice * 1.5, priceType: 'per_hour' },
+  { id: `slot_${sportId}_${varietyId}_20_22`, sportId, sportVarietyId: varietyId, startTime: '20:00', endTime: '22:00', isAvailable: true, price: basePrice * 1.4, priceType: 'per_hour' },
 ];
 
 // Dummy venues
@@ -194,7 +400,7 @@ export const dummyVenues: Venue[] = [
       email: 'info@sportzone.com',
       whatsapp: '+91-9876543210'
     },
-    sports: [masterSports[0]], // Cricket
+    sports: [masterSports[0]], // Cricket with all varieties
     amenities: [
       masterAmenities[0], // parking
       masterAmenities[1], // drinking water
@@ -221,7 +427,13 @@ export const dummyVenues: Venue[] = [
       saturday: { open: '06:00', close: '23:00', isOpen: true },
       sunday: { open: '07:00', close: '23:00', isOpen: true },
     },
-    timeSlots: generateTimeSlots(800),
+    // Generate time slots for different cricket varieties
+    timeSlots: [
+      ...generateTimeSlots(600, 'cricket', 'box_cricket'),
+      ...generateTimeSlots(800, 'cricket', 'turf_6x6'),
+      ...generateTimeSlots(1000, 'cricket', 'turf_7x7'),
+      ...generateTimeSlots(2000, 'cricket', 'full_ground'),
+    ],
     policies: {
       cancellationPolicy: 'Free cancellation up to 2 hours before booking time',
       advanceBookingDays: 7,
@@ -245,7 +457,7 @@ export const dummyVenues: Venue[] = [
       phone: '+91-9876543211',
       email: 'elite@badminton.com'
     },
-    sports: [masterSports[2]], // Badminton
+    sports: [masterSports[2]], // Badminton with varieties
     amenities: [
       masterAmenities[0], // parking
       masterAmenities[1], // drinking water
@@ -271,7 +483,10 @@ export const dummyVenues: Venue[] = [
       saturday: { open: '05:30', close: '23:30', isOpen: true },
       sunday: { open: '06:00', close: '23:30', isOpen: true },
     },
-    timeSlots: generateTimeSlots(400),
+    timeSlots: [
+      ...generateTimeSlots(400, 'badminton', 'single_court'),
+      ...generateTimeSlots(500, 'badminton', 'double_court'),
+    ],
     policies: {
       cancellationPolicy: 'Free cancellation up to 1 hour before booking time',
       advanceBookingDays: 3,
@@ -295,7 +510,7 @@ export const dummyVenues: Venue[] = [
       phone: '+91-9876543212',
       whatsapp: '+91-9876543212'
     },
-    sports: [masterSports[1]], // Football
+    sports: [masterSports[1]], // Football with varieties
     amenities: [
       masterAmenities[0], // parking
       masterAmenities[1], // drinking water
@@ -325,7 +540,11 @@ export const dummyVenues: Venue[] = [
       saturday: { open: '06:00', close: '23:00', isOpen: true },
       sunday: { open: '07:00', close: '22:00', isOpen: true },
     },
-    timeSlots: generateTimeSlots(1200),
+    timeSlots: [
+      ...generateTimeSlots(800, 'football', 'football_5x5'),
+      ...generateTimeSlots(1200, 'football', 'football_7x7'),
+      ...generateTimeSlots(2000, 'football', 'football_11x11'),
+    ],
     policies: {
       cancellationPolicy: 'Free cancellation up to 4 hours before booking time',
       advanceBookingDays: 14,
@@ -337,7 +556,7 @@ export const dummyVenues: Venue[] = [
   }
 ];
 
-// Dummy events
+// Dummy events with sport variety references
 export const dummyEvents: Event[] = [
   {
     id: 'event_1',
@@ -346,6 +565,7 @@ export const dummyEvents: Event[] = [
     description: 'Weekly cricket tournament for amateur players. All skill levels welcome!',
     eventType: 'tournament',
     sport: masterSports[0],
+    sportVarietyId: 'turf_7x7', // Specify the variety for this event
     participationType: 'team',
     teamSize: 11,
     maxParticipants: 88, // 8 teams
@@ -380,6 +600,7 @@ export const dummyEvents: Event[] = [
     description: 'Individual badminton tournament with prizes for winners',
     eventType: 'tournament',
     sport: masterSports[2],
+    sportVarietyId: 'single_court',
     participationType: 'individual',
     maxParticipants: 32,
     currentParticipants: 18,
@@ -412,6 +633,7 @@ export const dummyEvents: Event[] = [
     description: 'Weekly 7v7 football matches for corporate teams',
     eventType: 'league',
     sport: masterSports[1],
+    sportVarietyId: 'football_7x7',
     participationType: 'team',
     teamSize: 7,
     maxParticipants: 42, // 6 teams
@@ -445,10 +667,8 @@ export const dummyEvents: Event[] = [
     name: 'Box Cricket Blast',
     description: 'Fast-paced 6-over box cricket tournament',
     eventType: 'tournament',
-    sport: {
-      ...masterSports[0],
-      details: [masterSports[0].details![0]] // Only box cricket
-    },
+    sport: masterSports[0],
+    sportVarietyId: 'box_cricket', // Specify box cricket variety
     participationType: 'team',
     teamSize: 6,
     maxParticipants: 48, // 8 teams

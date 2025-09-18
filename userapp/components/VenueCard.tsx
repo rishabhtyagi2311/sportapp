@@ -1,7 +1,8 @@
 // components/booking/VenueCard.tsx
 import React from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
-import { Venue } from './../types/booking';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Venue } from '../types/booking';
 import { Ionicons } from '@expo/vector-icons';
 
 interface VenueCardProps {
@@ -10,6 +11,7 @@ interface VenueCardProps {
 }
 
 const VenueCard: React.FC<VenueCardProps> = ({ venue, onPress }) => {
+  const router = useRouter();
   const minPrice = Math.min(...venue.timeSlots.map((slot) => slot.price));
   const maxPrice = Math.max(...venue.timeSlots.map((slot) => slot.price));
   
@@ -17,9 +19,23 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onPress }) => {
     if (onPress) {
       onPress();
     } else {
-      // Default navigation logic - you can implement navigation here
-      console.log('Navigate to venue details:', venue.id);
+      // Navigate to venue details screen using expo-router
+      router.push({
+        pathname: './(venue)/VenueBooking/venueDetails/[venueId]',
+        params: { venueId: venue.id }
+      });
     }
+  };
+
+  const handleBookNow = (e: any) => {
+    e.stopPropagation(); // Prevent triggering the main card press
+    router.push({
+      pathname: '/venue-details/[venueId]',
+      params: { 
+        venueId: venue.id, 
+        autoSelectBooking: 'true' 
+      }
+    });
   };
 
   return (
@@ -30,9 +46,9 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onPress }) => {
     >
       {/* Image Section */}
       <View className="relative">
-        <View className="w-full h-48 bg-gray-400 rounded-t-xl items-center justify-center">
-          <Ionicons name="image-outline" size={48} color="black" />
-          <Text className="text-black text-sm mt-2">No photos uploaded yet</Text>
+        <View className="w-full h-48 bg-gray-300 rounded-t-xl items-center justify-center">
+          <Ionicons name="image-outline" size={48} color="#6b7280" />
+          <Text className="text-gray-600 text-sm mt-2">No photos uploaded yet</Text>
         </View>
         
         {/* Rating Badge */}
@@ -58,7 +74,7 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onPress }) => {
           </Text>
         </View>
 
-        {/* Price */}
+        {/* Price and Book Button */}
         <View className="flex-row items-center justify-between">
           <View>
             <Text className="text-orange-600 text-lg font-bold">
@@ -67,7 +83,10 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onPress }) => {
             <Text className="text-gray-500 text-xs">per hour</Text>
           </View>
           
-          <TouchableOpacity className="bg-green-600 px-4 py-2 rounded-lg">
+          <TouchableOpacity 
+            className="bg-green-600 px-4 py-2 rounded-lg"
+            onPress={handleBookNow}
+          >
             <Text className="text-white font-medium text-sm">Book Now</Text>
           </TouchableOpacity>
         </View>

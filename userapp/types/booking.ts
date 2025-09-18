@@ -1,11 +1,25 @@
 // types/booking.ts
-
 export interface Amenity {
   id: string;
   name: string;
   category: 'basic' | 'sports_equipment' | 'facilities' | 'services';
   icon?: string; // For UI display
   description?: string;
+}
+
+// Sport variety interface for different types/formats within a sport
+export interface SportVariety {
+  id: string;
+  name: string; // e.g., "6x6 Turf", "7x7 Turf", "Full Court", "Half Court"
+  description?: string; // Optional detailed description
+  specifications?: {
+    dimensions?: string; // e.g., "60ft x 40ft"
+    capacity?: number; // max players
+    surface?: string; // e.g., "Artificial Turf", "Concrete", "Wooden"
+    [key: string]: any; // Allow additional specifications
+  };
+  basePrice?: number; // Base price for this variety (can override sport base price)
+  isAvailable: boolean;
 }
 
 export interface SportDetail {
@@ -18,11 +32,15 @@ export interface Sport {
   id: string;
   name: string;
   category: 'indoor' | 'outdoor';
-  details?: SportDetail[]; // Array of sport-specific configurations
+  varieties: SportVariety[]; // Different formats/types available for this sport
+  details?: SportDetail[]; // Array of sport-specific configurations (kept for backward compatibility)
+  basePrice?: number; // Default base price for the sport
 }
 
 export interface TimeSlot {
   id: string;
+  sportId?: string; // Reference to Sport
+  sportVarietyId?: string; // Reference to specific SportVariety
   startTime: string; // HH:mm format
   endTime: string; // HH:mm format
   isAvailable: boolean;
@@ -48,7 +66,7 @@ export interface Venue {
     email?: string;
     whatsapp?: string;
   };
-  sports: Sport[]; // Multiple sports supported
+  sports: Sport[]; // Multiple sports supported with varieties
   amenities: Amenity[]; // Dynamic list of amenities
   images: string[]; // Array of image URLs
   rating: number;
@@ -78,6 +96,7 @@ export interface Event {
   description?: string;
   eventType: 'tournament' | 'practice' | 'friendly' | 'training' | 'league';
   sport: Sport;
+  sportVarietyId?: string; // Optional reference to specific sport variety for the event
   participationType: 'individual' | 'team';
   teamSize?: number; // Required if participationType is 'team'
   maxParticipants: number;
@@ -105,6 +124,8 @@ export interface Booking {
   id: string;
   userId: string;
   venueId: string;
+  sportId?: string; // Reference to booked sport
+  sportVarietyId?: string; // Reference to specific sport variety being booked
   eventId?: string; // Optional if it's an event booking
   bookingType: 'venue' | 'event';
   date: string; // YYYY-MM-DD format
@@ -123,7 +144,7 @@ export interface BookingState {
   events: Event[];
   bookings: Booking[];
   amenities: Amenity[]; // Master list of all possible amenities
-  sports: Sport[]; // Master list of all sports
+  sports: Sport[]; // Master list of all sports with varieties
   
   // Loading states
   isLoading: boolean;
@@ -149,6 +170,8 @@ export interface BookingState {
   getEventById: (id: string) => Event | undefined;
   getEventsByVenue: (venueId: string) => Event[];
   getVenuesBySport: (sportId: string) => Venue[];
+  getVenuesBySportVariety: (sportId: string, varietyId: string) => Venue[]; // New utility
+  getSportVarietiesBySport: (sportId: string) => SportVariety[]; // New utility
   
   // Filters
   searchVenues: (query: string, filters?: VenueFilters) => Venue[];
@@ -157,6 +180,7 @@ export interface BookingState {
 
 export interface VenueFilters {
   sports?: string[];
+  sportVarieties?: string[]; // New filter for sport varieties
   amenities?: string[];
   city?: string;
   priceRange?: {
@@ -172,6 +196,7 @@ export interface VenueFilters {
 
 export interface EventFilters {
   sports?: string[];
+  sportVarieties?: string[]; // New filter for sport varieties
   eventType?: string[];
   participationType?: 'individual' | 'team';
   dateRange?: {
@@ -184,3 +209,22 @@ export interface EventFilters {
   };
   city?: string;
 }
+
+// Helper types for better TypeScript support
+export interface BookingRequest {
+  venueId: string;
+  sportId?: string;
+  sportVarietyId?: string; // Specific variety being booked
+  timeSlotIds: string[];
+  customerInfo: {
+    name: string;
+    phone: string;
+    email?: string;
+  };
+  totalAmount: number;
+}
+
+// Helper type to get available varieties for a specific sport at a venue
+export type SportWithVarieties = Sport & {
+  availableVarieties: SportVariety[];
+};
