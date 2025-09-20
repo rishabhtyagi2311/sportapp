@@ -62,7 +62,7 @@ export default function AcademyTabsLayout() {
           tabBarActiveTintColor: "#111827",
           tabBarInactiveTintColor: "#6b7280",
           tabBarLabelStyle: { fontWeight: "600", textTransform: "none" },
-          tabBarStyle: { backgroundColor: "white" },
+          tabBarStyle: { pointerEvents: 'none',backgroundColor: "white" },
           tabBarIndicatorStyle: { backgroundColor: "#111827", height: 3 },
         }}
       >
