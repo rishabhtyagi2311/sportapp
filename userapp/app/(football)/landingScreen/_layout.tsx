@@ -15,57 +15,62 @@ export default function FootballLandingLayout() {
     
     return (
         <SafeAreaView className="flex-1 bg-white">
-            {/* Custom Header */}
-            <View className="bg-white px-4 py-3 flex-row items-center border-b border-gray-200">
+            {/* Enhanced Custom Header */}
+            <View className="bg-sky-100 px-4 py-4 flex-row items-center border-b-2 border-slate-700 shadow-lg">
                 <TouchableOpacity
                     onPress={() => {
                         console.log('🔙 Back button pressed - going directly to sports');
-                        // Use navigate to go directly to sports screen, bypassing tab history
                         router.navigate('/(homeScreenTabs)/sports');
                     }}
-                    className="mr-4"
+                    className="mr-4 p-2 rounded-full bg-slate-900/10"
                     activeOpacity={0.7}
                 >
-                    <Ionicons name="arrow-back" size={24} color="#111827" />
+                    <Ionicons name="arrow-back" size={24} color="#0f172a" />
                 </TouchableOpacity>
-                <Text className="text-xl font-bold text-gray-900">Football</Text>
+                <View className="flex-row items-center flex-1">
+                    
+                    <Text className="text-2xl font-bold text-slate-900">Football</Text>
+                </View>
             </View>
 
-            {/* Swipe-Only Tab Navigator - Clicks Disabled */}
+            {/* Enhanced Tab Navigator */}
             <Tabs
                 screenOptions={{
-                    tabBarActiveTintColor: "#111827",
-                    tabBarInactiveTintColor: "#6b7280",
+                    tabBarActiveTintColor: "#e0f2fe",
+                    tabBarInactiveTintColor: "#64748b",
                     tabBarLabelStyle: { 
-                        fontWeight: "600", 
+                        fontWeight: "700", 
                         textTransform: "none",
-                        fontSize: 14,
+                        fontSize: 15,
                         textAlign: 'center'
                     },
                     tabBarStyle: { 
-                        backgroundColor: "white",
+                        backgroundColor: "#0f172a",
                         elevation: 0,
                         shadowOpacity: 0,
-                        borderBottomWidth: 1,
-                        borderBottomColor: "#e5e7eb",
-                        height: 48,
-                        pointerEvents: 'none' // Disable all clicks on the entire tab bar
+                        borderBottomWidth: 0,
+                        height: 52,
+                        pointerEvents: 'none'
                     },
                     tabBarIndicatorStyle: { 
-                        backgroundColor: "#111827", 
-                        height: 3,
-                        borderRadius: 1.5,
-                        marginBottom: 0
+                        backgroundColor: "#87ceeb", 
+                        height: 4,
+                        borderRadius: 2,
+                        marginBottom: 0,
+                        shadowColor: "#87ceeb",
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.6,
+                        shadowRadius: 4,
                     },
-                    swipeEnabled: true, // Keep smooth swiping
+                    swipeEnabled: true,
                     
                     tabBarContentContainerStyle: {
                         alignItems: 'center',
                         justifyContent: 'center'
                     },
                     tabBarItemStyle: {
-                        paddingHorizontal: 16,
-                        paddingVertical: 12
+                        paddingHorizontal: 20,
+                        paddingVertical: 14
                     }
                 }}
                 initialRouteName="matches/index"

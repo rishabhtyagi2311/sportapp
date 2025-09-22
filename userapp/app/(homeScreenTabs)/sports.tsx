@@ -7,7 +7,7 @@ export default function SportsScreen() {
   
   const navigateToFootball = () => {
     console.log('🏈 Navigating to football matches...');
-    router.push('/(football)/matches'); // This will now work with the folder structure
+    router.push('/(football)/landingScreen'); 
   };
 
   return (

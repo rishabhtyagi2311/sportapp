@@ -2,14 +2,15 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 export default function TeamsScreen() {
   console.log('👥 Teams screen is rendering');
   
   const handleCreateTeam = () => {
-    console.log('➕ Create team button pressed');
-    // TODO: Navigate to create team screen
-    // router.push('/(football)/teams/create');
+    
+    router.push("./../../createNewTeam/basicDetail")
+   
   };
   
   return (
