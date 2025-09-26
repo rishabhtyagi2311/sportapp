@@ -7,7 +7,7 @@ export default function SportsScreen() {
   
   const navigateToFootball = () => {
     console.log('🏈 Navigating to football matches...');
-    router.push('/(football)/landingScreen'); 
+    router.push('/(football)/createFootballProfile'); 
   };
 
   return (

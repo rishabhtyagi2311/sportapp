@@ -1,4 +1,4 @@
-// app/(football)/teams/create.tsx
+// app/create-team.tsx
 import React, { useState } from "react";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import {
@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useFootballStore } from "@/store/footballTeamStore";
 
 export default function CreateTeamForm() {
   const [formData, setFormData] = useState({
@@ -19,6 +20,8 @@ export default function CreateTeamForm() {
     maxPlayers: "",
     city: "",
   });
+
+  const addTeam = useFootballStore((state) => state.addTeam); 
 
   const validateForm = () => {
     if (!formData.teamName.trim()) {
@@ -30,7 +33,10 @@ export default function CreateTeamForm() {
       return false;
     }
     if (isNaN(Number(formData.maxPlayers)) || Number(formData.maxPlayers) < 1) {
-      Alert.alert("Error", "Maximum players must be a valid number greater than 0");
+      Alert.alert(
+        "Error",
+        "Maximum players must be a valid number greater than 0"
+      );
       return false;
     }
     if (!formData.city.trim()) {
@@ -42,21 +48,21 @@ export default function CreateTeamForm() {
 
   const handleAddMembers = () => {
     if (!validateForm()) return;
-    
-    console.log("Team data:", formData);
-    // TODO: Save team data to store
-    
-    // Navigate to add members page
-    Alert.alert("Success", "Team created! Now add members.", [
-      {
-        text: "OK",
-        onPress: () => {
-          // TODO: Navigate to add members screen
-          // router.push('/(football)/teams/add-members');
-            router.push("./addTeamMembers")
-        }
-      }
-    ]);
+
+    const newTeam = addTeam({
+      teamName: formData.teamName.trim(),
+      maxPlayers: Number(formData.maxPlayers),
+      city: formData.city.trim(),
+      memberPlayerIds: [], // fresh team starts with no members
+      status: "active",
+      matchesPlayed: 0,
+      matchesWon: 0,
+      matchesLost: 0,
+      matchesDrawn: 0,
+    });
+
+    console.log("Team created and stored:", newTeam);
+    router.push("/(football)/landingScreen/teams");
   };
 
   return (
@@ -71,9 +77,7 @@ export default function CreateTeamForm() {
           >
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
-          <Text className="text-white text-xl font-bold">
-            Create New Team
-          </Text>
+          <Text className="text-white text-xl font-bold">Create New Team</Text>
         </View>
 
         {/* Form */}
@@ -150,15 +154,20 @@ export default function CreateTeamForm() {
             </View>
           </View>
 
-          {/* Team Info Card */}
+          {/* Info card */}
           <View className="bg-sky-100/20 rounded-xl p-4 border border-sky-100/30 mb-8">
             <View className="flex-row items-center mb-2">
-              <Ionicons name="information-circle-outline" size={20} color="white" />
-              <Text className="text-white font-semibold ml-2">Info</Text>
+              <Ionicons
+                name="information-circle-outline"
+                size={20}
+                color="white"
+              />
+              <Text className="text-white font-semibold ml-2">Team Info</Text>
             </View>
             <Text className="text-gray-300 text-sm leading-5">
-              After creating your team, you'll be able to add players, assign positions, 
-              and manage team details. You can always modify these settings later.
+              After creating your team, you'll be able to add registered players, assign
+              positions, and manage team details. You can always modify these
+              settings later.
             </Text>
           </View>
         </KeyboardAwareScrollView>
@@ -171,10 +180,9 @@ export default function CreateTeamForm() {
             activeOpacity={0.8}
           >
             <View className="flex-row items-center justify-center">
-              <Text className="text-black font-bold text-lg mr-6">
-                Add Team Members
+              <Text className="text-black font-bold text-lg mr-2">
+                Done 
               </Text>
-              <Ionicons name="person-add-outline" size={24} color="black" />
             </View>
           </TouchableOpacity>
         </View>

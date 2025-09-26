@@ -1,42 +1,60 @@
-// types/user.ts
-export interface User {
+// types/footballPlayer.ts
+export type FootballPosition = 
+  | 'Goalkeeper'
+  | 'Right Back'
+  | 'Left Back'
+  | 'Centre Back'
+  | 'Defensive Midfielder'
+  | 'Central Midfielder'
+  | 'Attacking Midfielder'
+  | 'Right Winger'
+  | 'Left Winger'
+  | 'Striker'
+  | 'Centre Forward';
+
+export interface FootballPlayerImage {
+  id: string;
+  uri: string;
+  type: string; // image/jpeg, image/png
+  fileName: string;
+  fileSize: number;
+}
+
+export interface FootballPlayer {
   id: string;
   name: string;
-  contactNumber: string;
-  email?: string;
+  position: FootballPosition;
   isRegistered: boolean;
-  profileImage?: string;
+  images: FootballPlayerImage[]; // Up to 3 images (optional)
+  profileImage?: string; // Main profile image URI
   createdAt: string;
   updatedAt: string;
+  contact?:string;
+  // Optional football-specific fields
+  preferredFoot?: 'Left' | 'Right' | 'Both';
+  experience?: 'Beginner' | 'Intermediate' | 'Advanced' | 'Professional';
+  // Removed fields: contactNumber, email, jerseyNumber, height, weight
 }
 
-export interface ContactFromPhone {
-  id: string;
+export interface FootballPlayerFormData {
   name: string;
-  phoneNumbers: string[];
-  isRegistered?: boolean;
+  position: FootballPosition | '';
+  images: FootballPlayerImage[];
+  preferredFoot: 'Left' | 'Right' | 'Both' | '';
+  experience: 'Beginner' | 'Intermediate' | 'Advanced' | 'Professional' | '';
+  // Removed fields: contactNumber, email, jerseyNumber, height, weight
 }
 
-export interface TeamMember {
-  userId?: string; // For registered users
-  name: string;
-  contactNumber: string;
-  isRegistered: boolean;
-  invitedAt?: string;
-  joinedAt?: string;
-  position?: string; // Player position (optional)
-}
-
-export interface UserState {
-  users: User[];
+export interface FootballPlayerState {
+  players: FootballPlayer[];
   isLoading: boolean;
   error: string | null;
-  searchResults: User[];
   
   // Actions
-  setUsers: (users: User[]) => void;
-  addUser: (user: User) => void;
-  searchUsers: (query: string) => User[];
-  getUserByContact: (contactNumber: string) => User | undefined;
-  fetchUsers: () => Promise<void>;
+  setPlayers: (players: FootballPlayer[]) => void;
+  addPlayer: (player: FootballPlayer) => void;
+  updatePlayer: (id: string, player: Partial<FootballPlayer>) => void;
+  deletePlayer: (id: string) => void;
+  getPlayerById: (id: string) => FootballPlayer | undefined;
+  getPlayersByPosition: (position: FootballPosition) => FootballPlayer[];
 }

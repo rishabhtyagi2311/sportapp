@@ -1,4 +1,4 @@
-// app/add-members.tsx
+// app/(football)/teams/addMembers.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -15,23 +15,42 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Contacts from 'expo-contacts';
-import { useUserStore } from '@/store/addingFootballMemberStore';
-import { User, TeamMember } from '@/types/addingMemberTypes';
+import { useFootballStore } from '@/store/footballTeamStore';
+import { FootballPlayer } from '@/types/addingMemberTypes';
+
+// Extended TeamMember interface to handle both registered and invited members
+interface TeamMember {
+  playerId?: string; // For registered football players
+  name: string;
+  contact?: string; // For contact-based invites
+  isRegistered: boolean;
+  position?: string;
+  invitedAt?: string;
+  joinedAt?: string;
+}
 
 export default function AddMembersScreen() {
-  const { users, isLoading, fetchUsers } = useUserStore();
+  const { teamId } = useLocalSearchParams();
+  const { 
+    getTeamById, 
+    getAllPlayers, 
+    getAvailablePlayersForTeam, 
+    addPlayerToTeam,
+    isLoading: storeLoading 
+  } = useFootballStore();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<TeamMember[]>([]);
-  const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [pendingContact, setPendingContact] = useState<{name: string; contactNumber: string} | null>(null);
+  const [searchResults, setSearchResults] = useState<FootballPlayer[]>([]);
+  const [pendingContact, setPendingContact] = useState<{name: string; contact: string} | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Load users when component mounts
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  // Get team and available players
+  const team = teamId ? getTeamById(teamId as string) : null;
+  const allPlayers = getAllPlayers();
+  const availableRegisteredPlayers = teamId ? getAvailablePlayersForTeam(teamId as string) : [];
 
   // Handle search with proper filtering
   useEffect(() => {
@@ -44,44 +63,57 @@ export default function AddMembersScreen() {
       const searchTerm = searchQuery.toLowerCase().trim();
       const normalizedQuery = searchQuery.replace(/\D/g, '');
 
-      const results = users.filter(user => {
-        const nameMatch = user.name.toLowerCase().includes(searchTerm);
-        const phoneMatch = user.contactNumber.replace(/\D/g, '').includes(normalizedQuery);
+      const results = allPlayers.filter(player => {
+        const nameMatch = player.name.toLowerCase().includes(searchTerm);
+        const positionMatch = player.position.toLowerCase().includes(searchTerm);
+        // Search by contact number if player has one
+        const contactMatch = player.contact ? 
+          player.contact.replace(/\D/g, '').includes(normalizedQuery) : false;
         
-        return nameMatch || phoneMatch;
+        return nameMatch || positionMatch || contactMatch;
       });
 
       setSearchResults(results);
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, users]);
+  }, [searchQuery]);
 
-  // Add member to team
+  // Add member to team (can be registered player or invited contact)
   const addMember = (member: TeamMember) => {
-    const exists = selectedMembers.find(m => m.contactNumber === member.contactNumber);
+    const identifier = member.playerId || member.contact || member.name;
+    const exists = selectedMembers.find(m => 
+      (m.playerId && m.playerId === member.playerId) ||
+      (m.contact && m.contact === member.contact) ||
+      m.name === member.name
+    );
+    
     if (!exists) {
       setSelectedMembers(prev => [...prev, member]);
       setSearchQuery('');
       setSearchResults([]);
-      console.log('Member added:', member); // Debug log
+      console.log('Member added:', member);
     } else {
       Alert.alert('Already Added', 'This member is already in your team.');
     }
   };
 
   // Remove member from team
-  const removeMember = (contactNumber: string) => {
-    setSelectedMembers(prev => prev.filter(m => m.contactNumber !== contactNumber));
+  const removeMember = (identifier: string) => {
+    setSelectedMembers(prev => prev.filter(m => 
+      m.playerId !== identifier && 
+      m.contact !== identifier && 
+      m.name !== identifier
+    ));
   };
 
-  // Handle registered user selection
-  const selectRegisteredUser = (user: User) => {
+  // Handle registered player selection
+  const selectRegisteredPlayer = (player: FootballPlayer) => {
     const teamMember: TeamMember = {
-      userId: user.id,
-      name: user.name,
-      contactNumber: user.contactNumber,
+      playerId: player.id,
+      name: player.name,
       isRegistered: true,
+      position: player.position,
       joinedAt: new Date().toISOString(),
     };
     addMember(teamMember);
@@ -134,21 +166,32 @@ export default function AddMembersScreen() {
 
     const normalizedNumber = phoneNumber.replace(/\D/g, '');
     
-    // Check if user is already registered
-    const registeredUser = users.find(user => 
-      user.contactNumber.replace(/\D/g, '') === normalizedNumber
+    // Check if user is already registered (by name or contact number if available)
+    const registeredPlayer = allPlayers.find(player => 
+      player.name.toLowerCase().trim() === contactName.toLowerCase().trim() ||
+      (player.contact && player.contact.replace(/\D/g, '') === normalizedNumber)
     );
     
-    if (registeredUser) {
-      // Show registered user for confirmation
+    if (registeredPlayer) {
+      // If player doesn't have contact number, add it to their profile
+      if (!registeredPlayer.contact) {
+        const { updatePlayer } = useFootballStore.getState();
+        updatePlayer(registeredPlayer.id, { contact: phoneNumber });
+      }
+      
+      // Show registered player for confirmation
       setPendingContact(null);
-      setSearchResults([registeredUser]);
+      setSearchResults([registeredPlayer]);
       setSearchQuery(contactName);
+      Alert.alert(
+        'Registered Player Found', 
+        `${contactName} is already registered! You can add them directly to the team.`
+      );
     } else {
       // Show unregistered contact for invite/cancel options
       setPendingContact({
         name: contactName,
-        contactNumber: normalizedNumber
+        contact: normalizedNumber
       });
       setSearchResults([]);
       setSearchQuery('');
@@ -160,23 +203,23 @@ export default function AddMembersScreen() {
     if (!pendingContact) return;
 
     try {
-      const message = `Hi ${pendingContact.name}! You've been invited to join our football team. Download our app to get started: https://yourapp.com/download`;
+      const message = `Hi ${pendingContact.name}! You've been invited to join our football team "${team?.teamName}". Download our app to register as a player and join: https://yourapp.com/download`;
       const encodedMessage = encodeURIComponent(message);
-      const whatsappUrl = `whatsapp://send?phone=91${pendingContact.contactNumber}&text=${encodedMessage}`;
+      const whatsappUrl = `whatsapp://send?phone=91${pendingContact.contact}&text=${encodedMessage}`;
       
       const canOpenWhatsApp = await Linking.canOpenURL(whatsappUrl);
       
       if (canOpenWhatsApp) {
         await Linking.openURL(whatsappUrl);
       } else {
-        const webWhatsappUrl = `https://wa.me/91${pendingContact.contactNumber}?text=${encodedMessage}`;
+        const webWhatsappUrl = `https://wa.me/91${pendingContact.contact}?text=${encodedMessage}`;
         await Linking.openURL(webWhatsappUrl);
       }
       
       // Add to team as invited member
       const teamMember: TeamMember = {
         name: pendingContact.name,
-        contactNumber: pendingContact.contactNumber,
+        contact: pendingContact.contact,
         isRegistered: false,
         invitedAt: new Date().toISOString(),
       };
@@ -187,7 +230,7 @@ export default function AddMembersScreen() {
       // Still add the member even if WhatsApp fails
       const teamMember: TeamMember = {
         name: pendingContact.name,
-        contactNumber: pendingContact.contactNumber,
+        contact: pendingContact.contact,
         isRegistered: false,
         invitedAt: new Date().toISOString(),
       };
@@ -208,26 +251,104 @@ export default function AddMembersScreen() {
       return;
     }
 
+    if (!team || !teamId) {
+      Alert.alert('Error', 'Team not found.');
+      return;
+    }
+
+    // Check team capacity
+    const registeredMembers = selectedMembers.filter(m => m.isRegistered);
+    const currentMemberCount = team.memberPlayerIds.length;
+    const newTotalMembers = currentMemberCount + registeredMembers.length;
+    
+    if (newTotalMembers > team.maxPlayers) {
+      Alert.alert(
+        'Team Capacity Exceeded', 
+        `Adding ${registeredMembers.length} registered players would exceed the team limit of ${team.maxPlayers}. Current members: ${currentMemberCount}`
+      );
+      return;
+    }
+
+    // Add registered players to the team using store methods
+    registeredMembers.forEach(member => {
+      if (member.playerId) {
+        addPlayerToTeam(teamId as string, member.playerId);
+      }
+    });
+
+    // Note: Invited (non-registered) members are tracked separately for now
+    // You might want to extend your store to handle invited members as well
+    
+    const registeredCount = registeredMembers.length;
+    const invitedCount = selectedMembers.length - registeredCount;
+    
+    let message = '';
+    if (registeredCount > 0 && invitedCount > 0) {
+      message = `${registeredCount} registered player${registeredCount > 1 ? 's' : ''} added to team and ${invitedCount} invitation${invitedCount > 1 ? 's' : ''} sent!`;
+    } else if (registeredCount > 0) {
+      message = `${registeredCount} registered player${registeredCount > 1 ? 's' : ''} added to ${team.teamName}!`;
+    } else {
+      message = `${invitedCount} invitation${invitedCount > 1 ? 's' : ''} sent!`;
+    }
+
     console.log('Team members to save:', selectedMembers);
-    Alert.alert('Success', 'Team members added successfully!', [
+    Alert.alert('Success', message, [
       { text: 'OK', onPress: () => router.back() }
     ]);
   };
 
-  const renderSearchResult = ({ item }: { item: User }) => (
+  // Handle case where team is not found
+  if (!team) {
+    return (
+      <SafeAreaView className="flex-1 bg-white">
+        <View className="flex-1 justify-center items-center px-4">
+          <View className="items-center">
+            <View className="w-20 h-20 bg-red-100 rounded-full justify-center items-center mb-4">
+              <Ionicons name="alert-circle-outline" size={32} color="#ef4444" />
+            </View>
+            
+            <Text className="text-lg font-semibold text-gray-900 mb-2 text-center">
+              Team Not Found
+            </Text>
+            <Text className="text-gray-600 text-center leading-6 max-w-sm mb-6">
+              The team you're trying to add members to doesn't exist.
+            </Text>
+            
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="bg-slate-900 rounded-xl py-3 px-6"
+              activeOpacity={0.8}
+            >
+              <Text className="text-white font-semibold">Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const renderSearchResult = ({ item }: { item: FootballPlayer }) => (
     <TouchableOpacity
-      onPress={() => selectRegisteredUser(item)}
+      onPress={() => selectRegisteredPlayer(item)}
       className="flex-row items-center p-4 border-b border-gray-200"
       activeOpacity={0.7}
     >
-      <View className="w-12 h-12 bg-blue-100 rounded-full items-center justify-center mr-3">
-        <Text className="text-blue-600 font-bold text-lg">
-          {item.name.charAt(0).toUpperCase()}
-        </Text>
+      <View className="w-12 h-12 bg-slate-200 rounded-full items-center justify-center mr-3">
+        {item.profileImage ? (
+          <Ionicons name="person" size={24} color="#64748b" />
+        ) : (
+          <Ionicons name="person-outline" size={24} color="#64748b" />
+        )}
       </View>
       <View className="flex-1">
         <Text className="text-gray-900 font-semibold text-base">{item.name}</Text>
-        <Text className="text-gray-600 text-sm">{item.contactNumber}</Text>
+        <Text className="text-gray-600 text-sm">{item.position}</Text>
+        {item.contact && (
+          <Text className="text-gray-500 text-xs mt-1">{item.contact}</Text>
+        )}
+        {item.experience && (
+          <Text className="text-gray-500 text-xs">{item.experience} level</Text>
+        )}
       </View>
       <View className="w-6 h-6 bg-green-500 rounded-full items-center justify-center">
         <Ionicons name="checkmark" size={16} color="white" />
@@ -235,19 +356,21 @@ export default function AddMembersScreen() {
     </TouchableOpacity>
   );
 
-  const renderSelectedMember = ({ item }: { item: TeamMember }) => (
-    <View className="flex-row items-center p-3 bg-green-50 rounded-lg mb-2 mx-4">
+  const renderSelectedMember = (member: TeamMember) => (
+    <View key={member.playerId || member.contact || member.name} className="flex-row items-center p-3 bg-green-50 rounded-lg mb-2 mx-4">
       <View className="w-10 h-10 bg-green-100 rounded-full items-center justify-center mr-3">
         <Text className="text-green-600 font-bold">
-          {item.name.charAt(0).toUpperCase()}
+          {member.name.charAt(0).toUpperCase()}
         </Text>
       </View>
       <View className="flex-1">
-        <Text className="text-gray-900 font-semibold">{item.name}</Text>
-        <Text className="text-gray-600 text-xs">{item.contactNumber}</Text>
+        <Text className="text-gray-900 font-semibold">{member.name}</Text>
+        <Text className="text-gray-600 text-xs">
+          {member.position || member.contact || 'Invited member'}
+        </Text>
       </View>
       <View className="flex-row items-center">
-        {item.isRegistered ? (
+        {member.isRegistered ? (
           <View className="bg-green-500 px-2 py-1 rounded mr-2">
             <Text className="text-white text-xs font-semibold">Registered</Text>
           </View>
@@ -257,7 +380,7 @@ export default function AddMembersScreen() {
           </View>
         )}
         <TouchableOpacity
-          onPress={() => removeMember(item.contactNumber)}
+          onPress={() => removeMember(member.playerId || member.contact || member.name)}
           className="w-6 h-6 bg-red-500 rounded-full items-center justify-center"
         >
           <Ionicons name="close" size={14} color="white" />
@@ -275,29 +398,33 @@ export default function AddMembersScreen() {
         <View className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
           <View className="flex-row items-center mb-3">
             <View className="w-12 h-12 bg-yellow-100 rounded-full items-center justify-center mr-3">
-              <Text className="text-yellow-600 font-bold text-lg">
-                {pendingContact.name.charAt(0).toUpperCase()}
-              </Text>
+              <Ionicons name="person-add-outline" size={24} color="#d97706" />
             </View>
             <View className="flex-1">
               <Text className="text-gray-900 font-semibold text-base">{pendingContact.name}</Text>
-              <Text className="text-gray-600 text-sm">{pendingContact.contactNumber}</Text>
+              <Text className="text-gray-600 text-sm">{pendingContact.contact}</Text>
+            </View>
+            <View className="bg-yellow-100 px-2 py-1 rounded-full">
+              <Text className="text-yellow-700 text-xs font-medium">Not Registered</Text>
             </View>
           </View>
           
           <View className="bg-yellow-100 rounded-lg p-3 mb-4">
-            <Text className="text-yellow-800 font-semibold text-center">
-              User not registered in app
-            </Text>
-            <Text className="text-yellow-700 text-sm text-center mt-1">
-              Send an invite to join your team or cancel selection
+            <View className="flex-row items-center justify-center mb-2">
+              <Ionicons name="information-circle" size={16} color="#d97706" />
+              <Text className="text-yellow-800 font-semibold ml-2">
+                Player not found in registered list
+              </Text>
+            </View>
+            <Text className="text-yellow-700 text-sm text-center">
+              Send an invitation to join your football team and register as a player
             </Text>
           </View>
 
           <View className="flex-row space-x-3">
             <TouchableOpacity
               onPress={handleInviteContact}
-              className="flex-1 bg-green-500 rounded-lg py-3"
+              className="flex-1 bg-green-500 rounded-xl py-3"
               activeOpacity={0.8}
             >
               <View className="flex-row items-center justify-center">
@@ -308,7 +435,7 @@ export default function AddMembersScreen() {
             
             <TouchableOpacity
               onPress={handleCancelContact}
-              className="flex-1 bg-gray-500 rounded-lg py-3"
+              className="flex-1 bg-gray-400 rounded-xl py-3"
               activeOpacity={0.8}
             >
               <View className="flex-row items-center justify-center">
@@ -334,21 +461,32 @@ export default function AddMembersScreen() {
           >
             <Ionicons name="arrow-back" size={24} color="#0f172a" />
           </TouchableOpacity>
-          <Text className="text-xl font-bold text-slate-900">Add Team Members</Text>
+          <View className="flex-1">
+            <Text className="text-xl font-bold text-slate-900">Add Team Members</Text>
+            <Text className="text-sm text-slate-700 mt-1">{team.teamName}</Text>
+          </View>
+          {/* Team capacity info */}
+          <View className="bg-slate-200 px-3 py-1 rounded-full">
+            <Text className="text-slate-700 text-sm font-medium">
+              {team.memberPlayerIds.length}/{team.maxPlayers}
+            </Text>
+          </View>
         </View>
 
         {/* Main Content */}
         <View className="flex-1">
           {/* Search Section */}
           <View className="p-4">
-            <Text className="text-gray-700 font-semibold mb-3">Search by name or phone number</Text>
+            <Text className="text-gray-700 font-semibold mb-3">
+              Search registered players or add from contacts
+            </Text>
             
             <View className="flex-row mb-4">
               <View className="flex-1 bg-gray-100 rounded-xl border border-gray-200 flex-row items-center px-4 mr-3">
                 <Ionicons name="search" size={20} color="#6b7280" />
                 <TextInput
                   className="flex-1 py-3 px-3 text-base text-gray-900"
-                  placeholder="Enter name or phone number"
+                  placeholder="Enter name or position"
                   placeholderTextColor="#6b7280"
                   value={searchQuery}
                   onChangeText={setSearchQuery}
@@ -371,7 +509,7 @@ export default function AddMembersScreen() {
               </TouchableOpacity>
             </View>
 
-            {isLoading && (
+            {(isLoading || storeLoading) && (
               <View className="items-center py-4">
                 <ActivityIndicator size="small" color="#3b82f6" />
               </View>
@@ -384,7 +522,9 @@ export default function AddMembersScreen() {
           {/* Search Results */}
           {searchResults.length > 0 && !pendingContact && (
             <View className="flex-1">
-              <Text className="text-gray-700 font-semibold px-4 mb-2">Search Results</Text>
+              <Text className="text-gray-700 font-semibold px-4 mb-2">
+                Registered Players ({searchResults.length})
+              </Text>
               <FlatList
                 data={searchResults}
                 renderItem={renderSearchResult}
@@ -399,10 +539,27 @@ export default function AddMembersScreen() {
           {searchQuery.length > 0 && searchResults.length === 0 && !isLoading && !pendingContact && (
             <View className="flex-1 items-center justify-center p-8">
               <Ionicons name="search" size={48} color="#9ca3af" />
-              <Text className="text-gray-500 text-lg font-semibold mt-4">No results found</Text>
+              <Text className="text-gray-500 text-lg font-semibold mt-4">No registered players found</Text>
               <Text className="text-gray-400 text-center mt-2">
-                Try searching with a different name or phone number
+                Try searching with a different name or position, or use contacts to invite new players
               </Text>
+            </View>
+          )}
+
+          {/* Show all registered players when not searching */}
+          {searchQuery.length === 0 && !pendingContact && (
+            <View className="flex-1">
+              <Text className="text-gray-700 font-semibold px-4 mb-2">
+                All Registered Players ({allPlayers.length})
+              </Text>
+              <FlatList
+                data={allPlayers}
+                renderItem={renderSearchResult}
+                keyExtractor={(item) => item.id}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: selectedMembers.length > 0 ? 200 : 20 }}
+              />
             </View>
           )}
         </View>
@@ -418,36 +575,7 @@ export default function AddMembersScreen() {
               showsVerticalScrollIndicator={true}
               contentContainerStyle={{ paddingVertical: 8 }}
             >
-              {selectedMembers.map((member) => (
-                <View key={member.contactNumber} className="flex-row items-center p-3 bg-green-50 rounded-lg mb-2 mx-4">
-                  <View className="w-10 h-10 bg-green-100 rounded-full items-center justify-center mr-3">
-                    <Text className="text-green-600 font-bold">
-                      {member.name.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-gray-900 font-semibold">{member.name}</Text>
-                    <Text className="text-gray-600 text-xs">{member.contactNumber}</Text>
-                  </View>
-                  <View className="flex-row items-center">
-                    {member.isRegistered ? (
-                      <View className="bg-green-500 px-2 py-1 rounded mr-2">
-                        <Text className="text-white text-xs font-semibold">Registered</Text>
-                      </View>
-                    ) : (
-                      <View className="bg-orange-500 px-2 py-1 rounded mr-2">
-                        <Text className="text-white text-xs font-semibold">Invited</Text>
-                      </View>
-                    )}
-                    <TouchableOpacity
-                      onPress={() => removeMember(member.contactNumber)}
-                      className="w-6 h-6 bg-red-500 rounded-full items-center justify-center"
-                    >
-                      <Ionicons name="close" size={14} color="white" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
+              {selectedMembers.map(member => renderSelectedMember(member))}
             </ScrollView>
           </View>
         )}
@@ -457,7 +585,7 @@ export default function AddMembersScreen() {
           <View className="p-4 bg-white border-t border-gray-200">
             <TouchableOpacity
               onPress={saveTeamMembers}
-              className="bg-blue-600 rounded-xl py-4"
+              className="bg-slate-900 rounded-xl py-4"
               activeOpacity={0.8}
             >
               <Text className="text-white font-bold text-center text-lg">
