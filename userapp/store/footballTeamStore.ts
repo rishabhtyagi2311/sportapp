@@ -97,13 +97,273 @@ const generateId = (prefix: string): string => {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
 
+// Dummy data generation
+const generateDummyPlayers = (): FootballPlayer[] => {
+  const players: FootballPlayer[] = [
+    {
+      id: 'player_1',
+      name: 'Marcus Silva',
+      position: 'Goalkeeper',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+      preferredFoot: 'Right',
+      experience: 'Advanced',
+      contact: '+91 9876543210'
+    },
+    {
+      id: 'player_2',
+      name: 'Ahmed Khan',
+      position: 'Centre Back',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-01-16T11:00:00Z',
+      updatedAt: '2024-01-16T11:00:00Z',
+      preferredFoot: 'Left',
+      experience: 'Professional',
+      contact: '+91 9876543211'
+    },
+    {
+      id: 'player_3',
+      name: 'Rajesh Patel',
+      position: 'Central Midfielder',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-01-17T12:00:00Z',
+      updatedAt: '2024-01-17T12:00:00Z',
+      preferredFoot: 'Both',
+      experience: 'Intermediate',
+      contact: '+91 9876543212'
+    },
+    {
+      id: 'player_4',
+      name: 'David Rodriguez',
+      position: 'Striker',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-01-18T13:00:00Z',
+      updatedAt: '2024-01-18T13:00:00Z',
+      preferredFoot: 'Right',
+      experience: 'Advanced',
+      contact: '+91 9876543213'
+    },
+    {
+      id: 'player_5',
+      name: 'Arjun Sharma',
+      position: 'Right Winger',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-01-19T14:00:00Z',
+      updatedAt: '2024-01-19T14:00:00Z',
+      preferredFoot: 'Right',
+      experience: 'Beginner',
+      contact: '+91 9876543214'
+    },
+    {
+      id: 'player_6',
+      name: 'Mohammed Ali',
+      position: 'Left Back',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-01-20T15:00:00Z',
+      updatedAt: '2024-01-20T15:00:00Z',
+      preferredFoot: 'Left',
+      experience: 'Intermediate',
+      contact: '+91 9876543215'
+    },
+    {
+      id: 'player_7',
+      name: 'Vikram Singh',
+      position: 'Attacking Midfielder',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-01-21T16:00:00Z',
+      updatedAt: '2024-01-21T16:00:00Z',
+      preferredFoot: 'Right',
+      experience: 'Advanced',
+      contact: '+91 9876543216'
+    },
+    {
+      id: 'player_8',
+      name: 'Carlos Santos',
+      position: 'Centre Back',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-01-22T17:00:00Z',
+      updatedAt: '2024-01-22T17:00:00Z',
+      preferredFoot: 'Right',
+      experience: 'Professional',
+      contact: '+91 9876543217'
+    },
+    {
+      id: 'player_9',
+      name: 'Rohit Kumar',
+      position: 'Defensive Midfielder',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-01-23T18:00:00Z',
+      updatedAt: '2024-01-23T18:00:00Z',
+      preferredFoot: 'Both',
+      experience: 'Intermediate',
+      contact: '+91 9876543218'
+    },
+    {
+      id: 'player_10',
+      name: 'Gabriel Martinez',
+      position: 'Left Winger',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-01-24T19:00:00Z',
+      updatedAt: '2024-01-24T19:00:00Z',
+      preferredFoot: 'Left',
+      experience: 'Advanced',
+      contact: '+91 9876543219'
+    },
+    {
+      id: 'player_11',
+      name: 'Sanjay Gupta',
+      position: 'Right Back',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-01-25T20:00:00Z',
+      updatedAt: '2024-01-25T20:00:00Z',
+      preferredFoot: 'Right',
+      experience: 'Beginner',
+      contact: '+91 9876543220'
+    },
+    {
+      id: 'player_12',
+      name: 'Alex Johnson',
+      position: 'Centre Forward',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-01-26T21:00:00Z',
+      updatedAt: '2024-01-26T21:00:00Z',
+      preferredFoot: 'Right',
+      experience: 'Professional',
+      contact: '+91 9876543221'
+    },
+    // Additional unassigned players
+    {
+      id: 'player_13',
+      name: 'Kiran Joshi',
+      position: 'Goalkeeper',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-02-01T10:00:00Z',
+      updatedAt: '2024-02-01T10:00:00Z',
+      preferredFoot: 'Right',
+      experience: 'Intermediate',
+      contact: '+91 9876543222'
+    },
+    {
+      id: 'player_14',
+      name: 'Lucas Brown',
+      position: 'Striker',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-02-02T11:00:00Z',
+      updatedAt: '2024-02-02T11:00:00Z',
+      preferredFoot: 'Left',
+      experience: 'Advanced',
+      contact: '+91 9876543223'
+    },
+    {
+      id: 'player_15',
+      name: 'Priya Nair',
+      position: 'Central Midfielder',
+      isRegistered: true,
+      images: [],
+      createdAt: '2024-02-03T12:00:00Z',
+      updatedAt: '2024-02-03T12:00:00Z',
+      preferredFoot: 'Both',
+      experience: 'Beginner',
+      contact: '+91 9876543224'
+    }
+  ];
+  
+  return players;
+};
+
+const generateDummyTeams = (): Team[] => {
+  const teams: Team[] = [
+    {
+      id: 'team_1',
+      teamName: 'Mumbai Warriors',
+      maxPlayers: 11,
+      city: 'Mumbai',
+      memberPlayerIds: ['player_1', 'player_2', 'player_3', 'player_4', 'player_5'],
+      createdAt: '2024-01-10T09:00:00Z',
+      updatedAt: '2024-01-25T15:30:00Z',
+      status: 'active',
+      description: 'Elite football team from Mumbai',
+      matchesPlayed: 8,
+      matchesWon: 5,
+      matchesLost: 2,
+      matchesDrawn: 1,
+      achievements: ['City Championship 2023', 'Regional Cup Winner']
+    },
+    {
+      id: 'team_2',
+      teamName: 'Delhi Thunder',
+      maxPlayers: 15,
+      city: 'Delhi',
+      memberPlayerIds: ['player_6', 'player_7', 'player_8', 'player_9'],
+      createdAt: '2024-01-12T10:30:00Z',
+      updatedAt: '2024-01-26T16:45:00Z',
+      status: 'active',
+      description: 'Professional football club from Delhi',
+      matchesPlayed: 6,
+      matchesWon: 4,
+      matchesLost: 1,
+      matchesDrawn: 1,
+      achievements: ['State League Runner-up']
+    },
+    {
+      id: 'team_3',
+      teamName: 'Bangalore United',
+      maxPlayers: 12,
+      city: 'Bangalore',
+      memberPlayerIds: ['player_10', 'player_11', 'player_12'],
+      createdAt: '2024-01-14T11:15:00Z',
+      updatedAt: '2024-01-27T17:20:00Z',
+      status: 'active',
+      description: 'Tech city\'s premier football team',
+      matchesPlayed: 4,
+      matchesWon: 2,
+      matchesLost: 1,
+      matchesDrawn: 1,
+      achievements: ['Inter-Corporate Championship']
+    },
+    {
+      id: 'team_4',
+      teamName: 'Chennai Strikers',
+      maxPlayers: 16,
+      city: 'Chennai',
+      memberPlayerIds: [],
+      createdAt: '2024-02-01T14:00:00Z',
+      updatedAt: '2024-02-01T14:00:00Z',
+      status: 'active',
+      description: 'Newly formed team looking for players',
+      matchesPlayed: 0,
+      matchesWon: 0,
+      matchesLost: 0,
+      matchesDrawn: 0,
+      achievements: []
+    }
+  ];
+  
+  return teams;
+};
+
 // Create the unified football store
 export const useFootballStore = create<FootballState>()(
   devtools(
     immer((set, get) => ({
-      // Initial state
-      players: [],
-      teams: [],
+      // Initial state with dummy data
+      players: generateDummyPlayers(),
+      teams: generateDummyTeams(),
       currentTeam: null,
       isLoading: false,
       error: null,

@@ -140,9 +140,9 @@ export default function TeamsScreen() {
       ) : (
         <>
           {/* Header */}
-          <View className="px-4 py-4 border-b border-gray-100">
-            <View className="flex-row items-center justify-between">
-              <View>
+          <View className="px-4 -mt-4 border-b border-gray-100">
+            <View className="flex-row items-center justify-between ">
+              <View >
                 <Text className="text-2xl font-bold text-gray-900">My Teams</Text>
                 <Text className="text-gray-600 text-sm">
                   {teams.length} {teams.length === 1 ? 'team' : 'teams'} created
@@ -176,7 +176,7 @@ export default function TeamsScreen() {
       {/* Floating Create Button */}
       <TouchableOpacity
         onPress={handleCreateTeam}
-        className="absolute bottom-6 right-6 w-14 h-14 bg-slate-900 rounded-full justify-center items-center shadow-lg"
+        className="absolute bottom-6 right-6 w-14 h-14 bg-sky-100 rounded-full justify-center items-center shadow-lg"
         activeOpacity={0.8}
         style={{
           elevation: 8,
@@ -186,7 +186,7 @@ export default function TeamsScreen() {
           shadowRadius: 6,
         }}
       >
-        <Ionicons name="add" size={28} color="white" />
+        <Ionicons name="add" size={28} color="black" />
       </TouchableOpacity>
     </SafeAreaView>
   );

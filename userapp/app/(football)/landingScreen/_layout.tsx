@@ -16,27 +16,27 @@ export default function FootballLandingLayout() {
     return (
         <SafeAreaView className="flex-1 bg-white">
             {/* Enhanced Custom Header */}
-            <View className="bg-sky-100 px-4 py-4 flex-row items-center border-b-2 border-slate-700 shadow-lg">
+            <View className="bg-slate-900 px-4 py-4 flex-row items-center border-b-2 border-slate-700 shadow-lg">
                 <TouchableOpacity
                     onPress={() => {
-                        console.log('🔙 Back button pressed - going directly to sports');
+
                         router.navigate('/(homeScreenTabs)/sports');
                     }}
-                    className="mr-4 p-2 rounded-full bg-slate-900/10"
+                    className="mr-4 p-2 rounded-full bg-sky-100"
                     activeOpacity={0.7}
                 >
                     <Ionicons name="arrow-back" size={24} color="#0f172a" />
                 </TouchableOpacity>
                 <View className="flex-row items-center flex-1">
                     
-                    <Text className="text-2xl font-bold text-slate-900">Football</Text>
+                    <Text className="text-2xl font-bold text-white">Football</Text>
                 </View>
             </View>
 
             {/* Enhanced Tab Navigator */}
             <Tabs
                 screenOptions={{
-                    tabBarActiveTintColor: "#e0f2fe",
+                    tabBarActiveTintColor: "#0f172a",
                     tabBarInactiveTintColor: "#64748b",
                     tabBarLabelStyle: { 
                         fontWeight: "700", 
@@ -45,7 +45,7 @@ export default function FootballLandingLayout() {
                         textAlign: 'center'
                     },
                     tabBarStyle: { 
-                        backgroundColor: "#0f172a",
+                        backgroundColor: "#e0f2fe",
                         elevation: 0,
                         shadowOpacity: 0,
                         borderBottomWidth: 0,
@@ -53,11 +53,11 @@ export default function FootballLandingLayout() {
                         pointerEvents: 'none'
                     },
                     tabBarIndicatorStyle: { 
-                        backgroundColor: "#87ceeb", 
+                        backgroundColor: "#0f172a", 
                         height: 4,
                         borderRadius: 2,
                         marginBottom: 0,
-                        shadowColor: "#87ceeb",
+                        shadowColor: "#0f172a",
                         shadowOffset: { width: 0, height: 2 },
                         shadowOpacity: 0.6,
                         shadowRadius: 4,
