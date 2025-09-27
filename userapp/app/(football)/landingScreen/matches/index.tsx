@@ -2,13 +2,14 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 
 export default function MatchesScreen() {
+  const router = useRouter()
   console.log('⚽ Matches screen is rendering');
   
   const handleCreateMatch = () => {
-    router.push("/(football)/matches/createMatch");
+    router.push("/(football)/startMatch/selectTeams");
   };
   
   // Empty State Component
