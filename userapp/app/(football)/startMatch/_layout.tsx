@@ -1,4 +1,4 @@
-// app/(football)/matches/_layout.tsx
+
 import { Stack } from 'expo-router';
 
 export default function MatchesLayout() {
@@ -26,30 +26,7 @@ export default function MatchesLayout() {
         }}
       />
     
-      {/* <Stack.Screen
-        name="createMatch"
-        options={{
-          title: 'Create Match',
-          headerShown: false,
-          presentation: 'modal',
-        }}
-      />
-      
-      <Stack.Screen
-        name="matchDetails"
-        options={{
-          title: 'Match Details',
-          headerShown: false,
-        }}
-      />
-
-      <Stack.Screen
-        name="matchResults"
-        options={{
-          title: 'Match Results',
-          headerShown: false,
-        }}
-      /> */}
+    
     </Stack>
   );
 }

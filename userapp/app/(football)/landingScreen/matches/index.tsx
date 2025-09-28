@@ -9,6 +9,8 @@ export default function MatchesScreen() {
   console.log('⚽ Matches screen is rendering');
   
   const handleCreateMatch = () => {
+    console.log('About to navigate to:', "/(football)/startMatch/selectTeams");
+  console.log('Router state:', router);
     router.push("/(football)/startMatch/selectTeams");
   };
   
