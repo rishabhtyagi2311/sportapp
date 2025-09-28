@@ -84,7 +84,7 @@ export default function SelectCaptainsScreen() {
       );
       
       // Navigate to final match details
-      router.push('/(football)/startMatch/finalMatchDetails');
+      router.push('/(football)/startMatch/finalDetails');
       
     } catch (error) {
       console.error('Error proceeding:', error);

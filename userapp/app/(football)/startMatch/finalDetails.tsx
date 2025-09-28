@@ -194,7 +194,7 @@ export default function FinalMatchDetailsScreen() {
       }
 
       // Navigate to match summary or start match
-      router.push('/(football)/matches/matchSummary');
+      router.push('/(football)/startMatch/scoringScreen');
       
     } catch (error) {
       console.error('Error completing match setup:', error);
