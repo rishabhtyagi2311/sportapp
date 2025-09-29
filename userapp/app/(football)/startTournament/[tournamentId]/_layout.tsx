@@ -1,7 +1,8 @@
 
 import { Stack } from 'expo-router';
 
-export default function MatchesLayout() {
+export default function tournamentDashboardLayout
+() {
   return (
     <Stack
       screenOptions={{
@@ -12,30 +13,37 @@ export default function MatchesLayout() {
     >
       
       <Stack.Screen
-        name="createTournament"
+        name="index"
         options={{
-          title: 'Create Tournament',
+          title: 'Dashboard',
           headerShown: false,
         }}
       />
       <Stack.Screen
-        name="selectTeams"
+        name="selectPlayers"
         options={{
-          title: 'Select Teams',
+          title: 'Select Players',
           headerShown: false,
         }}
       />
        <Stack.Screen
-        name="tournamentSpecifics"
+        name="selectCaptains"
         options={{
-          title: 'Tournament Specifics',
+          title: 'Select Captains',
           headerShown: false,
         }}
       />
       <Stack.Screen
-        name="tournamentId"
+        name="enterReferee"
         options={{
-          title: 'Tournament Id',
+          title: 'Referee Names',
+          headerShown: false,
+        }}
+      />
+       <Stack.Screen
+        name="scoringScreen"
+        options={{
+          title: 'Score Screen',
           headerShown: false,
         }}
       />

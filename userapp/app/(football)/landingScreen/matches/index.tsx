@@ -1,4 +1,4 @@
-// app/(football)/matches.tsx
+
 import React, { useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
