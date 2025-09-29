@@ -45,7 +45,7 @@ const VenueTab: React.FC = () => {
   return (
     <View className="flex-1 ">
       {/* Search and Filter Header */}
-      <View className="bg-gray-300 px-4 py-3 border-b border-gray-300 ">
+      <View className="bg-sky-100 px-4 py-3 ">
         <View className="flex-row items-center space-x-3">
           {/* Search Input */}
           <View className="flex-1 flex-row items-center bg-slate-900 rounded-lg px-3 py-2 mx-2">
@@ -107,7 +107,7 @@ const VenueTab: React.FC = () => {
 
       {/* Venues List */}
       <ScrollView 
-        className="flex-1 bg-gray-300"
+        className="flex-1 bg-sky-100"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
       >

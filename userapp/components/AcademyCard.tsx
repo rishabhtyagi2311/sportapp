@@ -23,7 +23,7 @@ export default function AcademyCard({ academy, onPress }: AcademyCardProps) {
      
       <View className="flex-row justify-between">
         <Text className="text-xs text-gray-500">Coach: {academy.coachName}</Text>
-        <Text className="text-xs text-gray-500">Fee: ₹{academy.Fee}/{academy.feeStructure}</Text>
+        <Text className="text-xs text-gray-500">Fee: ₹{academy.Fee}/month</Text>
       </View>
     </TouchableOpacity>
   );

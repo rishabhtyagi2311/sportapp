@@ -1,5 +1,4 @@
 // components/booking/EventTab.tsx
-
 import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { useBookingStore } from '@/store/venueStore';
@@ -7,6 +6,7 @@ import { Event, EventFilters } from './../types/booking';
 import EventCard from './EventCard';
 import FilterModal from './filterModal';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 const EventTab: React.FC = () => {
   const { events, searchEvents, sports } = useBookingStore();
@@ -43,16 +43,18 @@ const EventTab: React.FC = () => {
     return count;
   }, [filters]);
 
+
+
   return (
     <View className="flex-1 bg-gray-50">
       {/* Search and Filter Header */}
-      <View className="bg-white px-4 py-3 border-b border-gray-300">
+      <View className="bg-sky-100 px-4 py-3 ">
         <View className="flex-row items-center space-x-3">
           {/* Search Input */}
-          <View className="flex-1 flex-row items-center bg-gray-100 rounded-lg px-3 py-2">
+          <View className="flex-1 flex-row items-center bg-slate-900 rounded-lg px-3 py-2 mx-2">
             <Ionicons name="search" size={20} color="#6b7280" />
             <TextInput
-              className="flex-1 ml-2 text-gray-700"
+              className="flex-1 ml-2 text-white text-xl"
               placeholder="Search events..."
               placeholderTextColor="#9ca3af"
               value={searchQuery}
@@ -108,14 +110,18 @@ const EventTab: React.FC = () => {
 
       {/* Events List */}
       <ScrollView 
-        className="flex-1"
+        className="flex-1 bg-sky-100"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
       >
         {filteredEvents.length > 0 ? (
           <View className="px-4 pt-4">
             {filteredEvents.map((event) => (
-              <EventCard key={event.id} event={event} />
+              <EventCard 
+                key={event.id} 
+                event={event}  
+               
+              />
             ))}
           </View>
         ) : (

@@ -19,23 +19,11 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onPress }) => {
     if (onPress) {
       onPress();
     } else {
-      // Navigate to venue details screen using expo-router
       router.push({
-        pathname: './(venue)/VenueBooking/venueDetails/[venueId]',
+        pathname: '/(venue)/VenueBooking/venueDetails/[venueId]',
         params: { venueId: venue.id }
       });
     }
-  };
-
-  const handleBookNow = (e: any) => {
-    e.stopPropagation(); // Prevent triggering the main card press
-    router.push({
-      pathname: '/venue-details/[venueId]',
-      params: { 
-        venueId: venue.id, 
-        autoSelectBooking: 'true' 
-      }
-    });
   };
 
   return (
@@ -74,21 +62,12 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onPress }) => {
           </Text>
         </View>
 
-        {/* Price and Book Button */}
-        <View className="flex-row items-center justify-between">
-          <View>
-            <Text className="text-orange-600 text-lg font-bold">
-              ₹{minPrice}{minPrice !== maxPrice && `-${maxPrice}`}
-            </Text>
-            <Text className="text-gray-500 text-xs">per hour</Text>
-          </View>
-          
-          <TouchableOpacity 
-            className="bg-green-600 px-4 py-2 rounded-lg"
-            onPress={handleBookNow}
-          >
-            <Text className="text-white font-medium text-sm">Book Now</Text>
-          </TouchableOpacity>
+        {/* Price */}
+        <View>
+          <Text className="text-orange-600 text-lg font-bold">
+            ₹{minPrice}{minPrice !== maxPrice && `-${maxPrice}`}
+          </Text>
+          <Text className="text-gray-500 text-xs">per hour</Text>
         </View>
       </View>
     </TouchableOpacity>

@@ -9,7 +9,7 @@ export const dummyAcademies: Academy[] = [
     coachName: 'Rajesh Kumar',
     contactNumber: '+91-9876543210',
     facilities: 'Indoor Nets, Outdoor Ground, Gym',
-    feeStructure: 'Monthly',
+   
     Fee: '5000',
     city: 'Ghaziabad',
     headCoach: 'Rajesh Kumar',
@@ -27,7 +27,7 @@ export const dummyAcademies: Academy[] = [
     coachName: 'Michael Silva',
     contactNumber: '+91-9876543212',
     facilities: 'FIFA Standard Ground, Gymnasium',
-    feeStructure: 'Qtr',
+  
     Fee: '4500',
     city: 'Ghaziabad',
     headCoach: 'Michael Silva',

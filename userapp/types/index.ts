@@ -6,7 +6,7 @@ export type Academy = {
   coachName: string;
   contactNumber: string;
   facilities: string;
-  feeStructure: string;
+ 
   Fee: string;
   city: string;
   coaches?: Coach[];

@@ -22,7 +22,7 @@ const VenueDetailsScreen: React.FC = () => {
   const params = useLocalSearchParams();
   const router = useRouter();
   const venueId = params.venueId as string;
-  const autoSelectBooking = params.autoSelectBooking as string;
+  
   
   const [venue, setVenue] = useState<Venue | null>(null);
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);

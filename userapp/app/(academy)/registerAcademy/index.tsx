@@ -21,14 +21,17 @@ export default function SportsAcademyRegistration() {
     academyName: "",
     sportType: "",
     address: "",
-    city: "", // 👈 added city
+    city: "", 
     coachName: "",
     contactNumber: "",
     facilities: "",
-    feeStructure: "monthly",
+    
   });
 
-  const [monthlyFee, setMonthlyFee] = useState("");
+  const [Fee, setFee] = useState("");
+ const id = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+
 
   const popularSports = [
     { name: "Cricket", icon: "🏏" },
@@ -39,11 +42,7 @@ export default function SportsAcademyRegistration() {
     { name: "Swimming", icon: "🏊" },
   ];
 
-  const feeOptions = [
-    { id: "monthly", label: "Monthly" },
-    { id: "quarterly", label: "Quarterly (3 months)" },
-    { id: "annually", label: "Annual (12 months)" },
-  ];
+
 
   const getSportSpecificPlaceholder = () => {
     const sport = formData.sportType.toLowerCase();
@@ -77,7 +76,7 @@ export default function SportsAcademyRegistration() {
       !formData.coachName ||
       !formData.contactNumber ||
       !formData.facilities ||
-      !monthlyFee
+      !Fee
     ) {
       Alert.alert("Error", "Please fill in all required fields");
       return;
@@ -88,12 +87,12 @@ export default function SportsAcademyRegistration() {
       Alert.alert("Error", "Enter a valid 10-digit contact number");
       return;
     }
-    if (isNaN(Number(monthlyFee))) {
+    if (isNaN(Number(Fee))) {
       Alert.alert("Error", "Fee must be a valid number");
       return;
     }
 
-    const academyData = { ...formData, monthlyFee };
+    const academyData = { ...formData,Fee,id};
     addAcademy(academyData);
 
     Alert.alert("Success", "Sports academy registered successfully!");
@@ -107,9 +106,9 @@ export default function SportsAcademyRegistration() {
       coachName: "",
       contactNumber: "",
       facilities: "",
-      feeStructure: "monthly",
+     
     });
-    setMonthlyFee("");
+    setFee("");
     router.navigate("./manageAcademy");
   };
 
@@ -120,7 +119,7 @@ export default function SportsAcademyRegistration() {
         <View className="px-6 py-4 border-b border-white flex-row items-center mt-4">
           <TouchableOpacity
             className="mr-4"
-            onPress={() => router.back()}
+            onPress={() => router.navigate("/(homeScreenTabs)/academy")}
             activeOpacity={0.7}
           >
             <Ionicons name="arrow-back" size={24} color="white" />
@@ -326,33 +325,7 @@ export default function SportsAcademyRegistration() {
           <View className="mb-6">
             <Text className="text-white font-semibold mb-3">Training Fees</Text>
 
-            <View className="flex-row mb-3">
-              {feeOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.id}
-                  onPress={() =>
-                    setFormData((prev) => ({ ...prev, feeStructure: option.id }))
-                  }
-                  className={`flex-1 rounded-lg py-3 px-2 mr-2 border ${
-                    formData.feeStructure === option.id
-                      ? "bg-green-600 border-green-500"
-                      : "bg-slate-800 border-slate-700"
-                  }`}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    className={`text-center text-sm ${
-                      formData.feeStructure === option.id
-                        ? "text-white font-semibold"
-                        : "text-slate-300"
-                    }`}
-                  >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
+        
             <View className="bg-slate-800 rounded-xl border border-slate-700 flex-row items-center px-4">
               <Text className="text-slate-300 text-lg font-semibold mt-2">
                 ₹
@@ -362,17 +335,10 @@ export default function SportsAcademyRegistration() {
                 placeholder="Enter training fee *"
                 placeholderTextColor="#64748b"
                 keyboardType="numeric"
-                value={monthlyFee}
-                onChangeText={setMonthlyFee}
+                value={Fee}
+                onChangeText={setFee}
               />
-              <Text className="text-slate-400 text-sm mt-2">
-                /
-                {formData.feeStructure === "monthly"
-                  ? "month"
-                  : formData.feeStructure === "quarterly"
-                  ? "quarter"
-                  : "year"}
-              </Text>
+           
             </View>
           </View>
 

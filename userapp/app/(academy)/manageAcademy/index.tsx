@@ -12,7 +12,7 @@ export default function AcademyListScreen() {
     <SafeAreaView className="flex-1 bg-gray-100">
       {/* Custom Header */}
       <View className="flex-row items-center px-4 py-3 mt-2 mb-4 bg-slate-900 shadow-sm border-b border-gray-200">
-        <TouchableOpacity onPress={() => router.back()} className="mr-3">
+        <TouchableOpacity onPress={() => router.navigate("/(homeScreenTabs)/academy")} className="mr-3">
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         <Text className="text-lg font-bold text-white flex-1">My Academies</Text>

@@ -5,6 +5,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { Event } from './../types/booking';
 import { useBookingStore } from '@/store/venueStore';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 interface EventCardProps {
   event: Event;
@@ -14,6 +15,7 @@ interface EventCardProps {
 const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
   const { getVenueById } = useBookingStore();
   const venue = getVenueById(event.venueId);
+  const router = useRouter();
   
   const eventDate = new Date(event.dateTime);
   const isUpcoming = event.status === 'upcoming';
@@ -24,8 +26,10 @@ const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
     if (onPress) {
       onPress();
     } else {
-      // Default navigation logic
-      console.log('Navigate to event details:', event.id);
+       router.push({
+        pathname: '/(venue)/EventBooking/eventDetails/[eventId]',
+        params: { eventId: event.id }
+      });
     }
   };
 
@@ -52,7 +56,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
 
   return (
     <TouchableOpacity
-      className="bg-white rounded-xl shadow-sm border border-gray-200 mb-4"
+      className="bg-white rounded-xl mt-1/2 shadow-sm border border-gray-200 mb-4"
       onPress={handlePress}
       activeOpacity={0.7}
     >
