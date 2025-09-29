@@ -11,7 +11,7 @@ export default function SelectTeamsScreen() {
   const router = useRouter();
   const { teams } = useFootballStore();
   const { creationDraft, addTeamToDraft, removeTeamFromDraft, updateCreationDraft } = useTournamentStore();
-
+  
   const selectedTeamIds = creationDraft?.selectedTeamIds || [];
 
   const handleToggleTeam = (teamId: string) => {
@@ -27,7 +27,6 @@ export default function SelectTeamsScreen() {
       Alert.alert('Error', 'Please select at least 2 teams');
       return;
     }
-
     // Navigate to settings
     router.push('/(football)/startTournament/tournamentSpecifics');
   };
@@ -35,6 +34,41 @@ export default function SelectTeamsScreen() {
   const handleBack = () => {
     router.back();
   };
+
+  // Calculate total matches based on format
+  const totalMatches = useMemo(() => {
+    const n = selectedTeamIds.length;
+    if (n < 2) return 0;
+
+    if (creationDraft?.format === 'league') {
+      // Double round-robin: each team plays every other team twice (home & away)
+      // Formula: n * (n - 1)
+      // Examples: 
+      // - 3 teams: 3 * 2 = 6 matches
+      // - 4 teams: 4 * 3 = 12 matches
+      // - 5 teams: 5 * 4 = 20 matches
+      return n * (n - 1);
+    } else {
+      // Knockout: 2^(ceil(log2(n))) - 1
+      // This accounts for byes in non-power-of-2 team counts
+      const totalSlots = Math.pow(2, Math.ceil(Math.log2(n)));
+      return totalSlots - 1;
+    }
+  }, [selectedTeamIds.length, creationDraft?.format]);
+
+  // Calculate number of rounds
+  const totalRounds = useMemo(() => {
+    const n = selectedTeamIds.length;
+    if (n < 2) return 0;
+
+    if (creationDraft?.format === 'league') {
+      // Double round-robin rounds
+      return (n - 1) * 2;
+    } else {
+      // Knockout rounds
+      return Math.ceil(Math.log2(n));
+    }
+  }, [selectedTeamIds.length, creationDraft?.format]);
 
   // Group teams by some criteria or just show all
   const availableTeams = useMemo(() => {
@@ -96,7 +130,7 @@ export default function SelectTeamsScreen() {
 
       {/* Selected Count */}
       <View className="bg-blue-50 mx-4 mt-4 rounded-xl p-4">
-        <View className="flex-row items-center justify-between">
+        <View className="flex-row items-center justify-between mb-3">
           <View>
             <Text className="text-sm text-blue-700 mb-1">Selected Teams</Text>
             <Text className="text-2xl font-bold text-blue-900">
@@ -107,10 +141,29 @@ export default function SelectTeamsScreen() {
             <Ionicons name="people" size={24} color="#1e40af" />
           </View>
         </View>
-        {creationDraft.format === 'league' && selectedTeamIds.length >= 2 && (
-          <Text className="text-xs text-blue-600 mt-2">
-            Total Matches: {(selectedTeamIds.length * (selectedTeamIds.length - 1)) / 2}
-          </Text>
+        
+        {selectedTeamIds.length >= 2 && (
+          <View className="border-t border-blue-200 pt-3">
+            <View className="flex-row items-center justify-between mb-2">
+              <View className="flex-row items-center">
+                <Ionicons name="trophy-outline" size={14} color="#1e40af" />
+                <Text className="text-xs text-blue-700 ml-1 font-medium">Total Matches:</Text>
+              </View>
+              <Text className="text-sm font-bold text-blue-900">{totalMatches}</Text>
+            </View>
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center">
+                <Ionicons name="layers-outline" size={14} color="#1e40af" />
+                <Text className="text-xs text-blue-700 ml-1 font-medium">Total Rounds:</Text>
+              </View>
+              <Text className="text-sm font-bold text-blue-900">{totalRounds}</Text>
+            </View>
+            {creationDraft.format === 'league' && (
+              <Text className="text-xs text-blue-600 mt-2 italic">
+                Double round-robin: Each team plays every other team twice
+              </Text>
+            )}
+          </View>
         )}
       </View>
 
@@ -125,12 +178,6 @@ export default function SelectTeamsScreen() {
             <Text className="text-slate-500 text-center mb-6">
               You need to create teams first before creating a tournament
             </Text>
-            <TouchableOpacity
-              onPress={() => router.push('/(football)/teams/create')}
-              className="bg-blue-600 px-6 py-3 rounded-xl"
-            >
-              <Text className="text-white font-semibold">Create Team</Text>
-            </TouchableOpacity>
           </View>
         ) : (
           <>

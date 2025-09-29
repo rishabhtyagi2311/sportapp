@@ -1,6 +1,6 @@
 // app/(football)/tournaments/index.tsx
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -8,8 +8,7 @@ import { useTournamentStore, Tournament } from '@/store/footballTournamentStore'
 
 export default function TournamentsScreen() {
   const router = useRouter();
-  const { tournaments } = useTournamentStore();
-
+  const { tournaments, deleteTournament } = useTournamentStore();
   console.log('🏆 Tournaments screen is rendering');
   
   const handleCreateTournament = () => {
@@ -20,6 +19,28 @@ export default function TournamentsScreen() {
 
   const handleViewTournament = (tournamentId: string) => {
     router.navigate(`/(football)/startTournament/${tournamentId}`);
+  };
+
+  const handleDeleteTournament = (tournamentId: string, tournamentName: string) => {
+    Alert.alert(
+      'Delete Tournament',
+      `Are you sure you want to delete "${tournamentName}"? This action cannot be undone.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            deleteTournament(tournamentId);
+            console.log(`🗑️ Deleted tournament: ${tournamentName} (${tournamentId})`);
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   // Group tournaments by status
@@ -40,6 +61,7 @@ export default function TournamentsScreen() {
   const renderTournamentCard = (tournament: Tournament) => {
     const progress = getProgressPercentage(tournament);
     const completedMatches = tournament.fixtures.filter(f => f.status === 'completed').length;
+    const isDraft = tournament.status === 'draft';
 
     return (
       <TouchableOpacity
@@ -74,8 +96,22 @@ export default function TournamentsScreen() {
               </View>
             </View>
           </View>
-          <View className="w-12 h-12 bg-amber-100 rounded-lg items-center justify-center">
-            <Ionicons name="trophy" size={20} color="#f59e0b" />
+          <View className="flex-row items-center">
+            <View className="w-12 h-12 bg-amber-100 rounded-lg items-center justify-center">
+              <Ionicons name="trophy" size={20} color="#f59e0b" />
+            </View>
+            {isDraft && (
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleDeleteTournament(tournament.id, tournament.name);
+                }}
+                className="ml-2 w-12 h-12 bg-red-100 rounded-lg items-center justify-center"
+                activeOpacity={0.7}
+              >
+                <Ionicons name="trash-outline" size={20} color="#dc2626" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -152,57 +188,42 @@ export default function TournamentsScreen() {
       {tournaments.length === 0 ? (
         renderEmptyState()
       ) : (
-        <>
-          {/* Header */}
-          <View className="bg-white px-6 py-6 border-b border-slate-100">
-            <View className="flex-row items-center justify-between">
-              <View>
-                <Text className="text-3xl font-bold text-slate-900">Tournaments</Text>
-                <Text className="text-slate-600 mt-1">
-                  {tournaments.length} tournament{tournaments.length !== 1 ? 's' : ''}
-                </Text>
+        <ScrollView className="flex-1 px-4 pt-4" showsVerticalScrollIndicator={false}>
+          {/* Active Tournaments */}
+          {groupedTournaments.active.length > 0 && (
+            <View className="mb-6">
+              <View className="flex-row items-center mb-3">
+                <View className="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                <Text className="text-sm font-bold text-slate-700">Active Tournaments</Text>
               </View>
+              {groupedTournaments.active.map(renderTournamentCard)}
             </View>
-          </View>
+          )}
 
-          {/* Tournaments List */}
-          <ScrollView className="flex-1 px-4 pt-4" showsVerticalScrollIndicator={false}>
-            {/* Active Tournaments */}
-            {groupedTournaments.active.length > 0 && (
-              <View className="mb-6">
-                <View className="flex-row items-center mb-3">
-                  <View className="w-2 h-2 bg-green-500 rounded-full mr-2" />
-                  <Text className="text-sm font-bold text-slate-700">Active Tournaments</Text>
-                </View>
-                {groupedTournaments.active.map(renderTournamentCard)}
+          {/* Draft Tournaments */}
+          {groupedTournaments.draft.length > 0 && (
+            <View className="mb-6">
+              <View className="flex-row items-center mb-3">
+                <View className="w-2 h-2 bg-slate-400 rounded-full mr-2" />
+                <Text className="text-sm font-bold text-slate-700">Draft Tournaments</Text>
               </View>
-            )}
+              {groupedTournaments.draft.map(renderTournamentCard)}
+            </View>
+          )}
 
-            {/* Draft Tournaments */}
-            {groupedTournaments.draft.length > 0 && (
-              <View className="mb-6">
-                <View className="flex-row items-center mb-3">
-                  <View className="w-2 h-2 bg-slate-400 rounded-full mr-2" />
-                  <Text className="text-sm font-bold text-slate-700">Draft Tournaments</Text>
-                </View>
-                {groupedTournaments.draft.map(renderTournamentCard)}
+          {/* Completed Tournaments */}
+          {groupedTournaments.completed.length > 0 && (
+            <View className="mb-6">
+              <View className="flex-row items-center mb-3">
+                <View className="w-2 h-2 bg-blue-500 rounded-full mr-2" />
+                <Text className="text-sm font-bold text-slate-700">Completed Tournaments</Text>
               </View>
-            )}
+              {groupedTournaments.completed.map(renderTournamentCard)}
+            </View>
+          )}
 
-            {/* Completed Tournaments */}
-            {groupedTournaments.completed.length > 0 && (
-              <View className="mb-6">
-                <View className="flex-row items-center mb-3">
-                  <View className="w-2 h-2 bg-blue-500 rounded-full mr-2" />
-                  <Text className="text-sm font-bold text-slate-700">Completed Tournaments</Text>
-                </View>
-                {groupedTournaments.completed.map(renderTournamentCard)}
-              </View>
-            )}
-
-            <View className="h-24" />
-          </ScrollView>
-        </>
+          <View className="h-24" />
+        </ScrollView>
       )}
 
       {/* Floating Create Button */}

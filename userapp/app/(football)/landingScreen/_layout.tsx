@@ -19,7 +19,6 @@ export default function FootballLandingLayout() {
             <View className="bg-slate-900 px-4 py-4 flex-row items-center border-b-2 border-slate-700 shadow-lg">
                 <TouchableOpacity
                     onPress={() => {
-
                         router.navigate('/(homeScreenTabs)/sports');
                     }}
                     className="mr-4 p-2 rounded-full bg-sky-100"
@@ -41,7 +40,7 @@ export default function FootballLandingLayout() {
                     tabBarLabelStyle: { 
                         fontWeight: "700", 
                         textTransform: "none",
-                        fontSize: 15,
+                        fontSize: 14,
                         textAlign: 'center'
                     },
                     tabBarStyle: { 
@@ -69,8 +68,9 @@ export default function FootballLandingLayout() {
                         justifyContent: 'center'
                     },
                     tabBarItemStyle: {
-                        paddingHorizontal: 20,
-                        paddingVertical: 14
+                        paddingHorizontal: 8,
+                        paddingVertical: 14,
+                        minWidth: 100
                     }
                 }}
                 initialRouteName="matches/index"

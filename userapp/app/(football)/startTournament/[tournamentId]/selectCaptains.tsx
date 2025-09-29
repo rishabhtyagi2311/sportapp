@@ -1,5 +1,5 @@
 // app/(football)/tournaments/[tournamentId]/selectCaptains.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,41 +12,53 @@ export default function TournamentSelectCaptainsScreen() {
   const params = useLocalSearchParams();
   const tournamentId = params.tournamentId as string;
   const fixtureId = params.fixtureId as string;
-
-  const { activeTournamentMatch, setTournamentMatchCaptains } = useTournamentStore();
-  const { players } = useFootballStore();
-
+  
+  const { 
+    activeTournamentMatch, 
+    setTournamentMatchCaptains,
+    initializeTournamentMatch
+  } = useTournamentStore();
+  
+  const { getPlayerById } = useFootballStore();
+  
   const [homeCaptain, setHomeCaptain] = useState<string | null>(null);
   const [awayCaptain, setAwayCaptain] = useState<string | null>(null);
-
-  // Get players for each team
+  
+  // Initialize match if not already initialized
+  useEffect(() => {
+    if (!activeTournamentMatch && tournamentId && fixtureId) {
+      initializeTournamentMatch(tournamentId, fixtureId);
+    }
+  }, [tournamentId, fixtureId, activeTournamentMatch, initializeTournamentMatch]);
+  
+  // Get full player objects from the selected player IDs
   const homePlayers = useMemo(() => {
     if (!activeTournamentMatch) return [];
     return activeTournamentMatch.homeTeamPlayers
-      .map(id => players.find(p => p.id === id))
+      .map(id => getPlayerById(id))
       .filter(p => p !== undefined);
-  }, [activeTournamentMatch?.homeTeamPlayers, players]);
-
+  }, [activeTournamentMatch?.homeTeamPlayers, getPlayerById]);
+  
   const awayPlayers = useMemo(() => {
     if (!activeTournamentMatch) return [];
     return activeTournamentMatch.awayTeamPlayers
-      .map(id => players.find(p => p.id === id))
+      .map(id => getPlayerById(id))
       .filter(p => p !== undefined);
-  }, [activeTournamentMatch?.awayTeamPlayers, players]);
-
+  }, [activeTournamentMatch?.awayTeamPlayers, getPlayerById]);
+  
   const handleContinue = () => {
     if (!homeCaptain || !awayCaptain) {
       Alert.alert('Incomplete Selection', 'Please select captains for both teams');
       return;
     }
-
+    
     // Save captains to store
     setTournamentMatchCaptains(homeCaptain, awayCaptain);
     
     // Navigate to referee entry
     router.push(`/(football)/startTournament/${tournamentId}/enterReferee?fixtureId=${fixtureId}`);
   };
-
+  
   if (!activeTournamentMatch) {
     return (
       <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
@@ -60,7 +72,29 @@ export default function TournamentSelectCaptainsScreen() {
       </SafeAreaView>
     );
   }
-
+  
+  if (homePlayers.length === 0 || awayPlayers.length === 0) {
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+        <View className="items-center px-6">
+          <View className="w-20 h-20 bg-red-100 rounded-full items-center justify-center mb-4">
+            <Ionicons name="alert-circle" size={32} color="#ef4444" />
+          </View>
+          <Text className="text-lg font-bold text-slate-900 mb-2">Players Not Selected</Text>
+          <Text className="text-slate-500 text-center mb-6">
+            Please go back and select players for both teams first.
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="bg-blue-600 px-6 py-3 rounded-xl"
+          >
+            <Text className="text-white font-semibold">Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
       {/* Header */}
@@ -96,9 +130,14 @@ export default function TournamentSelectCaptainsScreen() {
             <View className="w-8 h-8 bg-emerald-500 rounded-lg items-center justify-center mr-2">
               <Ionicons name="shield" size={16} color="white" />
             </View>
-            <Text className="text-lg font-bold text-slate-900">
-              {activeTournamentMatch.homeTeamName} Captain
-            </Text>
+            <View className="flex-1">
+              <Text className="text-lg font-bold text-slate-900">
+                {activeTournamentMatch.homeTeamName} Captain
+              </Text>
+              <Text className="text-xs text-slate-500 mt-1">
+                Select from {homePlayers.length} players
+              </Text>
+            </View>
           </View>
 
           {homePlayers.map((player) => (
@@ -126,7 +165,9 @@ export default function TournamentSelectCaptainsScreen() {
                     <Text className="text-base font-bold text-slate-900" numberOfLines={1}>
                       {player.name}
                     </Text>
-                    
+                    <Text className="text-xs text-slate-500 mt-1">
+                      {player.position}
+                    </Text>
                   </View>
                 </View>
                 {homeCaptain === player.id && (
@@ -145,9 +186,14 @@ export default function TournamentSelectCaptainsScreen() {
             <View className="w-8 h-8 bg-red-500 rounded-lg items-center justify-center mr-2">
               <Ionicons name="flag" size={16} color="white" />
             </View>
-            <Text className="text-lg font-bold text-slate-900">
-              {activeTournamentMatch.awayTeamName} Captain
-            </Text>
+            <View className="flex-1">
+              <Text className="text-lg font-bold text-slate-900">
+                {activeTournamentMatch.awayTeamName} Captain
+              </Text>
+              <Text className="text-xs text-slate-500 mt-1">
+                Select from {awayPlayers.length} players
+              </Text>
+            </View>
           </View>
 
           {awayPlayers.map((player) => (
@@ -175,7 +221,9 @@ export default function TournamentSelectCaptainsScreen() {
                     <Text className="text-base font-bold text-slate-900" numberOfLines={1}>
                       {player.name}
                     </Text>
-                   
+                    <Text className="text-xs text-slate-500 mt-1">
+                      {player.position}
+                    </Text>
                   </View>
                 </View>
                 {awayCaptain === player.id && (

@@ -1,516 +1,500 @@
-// app/(football)/tournaments/[tournamentId]/matchScoring.tsx
-import React, { useState, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Modal,
-  TextInput,
-  Alert,
-  ImageBackground,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+// app/(football)/tournaments/[tournamentId].tsx
+import React, { useState, useMemo, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTournamentStore } from '@/store/footballTournamentStore';
-import { useFootballStore } from '@/store/footballTeamStore';
 
-// EVENT CONFIGURATIONS
-const EVENT_CONFIGS = {
-  goal: {
-    name: 'Goal',
-    icon: 'football',
-    color: '#10b981',
-    subTypes: [
-      { id: 'header', name: 'Header' },
-      { id: 'left_foot', name: 'Left Foot' },
-      { id: 'right_foot', name: 'Right Foot' },
-      { id: 'penalty_goal', name: 'Penalty' },
-      { id: 'free_kick_goal', name: 'Free Kick' },
-      { id: 'own_goal', name: 'Own Goal' },
-    ],
-  },
-  card: {
-    name: 'Card',
-    icon: 'card',
-    color: '#f59e0b',
-    subTypes: [
-      { id: 'yellow_card', name: 'Yellow Card' },
-      { id: 'red_card', name: 'Red Card' },
-      { id: 'second_yellow', name: 'Second Yellow' },
-    ],
-  },
-  substitution: {
-    name: 'Substitution',
-    icon: 'swap-horizontal',
-    color: '#6366f1',
-    subTypes: [],
-  },
-  foul: {
-    name: 'Foul',
-    icon: 'warning',
-    color: '#f97316',
-    subTypes: [
-      { id: 'dangerous_play', name: 'Dangerous Play' },
-      { id: 'unsporting_behavior', name: 'Unsporting Behavior' },
-      { id: 'dissent', name: 'Dissent' },
-      { id: 'handball', name: 'Handball' },
-    ],
-  },
-  corner: {
-    name: 'Corner',
-    icon: 'flag',
-    color: '#8b5cf6',
-    subTypes: [],
-  },
-  offside: {
-    name: 'Offside',
-    icon: 'flag-outline',
-    color: '#ef4444',
-    subTypes: [],
-  },
-};
+type TabType = 'fixtures' | 'standings' | 'matches';
 
-export default function TournamentMatchScoringScreen() {
+export default function TournamentDashboardScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const tournamentId = params.tournamentId as string;
+  
+  const {
+    getTournament,
+    getTournamentFixtures,
+    getTournamentStandings,
+    getUpcomingFixtures,
+    getCompletedFixtures,
+    startTournament,
+    initializeTournamentMatch,
+  } = useTournamentStore();
+  
+  const [activeTab, setActiveTab] = useState<TabType>('fixtures');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const { activeTournamentMatch, addTournamentMatchEvent, endTournamentMatch } = useTournamentStore();
-  const { players } = useFootballStore();
+  // Add loading delay to give user time to dismiss alert
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 2000); // 2 second delay
 
-  const [showEventModal, setShowEventModal] = useState(false);
-  const [selectedTeam, setSelectedTeam] = useState<'home' | 'away' | null>(null);
-  const [selectedEventType, setSelectedEventType] = useState<string | null>(null);
-  const [selectedSubType, setSelectedSubType] = useState<string | null>(null);
-  const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
-  const [selectedAssistPlayer, setSelectedAssistPlayer] = useState<any>(null);
-  const [eventMinute, setEventMinute] = useState('');
-  const [isExtraTime, setIsExtraTime] = useState(false);
-  const [eventDescription, setEventDescription] = useState('');
+    return () => clearTimeout(timer);
+  }, [tournamentId]);
 
-  const homeTeamPlayers = useMemo(() => {
-    if (!activeTournamentMatch) return [];
-    return activeTournamentMatch.homeTeamPlayers
-      .map(id => players.find(p => p.id === id))
-      .filter(p => p !== undefined);
-  }, [activeTournamentMatch?.homeTeamPlayers, players]);
+  const tournament = useMemo(() => getTournament(tournamentId), [tournamentId, getTournament, refreshKey]);
+  const allFixtures = useMemo(() => getTournamentFixtures(tournamentId), [tournamentId, getTournamentFixtures, refreshKey]);
+  const standings = useMemo(() => getTournamentStandings(tournamentId), [tournamentId, getTournamentStandings, refreshKey]);
+  const upcomingFixtures = useMemo(() => getUpcomingFixtures(tournamentId), [tournamentId, getUpcomingFixtures, refreshKey]);
+  const completedFixtures = useMemo(() => getCompletedFixtures(tournamentId), [tournamentId, getCompletedFixtures, refreshKey]);
 
-  const awayTeamPlayers = useMemo(() => {
-    if (!activeTournamentMatch) return [];
-    return activeTournamentMatch.awayTeamPlayers
-      .map(id => players.find(p => p.id === id))
-      .filter(p => p !== undefined);
-  }, [activeTournamentMatch?.awayTeamPlayers, players]);
-
-  const events = activeTournamentMatch?.events || [];
-  const homeScore = activeTournamentMatch?.homeScore || 0;
-  const awayScore = activeTournamentMatch?.awayScore || 0;
-
-  const resetEventForm = useCallback(() => {
-    setSelectedEventType(null);
-    setSelectedSubType(null);
-    setSelectedPlayer(null);
-    setSelectedAssistPlayer(null);
-    setEventMinute('');
-    setIsExtraTime(false);
-    setEventDescription('');
-    setSelectedTeam(null);
-  }, []);
-
-  const handleCreateEvent = useCallback(() => {
-    if (!selectedEventType || !selectedPlayer || !eventMinute.trim() || !selectedTeam || !activeTournamentMatch) {
-      Alert.alert('Error', 'Please fill all required fields');
-      return;
-    }
-    
-    const minute = parseInt(eventMinute);
-    if (isNaN(minute) || minute < 1) {
-      Alert.alert('Error', 'Invalid minute');
-      return;
-    }
-
-    const eventData = {
-      teamId: selectedTeam === 'home' ? activeTournamentMatch.homeTeamId : activeTournamentMatch.awayTeamId,
-      eventType: selectedEventType as any,
-      eventSubType: selectedSubType as any,
-      playerId: selectedPlayer.id,
-      playerName: selectedPlayer.name,
-      assistPlayerId: selectedAssistPlayer?.id,
-      assistPlayerName: selectedAssistPlayer?.name,
-      minute,
-      isExtraTime,
-      description: eventDescription.trim() || undefined,
-    };
-
-    addTournamentMatchEvent(eventData);
-    setShowEventModal(false);
-    resetEventForm();
-  }, [
-    selectedEventType,
-    selectedPlayer,
-    selectedAssistPlayer,
-    selectedTeam,
-    eventMinute,
-    isExtraTime,
-    eventDescription,
-    selectedSubType,
-    activeTournamentMatch,
-    addTournamentMatchEvent,
-    resetEventForm,
-  ]);
-
-  const handleEndMatch = useCallback(() => {
+  const handleStartTournament = () => {
     Alert.alert(
-      'End Match', 
-      'Are you sure you want to end this match? All data will be saved to the tournament.', 
+      'Start Tournament',
+      'Are you ready to start this tournament? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'End Match',
-          style: 'destructive',
+          text: 'Start',
+          style: 'default',
           onPress: () => {
-            endTournamentMatch();
-            router.push(`/(football)/startTournament/${tournamentId}`);
+            startTournament(tournamentId);
+            setRefreshKey(prev => prev + 1);
           },
         },
       ]
     );
-  }, [endTournamentMatch, router, tournamentId]);
+  };
 
-  const handleAddEvent = useCallback((team: 'home' | 'away') => {
-    setSelectedTeam(team);
-    setShowEventModal(true);
-  }, []);
-
-  const getCurrentPlayers = useCallback(() => {
-    return selectedTeam === 'home' ? homeTeamPlayers : awayTeamPlayers;
-  }, [selectedTeam, homeTeamPlayers, awayTeamPlayers]);
-
-  const renderEventCard = useCallback((event: any) => {
-    const config = EVENT_CONFIGS[event.eventType as keyof typeof EVENT_CONFIGS];
-    if (!config) return null;
+  const handlePlayMatch = (fixtureId: string) => {
+    const matchData = initializeTournamentMatch(tournamentId, fixtureId);
     
-    const isHomeTeam = event.teamId === activeTournamentMatch?.homeTeamId;
+    if (!matchData) {
+      Alert.alert('Error', 'Unable to initialize match');
+      return;
+    }
 
+    router.push(`/(football)/startTournament/${tournamentId}/selectPlayers?fixtureId=${fixtureId}`);
+  };
+
+  const handleGoBack = () => {
+    router.push('/(football)/landingScreen/tournament');
+  };
+
+  // Invalid Tournament ID
+  if (!tournamentId) {
     return (
-      <View
-        key={event.id}
-        className={`bg-white rounded-xl p-4 mb-3 border-l-4 ${
-          isHomeTeam ? 'border-green-500' : 'border-red-500'
-        }`}
-      >
-        <View className="flex-row items-center justify-between mb-2">
-          <View className="flex-row items-center">
-            <View
-              className="w-8 h-8 rounded-full items-center justify-center mr-3"
-              style={{ backgroundColor: config.color }}
-            >
-              <Ionicons name={config.icon as any} size={16} color="white" />
-            </View>
-            <View>
-              <Text className="text-lg font-bold text-slate-900">
-                {config.name}
-                {event.eventSubType &&
-                  ` - ${config.subTypes?.find(st => st.id === event.eventSubType)?.name || ''}`}
-              </Text>
-              <Text className="text-sm text-slate-600">
-                {event.playerName}
-                {event.assistPlayerName && ` (Assist: ${event.assistPlayerName})`}
-              </Text>
-            </View>
+      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+        <View className="items-center px-6">
+          <View className="w-20 h-20 bg-red-100 rounded-full items-center justify-center mb-4">
+            <Ionicons name="alert-circle" size={32} color="#ef4444" />
           </View>
-          <View className="items-end">
-            <Text className="text-lg font-bold text-slate-900">{event.minute}'</Text>
-            {event.isExtraTime && (
-              <Text className="text-xs text-orange-600 font-medium">+ET</Text>
-            )}
-            <Text className={`text-xs font-medium ${isHomeTeam ? 'text-green-600' : 'text-red-600'}`}>
-              {isHomeTeam ? activeTournamentMatch?.homeTeamName : activeTournamentMatch?.awayTeamName}
-            </Text>
-          </View>
+          <Text className="text-lg font-bold text-slate-900 mb-2">Invalid Tournament ID</Text>
+          <Text className="text-slate-500 text-center mb-6">
+            No tournament ID was provided.
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.push('/(football)/landingScreen/tournament')}
+            className="bg-blue-600 px-6 py-3 rounded-xl"
+          >
+            <Text className="text-white font-semibold">Go to Tournaments</Text>
+          </TouchableOpacity>
         </View>
-      </View>
-    );
-  }, [activeTournamentMatch]);
-
-  if (!activeTournamentMatch) {
-    return (
-      <SafeAreaView className="flex-1 bg-slate-100 items-center justify-center">
-        <Text className="text-slate-500 text-lg">No active tournament match found</Text>
-        <TouchableOpacity
-          onPress={() => router.push(`/(football)/startTournament/${tournamentId}`)}
-          className="mt-4 bg-blue-600 px-6 py-3 rounded-xl"
-        >
-          <Text className="text-white font-semibold">Back to Tournament</Text>
-        </TouchableOpacity>
       </SafeAreaView>
     );
   }
 
+  // Loading State
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+        <View className="items-center px-6">
+          <ActivityIndicator size="large" color="#3b82f6" />
+          <Text className="text-base font-semibold text-slate-700 mt-4">Loading tournament...</Text>
+          <Text className="text-sm text-slate-500 mt-2 text-center">
+            Please wait a moment
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Tournament Not Found (only shows after loading)
+  if (!tournament) {
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+        <View className="items-center px-6">
+          <View className="w-20 h-20 bg-slate-100 rounded-full items-center justify-center mb-4">
+            <Ionicons name="trophy-outline" size={32} color="#64748b" />
+          </View>
+          <Text className="text-lg font-bold text-slate-900 mb-2">Tournament Not Found</Text>
+          <Text className="text-slate-500 text-center mb-2">
+            ID: {tournamentId}
+          </Text>
+          <Text className="text-slate-500 text-center mb-6">
+            The tournament doesn't exist or may have been deleted.
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.push('/(football)/landingScreen/tournament')}
+            className="bg-blue-600 px-6 py-3 rounded-xl"
+          >
+            <Text className="text-white font-semibold">Go to Tournaments</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const progressPercentage = useMemo(() => {
+    if (allFixtures.length === 0) return 0;
+    return Math.round((completedFixtures.length / allFixtures.length) * 100);
+  }, [allFixtures.length, completedFixtures.length]);
+
   return (
-    <SafeAreaView className="flex-1 bg-slate-100">
-      {/* Header with Image Background */}
-      <ImageBackground
-        source={{ uri: 'https://images.unsplash.com/photo-1459865264687-595d652de67e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2340&q=80' }}
-        className="h-64"
-        resizeMode="cover"
-      >
-        <View className="flex-1 bg-black/50">
-          <SafeAreaView>
-            <View className="flex-row items-center justify-between px-4 py-2">
-              <TouchableOpacity onPress={() => router.back()} className="p-2">
-                <Ionicons name="arrow-back" size={24} color="white" />
-              </TouchableOpacity>
-              <Text className="text-white text-lg font-bold">Tournament Match</Text>
-              <View className="w-10" />
+    <SafeAreaView className="flex-1 bg-slate-50">
+      {/* Header */}
+      <View className="bg-white px-4 py-4 border-b border-slate-200">
+        <View className="flex-row items-center justify-between mb-3">
+          <TouchableOpacity onPress={handleGoBack} className="p-2">
+            <Ionicons name="arrow-back" size={24} color="#1e293b" />
+          </TouchableOpacity>
+          <TouchableOpacity className="p-2">
+            <Ionicons name="ellipsis-horizontal" size={24} color="#1e293b" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Tournament Header */}
+        <View>
+          <View className="flex-row items-center mb-2">
+            <View className="w-10 h-10 bg-amber-100 rounded-lg items-center justify-center mr-3">
+              <Ionicons name="trophy" size={20} color="#f59e0b" />
             </View>
-          </SafeAreaView>
-          
-          {/* Score Section */}
-          <View className="flex-1 justify-center px-4">
-            <View className="flex-row items-center justify-between">
-              {/* Home Team */}
-              <TouchableOpacity 
-                onPress={() => handleAddEvent('home')}
-                className="items-center flex-1"
-              >
-                <View className="w-20 h-20 bg-white/20 rounded-full items-center justify-center mb-2 border-2 border-white/30">
-                  <Ionicons name="shield" size={40} color="white" />
-                </View>
-                <Text className="text-white text-sm font-medium text-center mb-1">
-                  {activeTournamentMatch.homeTeamName}
-                </Text>
-                <Text className="text-white text-4xl font-bold">{homeScore}</Text>
-              </TouchableOpacity>
-              
-              {/* VS */}
-              <View className="px-8">
-                <Text className="text-white text-2xl font-bold">VS</Text>
-              </View>
-              
-              {/* Away Team */}
-              <TouchableOpacity 
-                onPress={() => handleAddEvent('away')}
-                className="items-center flex-1"
-              >
-                <View className="w-20 h-20 bg-white/20 rounded-full items-center justify-center mb-2 border-2 border-white/30">
-                  <Ionicons name="shield-outline" size={40} color="white" />
-                </View>
-                <Text className="text-white text-sm font-medium text-center mb-1">
-                  {activeTournamentMatch.awayTeamName}
-                </Text>
-                <Text className="text-white text-4xl font-bold">{awayScore}</Text>
-              </TouchableOpacity>
-            </View>
-            
-            {/* Match Time */}
-            <View className="items-center mt-4">
-              <Text className="text-white/80 text-sm">
-                {activeTournamentMatch.currentMinute}' 
+            <View className="flex-1">
+              <Text className="text-xl font-bold text-slate-900" numberOfLines={1}>
+                {tournament.name}
               </Text>
+              <View className="flex-row items-center mt-1">
+                <View className={`px-2 py-1 rounded ${
+                  tournament.status === 'active' ? 'bg-green-100' :
+                  tournament.status === 'completed' ? 'bg-blue-100' :
+                  'bg-slate-100'
+                }`}>
+                  <Text className={`text-xs font-semibold ${
+                    tournament.status === 'active' ? 'text-green-700' :
+                    tournament.status === 'completed' ? 'text-blue-700' :
+                    'text-slate-600'
+                  }`}>
+                    {tournament.status.toUpperCase()}
+                  </Text>
+                </View>
+                <Text className="text-xs text-slate-500 ml-2">
+                  {tournament.format === 'league' ? 'League' : 'Knockout'}
+                </Text>
+              </View>
             </View>
+          </View>
+
+          {/* Progress Bar */}
+          <View className="mt-4">
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-xs text-slate-600 font-medium">Tournament Progress</Text>
+              <Text className="text-xs text-slate-600 font-bold">{progressPercentage}%</Text>
+            </View>
+            <View className="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <View 
+                className="h-full bg-green-500"
+                style={{ width: `${progressPercentage}%` }}
+              />
+            </View>
+            <Text className="text-xs text-slate-500 mt-1">
+              {completedFixtures.length} of {allFixtures.length} matches completed
+            </Text>
           </View>
         </View>
-      </ImageBackground>
-
-      {/* Event List */}
-      <ScrollView className="flex-1 px-4 pt-4">
-        {events.length > 0 ? (
-          <>
-            <Text className="text-lg font-bold text-slate-900 mb-4">
-              Match Events ({events.length})
-            </Text>
-            {events
-              .sort((a, b) => a.minute - b.minute)
-              .map(renderEventCard)}
-          </>
-        ) : (
-          <View className="items-center justify-center py-16">
-            <Ionicons name="football" size={48} color="#94a3b8" />
-            <Text className="text-slate-500 text-lg font-medium mt-4">No events yet</Text>
-            <Text className="text-slate-400 text-sm mt-2">Tap team logos to add match events</Text>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* End Match Button */}
-      <View className="p-4 bg-white border-t border-slate-200">
-        <TouchableOpacity
-          onPress={handleEndMatch}
-          className="bg-red-600 rounded-2xl py-4 items-center"
-        >
-          <View className="flex-row items-center">
-            <Ionicons name="stop-circle" size={20} color="white" />
-            <Text className="text-white font-bold text-lg ml-2">End Match</Text>
-          </View>
-        </TouchableOpacity>
       </View>
 
-      {/* Event Modal */}
-      <Modal
-        visible={showEventModal}
-        animationType="slide"
-        onRequestClose={() => {
-          setShowEventModal(false);
-          resetEventForm();
-        }}
-      >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          className="flex-1"
-        >
-          <SafeAreaView className="flex-1 bg-white mt-12">
-            <View className="flex-row items-center justify-between p-4 border-b border-slate-200">
-              <TouchableOpacity onPress={() => { setShowEventModal(false); resetEventForm(); }}>
-                <Ionicons name="close" size={24} color="#64748b" />
-              </TouchableOpacity>
-              <Text className="text-lg font-bold text-slate-900">
-                Add Event - {selectedTeam === 'home' ? activeTournamentMatch.homeTeamName : activeTournamentMatch.awayTeamName}
-              </Text>
-              <TouchableOpacity onPress={handleCreateEvent} className="bg-blue-600 px-4 py-2 rounded-lg">
-                <Text className="text-white font-semibold">Save</Text>
-              </TouchableOpacity>
-            </View>
+      {/* Stats Row */}
+      <View className="bg-white px-4 py-4 border-b border-slate-100">
+        <View className="flex-row justify-around">
+          <View className="items-center">
+            <Text className="text-2xl font-bold text-slate-900">{tournament.teams.length}</Text>
+            <Text className="text-xs text-slate-500 mt-1">Teams</Text>
+          </View>
+          <View className="w-px bg-slate-200" />
+          <View className="items-center">
+            <Text className="text-2xl font-bold text-slate-900">{allFixtures.length}</Text>
+            <Text className="text-xs text-slate-500 mt-1">Matches</Text>
+          </View>
+          <View className="w-px bg-slate-200" />
+          <View className="items-center">
+            <Text className="text-sm font-bold text-slate-900" numberOfLines={1}>
+              {tournament.settings.venue || 'TBD'}
+            </Text>
+            <Text className="text-xs text-slate-500 mt-1">Venue</Text>
+          </View>
+        </View>
+      </View>
 
-            <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {/* Event Type Selection */}
-              <Text className="text-lg font-bold text-slate-900 mb-3">Event Type</Text>
-              <View className="flex-row flex-wrap gap-2 mb-6">
-                {Object.entries(EVENT_CONFIGS).map(([key, config]) => (
-                  <TouchableOpacity
-                    key={key}
-                    onPress={() => { setSelectedEventType(key); setSelectedSubType(null); }}
-                    className={`flex-row items-center px-4 py-3 rounded-xl border ${
-                      selectedEventType === key ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'
-                    }`}
-                  >
-                    <View className="w-6 h-6 rounded-full items-center justify-center mr-2" style={{ backgroundColor: config.color }}>
-                      <Ionicons name={config.icon as any} size={12} color="white" />
-                    </View>
-                    <Text className={`font-medium ${selectedEventType === key ? 'text-blue-700' : 'text-slate-700'}`}>
-                      {config.name}
+      {/* Tabs */}
+      <View className="bg-white px-4 border-b border-slate-200">
+        <View className="flex-row">
+          <TouchableOpacity
+            onPress={() => setActiveTab('fixtures')}
+            className={`flex-1 items-center py-4 border-b-2 ${
+              activeTab === 'fixtures' ? 'border-blue-600' : 'border-transparent'
+            }`}
+          >
+            <Text className={`font-bold text-base ${
+              activeTab === 'fixtures' ? 'text-blue-600' : 'text-slate-400'
+            }`}>
+              Fixtures
+            </Text>
+          </TouchableOpacity>
+          
+          {tournament.format === 'league' && (
+            <TouchableOpacity
+              onPress={() => setActiveTab('standings')}
+              className={`flex-1 items-center py-4 border-b-2 ${
+                activeTab === 'standings' ? 'border-blue-600' : 'border-transparent'
+              }`}
+            >
+              <Text className={`font-bold text-base ${
+                activeTab === 'standings' ? 'text-blue-600' : 'text-slate-400'
+              }`}>
+                Standings
+              </Text>
+            </TouchableOpacity>
+          )}
+          
+          <TouchableOpacity
+            onPress={() => setActiveTab('matches')}
+            className={`flex-1 items-center py-4 border-b-2 ${
+              activeTab === 'matches' ? 'border-blue-600' : 'border-transparent'
+            }`}
+          >
+            <Text className={`font-bold text-base ${
+              activeTab === 'matches' ? 'text-blue-600' : 'text-slate-400'
+            }`}>
+              Completed
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Content */}
+      <ScrollView className="flex-1 px-4 pt-4" showsVerticalScrollIndicator={false}>
+        {/* Fixtures Tab */}
+        {activeTab === 'fixtures' && (
+          <View>
+            {upcomingFixtures.length === 0 ? (
+              <View className="items-center justify-center py-16">
+                <View className="w-20 h-20 bg-slate-100 rounded-full items-center justify-center mb-4">
+                  <Ionicons name="calendar-outline" size={32} color="#64748b" />
+                </View>
+                <Text className="text-lg font-bold text-slate-900 mb-2">No Upcoming Fixtures</Text>
+                <Text className="text-slate-500 text-center">
+                  {tournament.status === 'draft' 
+                    ? 'Start the tournament to begin playing matches' 
+                    : tournament.format === 'knockout'
+                    ? 'Complete current round matches to generate next round'
+                    : 'All matches have been completed'}
+                </Text>
+              </View>
+            ) : (
+              upcomingFixtures.map((fixture) => (
+                <View
+                  key={fixture.id}
+                  className="bg-white rounded-xl p-4 mb-3 border border-slate-100"
+                >
+                  <View className="flex-row items-center justify-between mb-3">
+                    <Text className="text-xs font-semibold text-slate-500">
+                      {fixture.roundName || `Round ${fixture.round}`} • Match {fixture.matchNumber}
                     </Text>
-                  </TouchableOpacity>
+                    <View className="bg-blue-50 px-2 py-1 rounded">
+                      <Text className="text-xs font-semibold text-blue-700">UPCOMING</Text>
+                    </View>
+                  </View>
+
+                  <View className="flex-row items-center justify-between mb-3">
+                    <View className="flex-1">
+                      <View className="flex-row items-center">
+                        <View className="w-8 h-8 bg-emerald-500 rounded-lg items-center justify-center mr-2">
+                          <Ionicons name="shield" size={14} color="white" />
+                        </View>
+                        <Text className="text-sm font-bold text-slate-900" numberOfLines={1}>
+                          {fixture.homeTeamName}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text className="text-lg font-bold text-slate-400 mx-4">vs</Text>
+                    <View className="flex-1 items-end">
+                      <View className="flex-row items-center">
+                        <Text className="text-sm font-bold text-slate-900 mr-2" numberOfLines={1}>
+                          {fixture.awayTeamName}
+                        </Text>
+                        <View className="w-8 h-8 bg-red-500 rounded-lg items-center justify-center">
+                          <Ionicons name="flag" size={14} color="white" />
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  {tournament.status === 'active' && fixture.homeTeamId && fixture.awayTeamId && (
+                    <TouchableOpacity
+                      onPress={() => handlePlayMatch(fixture.id)}
+                      className="bg-blue-600 rounded-lg py-3 items-center"
+                    >
+                      <Text className="text-white font-semibold text-sm">Play Match</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))
+            )}
+          </View>
+        )}
+
+        {/* Standings Tab */}
+        {activeTab === 'standings' && tournament.format === 'league' && (
+          <View>
+            {standings.length === 0 ? (
+              <View className="items-center justify-center py-16">
+                <Text className="text-slate-500">No standings available yet</Text>
+              </View>
+            ) : (
+              <View className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+                {/* Header */}
+                <View className="flex-row items-center bg-slate-50 px-4 py-3 border-b border-slate-100">
+                  <Text className="w-10 text-xs font-bold text-slate-600">#</Text>
+                  <Text className="flex-1 text-xs font-bold text-slate-600">Team</Text>
+                  <Text className="w-10 text-xs font-bold text-slate-600 text-center">P</Text>
+                  <Text className="w-10 text-xs font-bold text-slate-600 text-center">W</Text>
+                  <Text className="w-10 text-xs font-bold text-slate-600 text-center">D</Text>
+                  <Text className="w-10 text-xs font-bold text-slate-600 text-center">L</Text>
+                  <Text className="w-12 text-xs font-bold text-slate-600 text-center">GD</Text>
+                  <Text className="w-12 text-xs font-bold text-slate-600 text-center">Pts</Text>
+                </View>
+
+                {/* Rows */}
+                {standings.map((team, index) => (
+                  <View
+                    key={team.id}
+                    className={`flex-row items-center px-4 py-3 ${
+                      index < standings.length - 1 ? 'border-b border-slate-50' : ''
+                    } ${index === 0 ? 'bg-green-50' : ''}`}
+                  >
+                    <Text className="w-10 text-sm font-bold text-slate-900">{index + 1}</Text>
+                    <View className="flex-1 flex-row items-center">
+                      <View className="w-6 h-6 bg-blue-100 rounded items-center justify-center mr-2">
+                        <Ionicons name="shield" size={12} color="#3b82f6" />
+                      </View>
+                      <Text className="text-sm font-semibold text-slate-900" numberOfLines={1}>
+                        {team.teamName}
+                      </Text>
+                    </View>
+                    <Text className="w-10 text-sm text-slate-600 text-center">{team.played}</Text>
+                    <Text className="w-10 text-sm text-slate-600 text-center">{team.won}</Text>
+                    <Text className="w-10 text-sm text-slate-600 text-center">{team.drawn}</Text>
+                    <Text className="w-10 text-sm text-slate-600 text-center">{team.lost}</Text>
+                    <Text className={`w-12 text-sm font-semibold text-center ${
+                      team.goalDifference > 0 ? 'text-green-600' :
+                      team.goalDifference < 0 ? 'text-red-600' :
+                      'text-slate-600'
+                    }`}>
+                      {team.goalDifference > 0 ? '+' : ''}{team.goalDifference}
+                    </Text>
+                    <Text className="w-12 text-sm font-bold text-slate-900 text-center">{team.points}</Text>
+                  </View>
                 ))}
               </View>
+            )}
+          </View>
+        )}
 
-              {/* Sub Type */}
-              {selectedEventType && EVENT_CONFIGS[selectedEventType as keyof typeof EVENT_CONFIGS]?.subTypes?.length > 0 && (
-                <>
-                  <Text className="text-lg font-bold text-slate-900 mb-3">Sub Type</Text>
-                  <View className="flex-row flex-wrap gap-2 mb-6">
-                    {EVENT_CONFIGS[selectedEventType as keyof typeof EVENT_CONFIGS].subTypes.map((subType) => (
-                      <TouchableOpacity
-                        key={subType.id}
-                        onPress={() => setSelectedSubType(subType.id)}
-                        className={`px-4 py-2 rounded-lg border ${
-                          selectedSubType === subType.id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'
-                        }`}
-                      >
-                        <Text className={selectedSubType === subType.id ? 'text-blue-700' : 'text-slate-700'}>
-                          {subType.name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </>
-              )}
-
-              {/* Player Selection */}
-              <Text className="text-lg font-bold text-slate-900 mb-3">Player</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
-                <View className="flex-row gap-2">
-                  {getCurrentPlayers().map((player) => (
-                    <TouchableOpacity
-                      key={player.id}
-                      onPress={() => setSelectedPlayer(player)}
-                      className={`px-4 py-3 rounded-xl border min-w-[120px] items-center ${
-                        selectedPlayer?.id === player.id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'
-                      }`}
-                    >
-                      <Text className={`font-medium ${selectedPlayer?.id === player.id ? 'text-blue-700' : 'text-slate-700'}`}>
-                        {player.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+        {/* Completed Matches Tab */}
+        {activeTab === 'matches' && (
+          <View>
+            {completedFixtures.length === 0 ? (
+              <View className="items-center justify-center py-16">
+                <View className="w-20 h-20 bg-slate-100 rounded-full items-center justify-center mb-4">
+                  <Ionicons name="checkmark-circle-outline" size={32} color="#64748b" />
                 </View>
-              </ScrollView>
-
-              {/* Assist Player (for goals) */}
-              {selectedEventType === 'goal' && (
-                <>
-                  <Text className="text-lg font-bold text-slate-900 mb-3">Assist Player (Optional)</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
-                    <View className="flex-row gap-2">
-                      <TouchableOpacity
-                        onPress={() => setSelectedAssistPlayer(null)}
-                        className={`px-4 py-3 rounded-xl border min-w-[120px] items-center ${
-                          !selectedAssistPlayer ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'
-                        }`}
-                      >
-                        <Text className={`font-medium ${!selectedAssistPlayer ? 'text-blue-700' : 'text-slate-700'}`}>
-                          No Assist
-                        </Text>
-                      </TouchableOpacity>
-                      {getCurrentPlayers().filter(p => p.id !== selectedPlayer?.id).map((player) => (
-                        <TouchableOpacity
-                          key={player.id}
-                          onPress={() => setSelectedAssistPlayer(player)}
-                          className={`px-4 py-3 rounded-xl border min-w-[120px] items-center ${
-                            selectedAssistPlayer?.id === player.id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'
-                          }`}
-                        >
-                          <Text className={`font-medium ${selectedAssistPlayer?.id === player.id ? 'text-blue-700' : 'text-slate-700'}`}>
-                            {player.name}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </ScrollView>
-                </>
-              )}
-
-              {/* Minute */}
-              <Text className="text-lg font-bold text-slate-900 mb-3">Minute</Text>
-              <View className="flex-row gap-3 mb-6">
-                <TextInput
-                  value={eventMinute}
-                  onChangeText={setEventMinute}
-                  placeholder="45"
-                  keyboardType="numeric"
-                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg"
-                />
-                <TouchableOpacity
-                  onPress={() => setIsExtraTime(!isExtraTime)}
-                  className={`px-4 py-3 rounded-xl border ${
-                    isExtraTime ? 'border-orange-500 bg-orange-50' : 'border-slate-200 bg-white'
-                  }`}
-                >
-                  <Text className={`font-medium ${isExtraTime ? 'text-orange-700' : 'text-slate-700'}`}>
-                    Extra Time
-                  </Text>
-                </TouchableOpacity>
+                <Text className="text-lg font-bold text-slate-900 mb-2">No Completed Matches</Text>
+                <Text className="text-slate-500 text-center">
+                  Completed matches will appear here
+                </Text>
               </View>
+            ) : (
+              completedFixtures.map((fixture) => (
+                <TouchableOpacity
+                  key={fixture.id}
+                  className="bg-white rounded-xl p-4 mb-3 border border-slate-100"
+                  onPress={() => {
+                    if (fixture.id) {
+                      router.push(`/(football)/landingScreen/matchDetails?matchId=${fixture.id}`);
+                    }
+                  }}
+                >
+                  <View className="flex-row items-center justify-between mb-3">
+                    <Text className="text-xs font-semibold text-slate-500">
+                      {fixture.roundName || `Round ${fixture.round}`} • Match {fixture.matchNumber}
+                    </Text>
+                    <View className="bg-green-50 px-2 py-1 rounded">
+                      <Text className="text-xs font-semibold text-green-700">COMPLETED</Text>
+                    </View>
+                  </View>
 
-              {/* Description */}
-              <Text className="text-lg font-bold text-slate-900 mb-3">Description (Optional)</Text>
-              <TextInput
-                value={eventDescription}
-                onChangeText={setEventDescription}
-                placeholder="Additional notes..."
-                multiline
-                numberOfLines={3}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-base"
-                textAlignVertical="top"
-              />
-            </ScrollView>
-          </SafeAreaView>
-        </KeyboardAvoidingView>
-      </Modal>
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-1 flex-row items-center">
+                      <View className={`w-8 h-8 rounded-lg items-center justify-center mr-2 ${
+                        fixture.winnerId === fixture.homeTeamId ? 'bg-green-500' : 'bg-emerald-500'
+                      }`}>
+                        <Ionicons name="shield" size={14} color="white" />
+                      </View>
+                      <Text className={`text-sm font-bold flex-1 ${
+                        fixture.winnerId === fixture.homeTeamId ? 'text-green-700' : 'text-slate-900'
+                      }`} numberOfLines={1}>
+                        {fixture.homeTeamName}
+                      </Text>
+                    </View>
+
+                    <View className="mx-4 bg-slate-50 rounded-lg px-3 py-2">
+                      <View className="flex-row items-center">
+                        <Text className="text-lg font-bold text-slate-900">{fixture.homeScore}</Text>
+                        <Text className="text-sm font-medium text-slate-400 mx-2">-</Text>
+                        <Text className="text-lg font-bold text-slate-900">{fixture.awayScore}</Text>
+                      </View>
+                    </View>
+
+                    <View className="flex-1 flex-row items-center justify-end">
+                      <Text className={`text-sm font-bold flex-1 text-right ${
+                        fixture.winnerId === fixture.awayTeamId ? 'text-green-700' : 'text-slate-900'
+                      }`} numberOfLines={1}>
+                        {fixture.awayTeamName}
+                      </Text>
+                      <View className={`w-8 h-8 rounded-lg items-center justify-center ml-2 ${
+                        fixture.winnerId === fixture.awayTeamId ? 'bg-green-500' : 'bg-red-500'
+                      }`}>
+                        <Ionicons name="flag" size={14} color="white" />
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        )}
+
+        <View className="h-24" />
+      </ScrollView>
+
+      {/* Start Tournament Button */}
+      {tournament.status === 'draft' && (
+        <View className="bg-white px-4 py-4 border-t border-slate-200">
+          <TouchableOpacity
+            onPress={handleStartTournament}
+            className="bg-green-600 rounded-xl py-4 items-center"
+          >
+            <View className="flex-row items-center">
+              <Ionicons name="play" size={20} color="white" />
+              <Text className="text-white font-bold text-base ml-2">Start Tournament</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
