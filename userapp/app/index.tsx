@@ -13,12 +13,11 @@ export default function Index() {
       if (userId) {
         router.replace("/(homeScreenTabs)");
       } else {
-        // router.replace("/(onboardingStack)/basicInfoRegisterOne");
-        router.replace("/(homeScreenTabs)");
+        router.replace("/(onboardingStack)/basicInfoRegisterOne");
+        // router.replace("/(homeScreenTabs)");
       }
     };
     checkAuth();
   }, []);
-
   return null;
 }

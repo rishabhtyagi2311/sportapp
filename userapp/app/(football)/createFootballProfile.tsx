@@ -360,15 +360,7 @@ export default function CreateFootballProfile() {
             </View>
           </TouchableOpacity>
 
-          {/* Footer Note */}
-          <View className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 mb-10">
-            <View className="flex-row items-center justify-center">
-              <Ionicons name="information-circle-outline" size={16} color="white" />
-              <Text className="text-slate-400 text-sm text-center ml-2">
-                This profile will be used for team selection and player management
-              </Text>
-            </View>
-          </View>
+         
         </ScrollView>
       </View>
     </SafeAreaView>

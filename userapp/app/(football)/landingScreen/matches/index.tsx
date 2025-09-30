@@ -20,7 +20,7 @@ export default function MatchesScreen() {
 
   const handleViewMatch = useCallback((matchId: string) => {
     // Navigate to match details view
-    router.push(`/(football)/matches/matchDetails?matchId=${matchId}`);
+    router.push(`/(football)/matchDetails/${matchId}`);
   }, [router]);
 
   // Group matches by date
