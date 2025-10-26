@@ -52,7 +52,7 @@ export default function AcademyTabsLayout() {
           {academy.address}, {academy.city}
         </Text>
         <Text className="text-white mt-2">
-          ₹{academy.monthlyFee}/{academy.feeStructure}
+          ₹{academy.Fee}/month
         </Text>
       </View>
 

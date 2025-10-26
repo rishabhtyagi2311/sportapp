@@ -1,13 +1,14 @@
+// app/(academy)/academyMainScreen.tsx
 import React, { useRef } from "react";
-import { 
-  SafeAreaView, 
-  View, 
-  Image as RNImage, 
-  Text, 
-  TouchableWithoutFeedback, 
-  Dimensions, 
-  ScrollView, 
-  Animated 
+import {
+  SafeAreaView,
+  View,
+  Image as RNImage,
+  Text,
+  TouchableWithoutFeedback,
+  Dimensions,
+  ScrollView,
+  Animated
 } from "react-native";
 import Svg, { Defs, ClipPath, Path, Image as SvgImage } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,24 +16,18 @@ import { router } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
-export default function Academy() {
-  const src = require("../../assets/images/academyCoverImage.jpg");
+export default function AcademyMainScreen() {
+  const src = require("@/assets/images/academyCoverImage.jpg");
   const uri = RNImage.resolveAssetSource(src).uri;
 
   const handlePress = (action: string): void => {
     console.log(`${action} pressed`);
-    // Add your navigation logic here
-    if(action === 'Register')
-    {
-      router.navigate('./../(academy)/registerAcademy')
+
+    if (action === "Explore") {
+      router.navigate('./../(academy)/browseAcademy');
     }
-    else if(action === "Explore")
-    {
-      router.navigate('./../(academy)/browseAcademy')
-    }
-    else if(action==="Manage")
-    {
-      router.navigate('./../(academy)/manageAcademy')
+    else if (action === "Manage") {
+      router.navigate('./../manageProfile');
     }
   };
 
@@ -114,7 +109,6 @@ export default function Academy() {
               />
             </ClipPath>
           </Defs>
-
           <SvgImage
             href={{ uri }}
             width="100%"
@@ -157,19 +151,8 @@ export default function Academy() {
           </View>
 
           {/* Action Buttons */}
-          <View className="items-center mb-8">
-            <View className="flex-row justify-center mb-8">
-              <View className="items-center mx-6">
-                <ButtonComponent
-                  icon="school-outline"
-                  label="Register Academy"
-                  onPress={() => handlePress("Register")}
-                  style={{
-                    width: width * 0.25,
-                    height: width * 0.25,
-                  }}
-                />
-              </View>
+          <View className="items-center mb-4 mt-8">
+            <View className="flex-row justify-center mb-8 ">
 
               <View className="items-center mx-6">
                 <ButtonComponent
@@ -181,20 +164,21 @@ export default function Academy() {
                     height: width * 0.25,
                   }}
                 />
+              </View> 
+              <View className="items-center mx-6">
+                <ButtonComponent
+                  icon="trophy-outline"
+                  label="Manage Academy"
+                  onPress={() => handlePress("Manage")}
+                  style={{
+                    width: width * 0.25,
+                    height: width * 0.25,
+                  }}
+                />
               </View>
+
             </View>
 
-            <View className="items-center">
-              <ButtonComponent
-                icon="trophy-outline"
-                label="Manage Academy"
-                onPress={() => handlePress("Manage")}
-                style={{
-                  width: width * 0.25,
-                  height: width * 0.25,
-                }}
-              />
-            </View>
           </View>
         </ScrollView>
       </View>
