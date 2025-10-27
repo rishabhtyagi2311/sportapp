@@ -26,7 +26,7 @@ type Academy = {
   coachName: string;
   contactNumber: string;
   facilities: string;
-  feeStructure: string;
+  
   Fee: string;
   city: string;
 };
@@ -137,7 +137,7 @@ export default function BrowseAcademies() {
           <View className="absolute top-3 right-3 bg-white px-3 py-1 rounded-full shadow-sm">
             <Text className="text-slate-900 text-xs font-bold">
               ₹{academy.Fee}
-              /{academy.feeStructure === 'monthly' ? 'mo' : academy.feeStructure === 'quarterly' ? 'qtr' : 'yr'}
+              /month
             </Text>
           </View>
         </View>

@@ -1,4 +1,4 @@
-// app/(academy)/createProfile.tsx
+// app/(academy)/registerChildProfile/index.tsx
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -12,15 +12,16 @@ import {
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useParentStore } from "@/store/parentAcademyProfile";
+import { usechildStore } from "@/store/academyChildProfile";
 
-export default function CreateProfile() {
+export default function RegisterChildProfile() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const setParentProfile = useParentStore((state) => state.setParentProfile);
-  const updateParentProfile = useParentStore((state) => state.updateParentProfile);
+  const addChildProfile = usechildStore((state) => state.addChildProfile);
+  const updateChildProfile = usechildStore((state) => state.updateChildProfile);
 
   const isEditing = params.isEditing === "true";
+  const profileId = params.profileId as string;
 
   const [formData, setFormData] = useState({
     fatherName: "",
@@ -31,8 +32,10 @@ export default function CreateProfile() {
     city: "",
   });
 
+  // Use useEffect with proper dependencies to avoid infinite loop
   useEffect(() => {
-    if (isEditing) {
+    if (isEditing && params.fatherName) {
+      // Only set form data once when component mounts in edit mode
       setFormData({
         fatherName: (params.fatherName as string) || "",
         motherName: (params.motherName as string) || "",
@@ -42,7 +45,9 @@ export default function CreateProfile() {
         city: (params.city as string) || "",
       });
     }
-  }, [params]);
+    // Only run once when component mounts
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = () => {
     if (
@@ -63,8 +68,8 @@ export default function CreateProfile() {
       return;
     }
 
-    if (isEditing) {
-      updateParentProfile({ ...formData });
+    if (isEditing && profileId) {
+      updateChildProfile(profileId, { ...formData });
       Alert.alert("Success", "Profile updated successfully!", [
         {
           text: "OK",
@@ -73,8 +78,8 @@ export default function CreateProfile() {
       ]);
     } else {
       const id = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-      const parentData = { ...formData, id };
-      setParentProfile(parentData);
+      const childData = { ...formData, id };
+      addChildProfile(childData);
       Alert.alert("Success", "Profile created successfully!", [
         {
           text: "OK",
@@ -119,7 +124,8 @@ export default function CreateProfile() {
                 Welcome to Academy Connect! 👋
               </Text>
               <Text className="text-slate-300 text-sm leading-5">
-                Let's create your parent profile. This will help us personalize your experience.
+                Let's start by creating your child profile. This will help us
+                personalize your experience.
               </Text>
             </View>
           )}
