@@ -1,4 +1,4 @@
-// stores/matchExecutionStore.ts
+// stores/matchExecutionStore.ts (complete updated version)
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
@@ -120,6 +120,9 @@ export interface MatchExecutionState {
   // Current active match
   activeMatch: ActiveMatch | null;
   
+  // Live matches (ongoing matches)
+  liveMatches: ActiveMatch[];
+  
   // Completed matches history
   completedMatches: CompletedMatch[];
   
@@ -161,6 +164,12 @@ export interface MatchExecutionState {
   // Error handling
   setError: (error: string | null) => void;
   clearError: () => void;
+  
+  // New actions for live matches
+  addLiveMatch: (matchSetup: MatchCreationData) => string; // Returns match ID
+  updateLiveMatch: (matchId: string, updates: Partial<ActiveMatch>) => void;
+  completeLiveMatch: (matchId: string, notes?: string) => CompletedMatch | null;
+  getLiveMatches: () => ActiveMatch[];
 }
 
 // Helper functions
@@ -187,7 +196,6 @@ const calculatePlayerStats = (events: MatchEvent[], matchSetup: MatchCreationDat
     ...matchSetup.myTeam.substitutes,
     ...matchSetup.opponentTeam.substitutes
   ];
-
   return allPlayers.map(playerId => {
     const playerEvents = events.filter(e => e.playerId === playerId || e.assistPlayerId === playerId);
     
@@ -209,7 +217,6 @@ const calculatePlayerStats = (events: MatchEvent[], matchSetup: MatchCreationDat
     } else if (substitutionIn) {
       minutesPlayed = 90 - substitutionIn.minute; // Minutes from substitution to end
     }
-
     return {
       playerId,
       playerName: 'Player Name', // Would need to fetch from players store
@@ -227,6 +234,7 @@ const calculatePlayerStats = (events: MatchEvent[], matchSetup: MatchCreationDat
 // Initial state
 const initialState = {
   activeMatch: null,
+  liveMatches: [], // Add this new field
   completedMatches: [],
   isStartingMatch: false,
   isSavingEvent: false,
@@ -239,12 +247,88 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
   devtools(
     immer((set, get) => ({
       ...initialState,
-
+      
+      // Add a match to live matches
+      addLiveMatch: (matchSetup) => {
+        const matchId = `match_${Date.now()}`;
+        
+        set((state) => {
+          const newMatch: ActiveMatch = {
+            id: matchId,
+            matchSetup,
+            startTime: new Date(),
+            currentMinute: 0,
+            status: 'in_progress',
+            events: [],
+            homeTeamScore: 0,
+            awayTeamScore: 0,
+            isExtraTime: false,
+            notes: '',
+          };
+          
+          state.liveMatches.push(newMatch);
+          state.error = null;
+        });
+        
+        return matchId;
+      },
+      
+      // Update a live match
+      updateLiveMatch: (matchId, updates) => set((state) => {
+        const matchIndex = state.liveMatches.findIndex(m => m.id === matchId);
+        if (matchIndex !== -1) {
+          Object.assign(state.liveMatches[matchIndex], updates);
+        }
+      }),
+      
+      // Complete a live match and move it to completed matches
+      completeLiveMatch: (matchId, notes) => {
+        const state = get();
+        const matchIndex = state.liveMatches.findIndex(m => m.id === matchId);
+        
+        if (matchIndex === -1) return null;
+        
+        const match = state.liveMatches[matchIndex];
+        const endTime = new Date();
+        const actualDuration = Math.floor((endTime.getTime() - match.startTime.getTime()) / (1000 * 60));
+        
+        const homeTeamStats = calculateTeamStats(match.events, match.matchSetup.myTeam.teamId);
+        const awayTeamStats = calculateTeamStats(match.events, match.matchSetup.opponentTeam.teamId);
+        const playerStats = calculatePlayerStats(match.events, match.matchSetup);
+        
+        const completedMatch: CompletedMatch = {
+          id: match.id,
+          matchSetup: match.matchSetup,
+          startTime: match.startTime,
+          endTime,
+          actualDuration,
+          status: 'finished',
+          homeTeamScore: match.homeTeamScore,
+          awayTeamScore: match.awayTeamScore,
+          events: match.events,
+          homeTeamStats,
+          awayTeamStats,
+          playerStats,
+          referees: match.matchSetup.referees.map(ref => ref.name),
+          venue: match.matchSetup.venue?.name || 'Unknown Venue',
+          notes: notes || match.notes,
+          createdAt: match.startTime,
+          updatedAt: endTime,
+        };
+        
+        set((state) => {
+          state.completedMatches.unshift(completedMatch);
+          state.liveMatches.splice(matchIndex, 1);
+        });
+        
+        return completedMatch;
+      },
+      
       // Start a new match
       startMatch: (matchSetup) => set((state) => {
         const matchId = `match_${Date.now()}`;
         
-        state.activeMatch = {
+        const newMatch: ActiveMatch = {
           id: matchId,
           matchSetup,
           startTime: new Date(),
@@ -257,21 +341,28 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
           notes: '',
         };
         
+        // If we want to track it as active and also in liveMatches
+        state.activeMatch = newMatch;
+        state.liveMatches.push(newMatch);
+        
         state.error = null;
       }),
-
+      
       // End the current match
       endMatch: (notes) => {
         const state = get();
         if (!state.activeMatch) return null;
-
+        
+        // Find this match in liveMatches and remove it
+        const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+        
         const endTime = new Date();
         const actualDuration = Math.floor((endTime.getTime() - state.activeMatch.startTime.getTime()) / (1000 * 60));
         
         const homeTeamStats = calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.myTeam.teamId);
         const awayTeamStats = calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.opponentTeam.teamId);
         const playerStats = calculatePlayerStats(state.activeMatch.events, state.activeMatch.matchSetup);
-
+        
         const completedMatch: CompletedMatch = {
           id: state.activeMatch.id,
           matchSetup: state.activeMatch.matchSetup,
@@ -285,47 +376,59 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
           homeTeamStats,
           awayTeamStats,
           playerStats,
-          referees: state.activeMatch.matchSetup.referees.map(ref  => ref.name),
+          referees: state.activeMatch.matchSetup.referees.map(ref => ref.name),
           venue: state.activeMatch.matchSetup.venue?.name || 'Unknown Venue',
           notes: notes || state.activeMatch.notes,
           createdAt: state.activeMatch.startTime,
           updatedAt: endTime,
         };
-
+        
         set((state) => {
           state.completedMatches.unshift(completedMatch);
           state.activeMatch = null;
+          
+          // Also remove from liveMatches if found
+          if (liveMatchIndex !== -1) {
+            state.liveMatches.splice(liveMatchIndex, 1);
+          }
         });
-
+        
         return completedMatch;
       },
-
+      
       // Abandon match
       abandonMatch: (reason) => set((state) => {
         if (state.activeMatch) {
           state.activeMatch.status = 'abandoned';
           state.activeMatch.notes = `Match abandoned: ${reason}`;
+          
+          // Also update in live matches
+          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+          if (liveMatchIndex !== -1) {
+            state.liveMatches[liveMatchIndex].status = 'abandoned';
+            state.liveMatches[liveMatchIndex].notes = `Match abandoned: ${reason}`;
+          }
         }
       }),
-
+      
       // Add event to active match
       addEvent: (eventData) => set((state) => {
         if (!state.activeMatch) return;
-
+        
         const newEvent: MatchEvent = {
           ...eventData,
           id: `event_${Date.now()}`,
           timestamp: new Date(),
         };
-
+        
         state.activeMatch.events.push(newEvent);
         state.activeMatch.events.sort((a, b) => a.minute - b.minute);
-
+        
         // Update scores if it's a goal
         if (newEvent.eventType === 'goal') {
           const isHomeTeam = newEvent.teamId === state.activeMatch.matchSetup.myTeam.teamId;
           const isOwnGoal = newEvent.eventSubType === 'own_goal';
-
+          
           if (isOwnGoal) {
             // Own goal goes to opposite team
             if (isHomeTeam) {
@@ -342,12 +445,21 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
             }
           }
         }
+        
+        // Also update in live matches
+        const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+        if (liveMatchIndex !== -1) {
+          state.liveMatches[liveMatchIndex].events.push(newEvent);
+          state.liveMatches[liveMatchIndex].events.sort((a, b) => a.minute - b.minute);
+          state.liveMatches[liveMatchIndex].homeTeamScore = state.activeMatch.homeTeamScore;
+          state.liveMatches[liveMatchIndex].awayTeamScore = state.activeMatch.awayTeamScore;
+        }
       }),
-
+      
       // Update event
       updateEvent: (eventId, updates) => set((state) => {
         if (!state.activeMatch) return;
-
+        
         const eventIndex = state.activeMatch.events.findIndex(e => e.id === eventId);
         if (eventIndex !== -1) {
           Object.assign(state.activeMatch.events[eventIndex], updates);
@@ -359,11 +471,11 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
           const goals = state.activeMatch.events.filter(e => e.eventType === 'goal');
           let homeScore = 0;
           let awayScore = 0;
-
+          
           goals.forEach(goal => {
             const isHomeTeam = goal.teamId === state.activeMatch!.matchSetup.myTeam.teamId;
             const isOwnGoal = goal.eventSubType === 'own_goal';
-
+            
             if (isOwnGoal) {
               if (isHomeTeam) awayScore += 1;
               else homeScore += 1;
@@ -372,26 +484,39 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
               else awayScore += 1;
             }
           });
-
+          
           state.activeMatch.homeTeamScore = homeScore;
           state.activeMatch.awayTeamScore = awayScore;
+          
+          // Also update in live matches
+          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+          if (liveMatchIndex !== -1) {
+            const liveEventIndex = state.liveMatches[liveMatchIndex].events.findIndex(e => e.id === eventId);
+            if (liveEventIndex !== -1) {
+              Object.assign(state.liveMatches[liveMatchIndex].events[liveEventIndex], updates);
+              state.liveMatches[liveMatchIndex].events.sort((a, b) => a.minute - b.minute);
+            }
+            
+            state.liveMatches[liveMatchIndex].homeTeamScore = homeScore;
+            state.liveMatches[liveMatchIndex].awayTeamScore = awayScore;
+          }
         }
       }),
-
+      
       // Remove event
       removeEvent: (eventId) => set((state) => {
         if (!state.activeMatch) return;
-
+        
         const eventIndex = state.activeMatch.events.findIndex(e => e.id === eventId);
         if (eventIndex !== -1) {
           const removedEvent = state.activeMatch.events[eventIndex];
           state.activeMatch.events.splice(eventIndex, 1);
-
+          
           // Recalculate scores if it was a goal
           if (removedEvent.eventType === 'goal') {
             const isHomeTeam = removedEvent.teamId === state.activeMatch.matchSetup.myTeam.teamId;
             const isOwnGoal = removedEvent.eventSubType === 'own_goal';
-
+            
             if (isOwnGoal) {
               if (isHomeTeam) {
                 state.activeMatch.awayTeamScore = Math.max(0, state.activeMatch.awayTeamScore - 1);
@@ -406,30 +531,60 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
               }
             }
           }
+          
+          // Also update in live matches
+          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+          if (liveMatchIndex !== -1) {
+            const liveEventIndex = state.liveMatches[liveMatchIndex].events.findIndex(e => e.id === eventId);
+            if (liveEventIndex !== -1) {
+              state.liveMatches[liveMatchIndex].events.splice(liveEventIndex, 1);
+            }
+            
+            state.liveMatches[liveMatchIndex].homeTeamScore = state.activeMatch.homeTeamScore;
+            state.liveMatches[liveMatchIndex].awayTeamScore = state.activeMatch.awayTeamScore;
+          }
         }
       }),
-
+      
       // Update match status
       updateMatchStatus: (status) => set((state) => {
         if (state.activeMatch) {
           state.activeMatch.status = status;
+          
+          // Also update in live matches
+          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+          if (liveMatchIndex !== -1) {
+            state.liveMatches[liveMatchIndex].status = status;
+          }
         }
       }),
-
+      
       // Update current minute
       updateCurrentMinute: (minute) => set((state) => {
         if (state.activeMatch) {
           state.activeMatch.currentMinute = minute;
+          
+          // Also update in live matches
+          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+          if (liveMatchIndex !== -1) {
+            state.liveMatches[liveMatchIndex].currentMinute = minute;
+          }
         }
       }),
-
+      
       // Add match notes
       addMatchNotes: (notes) => set((state) => {
         if (state.activeMatch) {
           state.activeMatch.notes = notes;
+          
+          // Also update in live matches
+          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+          if (liveMatchIndex !== -1) {
+            state.liveMatches[liveMatchIndex].notes = notes;
+          }
         }
       }),
-
+      
       // Get match duration
       getMatchDuration: () => {
         const state = get();
@@ -438,7 +593,7 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
         const now = new Date();
         return Math.floor((now.getTime() - state.activeMatch.startTime.getTime()) / (1000 * 60));
       },
-
+      
       // Get team score
       getTeamScore: (teamId) => {
         const state = get();
@@ -447,7 +602,7 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
         const isHomeTeam = teamId === state.activeMatch.matchSetup.myTeam.teamId;
         return isHomeTeam ? state.activeMatch.homeTeamScore : state.activeMatch.awayTeamScore;
       },
-
+      
       // Get team events
       getTeamEvents: (teamId) => {
         const state = get();
@@ -455,7 +610,7 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
         
         return state.activeMatch.events.filter(event => event.teamId === teamId);
       },
-
+      
       // Get player events
       getPlayerEvents: (playerId) => {
         const state = get();
@@ -465,7 +620,7 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
           event.playerId === playerId || event.assistPlayerId === playerId
         );
       },
-
+      
       // Get match statistics
       getMatchStats: () => {
         const state = get();
@@ -481,28 +636,33 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
         
         return { homeStats, awayStats };
       },
-
+      
       // Get completed matches
       getCompletedMatches: () => {
         return get().completedMatches;
       },
-
+      
+      // Get live matches
+      getLiveMatches: () => {
+        return get().liveMatches;
+      },
+      
       // Get match by ID
       getMatchById: (matchId) => {
         const state = get();
         return state.completedMatches.find(match => match.id === matchId) || null;
       },
-
+      
       // Clear match history
       clearMatchHistory: () => set((state) => {
         state.completedMatches = [];
       }),
-
+      
       // Error handling
       setError: (error) => set((state) => {
         state.error = error;
       }),
-
+      
       clearError: () => set((state) => {
         state.error = null;
       }),

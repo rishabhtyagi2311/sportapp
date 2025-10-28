@@ -25,7 +25,7 @@ export interface FootballPlayer {
   name: string;
   position: FootballPosition;
   isRegistered: boolean;
-  images: FootballPlayerImage[]; // Up to 3 images (optional)
+  
   profileImage?: string; // Main profile image URI
   createdAt: string;
   updatedAt: string;

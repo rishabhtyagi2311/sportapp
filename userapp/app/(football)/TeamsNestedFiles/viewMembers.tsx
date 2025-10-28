@@ -1,28 +1,97 @@
 // app/(football)/teams/viewMembers.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
-  Dimensions,
+  Image,
+  Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useFootballStore } from '@/store/footballTeamStore';
-
+import * as ImagePicker from 'expo-image-picker';
 
 export default function ViewMembersScreen() {
   const { teamId } = useLocalSearchParams();
-  const { getTeamById, getTeamPlayers } = useFootballStore();
+  const { 
+    getTeamById, 
+    getTeamPlayers, 
+    setTeamCaptain, 
+    getTeamCaptain, 
+    setTeamLogo,
+    getTeamLogoUri
+  } = useFootballStore();
   
   // Get team by ID from route parameters
   const team = teamId ? getTeamById(teamId as string) : null;
   const teamPlayers = team ? getTeamPlayers(team.id) : [];
+  const captain = team ? getTeamCaptain(team.id) : undefined;
+  const teamLogoUri = team ? getTeamLogoUri(team.id) : undefined;
 
   const handleGoBack = () => {
     router.back();
+  };
+
+  // Handle team logo selection
+  const handleSelectTeamLogo = async () => {
+    if (!team) return;
+    
+    // Request permission
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'We need access to your photos to set a team logo');
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0].uri) {
+        // Set team logo in store
+        setTeamLogo(team.id, result.assets[0].uri);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick an image. Please try again.');
+    }
+  };
+
+  // Handle setting a player as team captain
+  const handleSetCaptain = (playerId: string) => {
+    if (!team) return;
+    
+    // Check if the player is already the captain
+    const isCurrentCaptain = team.captainId === playerId;
+    
+    if (isCurrentCaptain) {
+      Alert.alert(
+        'Remove Captain',
+        'Do you want to remove this player as team captain?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Remove',
+            onPress: () => setTeamCaptain(team.id, ''), // Empty string to remove captain
+            style: 'destructive',
+          },
+        ]
+      );
+    } else {
+      // Set as new captain
+      setTeamCaptain(team.id, playerId);
+    }
   };
 
   // Get position color for better visual organization
@@ -43,79 +112,102 @@ export default function ViewMembersScreen() {
     return positionColors[position as keyof typeof positionColors] || '#6b7280';
   };
 
-  const renderPlayerCard = (player: any, index: number) => (
-    <View
-      key={player.id}
-      className="bg-white rounded-xl mx-4 mb-3 shadow-sm border border-gray-100"
-      style={{
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-      }}
-    >
-      <View className="flex-row items-center p-4">
-        {/* Position Color Bar */}
-        <View 
-          className="w-1 h-12 rounded-full mr-3"
-          style={{ backgroundColor: getPositionColor(player.position) }}
-        />
-        
-        {/* Profile Picture with Position Initial */}
-        <View 
-          className="w-12 h-12 rounded-xl items-center justify-center mr-3"
-          style={{ backgroundColor: getPositionColor(player.position) + '15' }}
-        >
-          <Text 
-            className="font-bold text-sm"
-            style={{ color: getPositionColor(player.position) }}
+  const renderPlayerCard = (player: any, index: number) => {
+    const isCaptain = captain?.id === player.id;
+    
+    return (
+      <TouchableOpacity
+        key={player.id}
+        onPress={() => handleSetCaptain(player.id)}
+        activeOpacity={0.9}
+        className="bg-white rounded-xl mx-4 mb-3 shadow-sm border border-gray-100"
+        style={{
+          elevation: 2,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.1,
+          shadowRadius: 3,
+        }}
+      >
+        <View className="flex-row items-center p-4">
+          {/* Position Color Bar */}
+          <View 
+            className="w-1 h-12 rounded-full mr-3"
+            style={{ backgroundColor: getPositionColor(player.position) }}
+          />
+          
+          {/* Profile Picture with Position Initial */}
+          <View 
+            className="w-12 h-12 rounded-xl items-center justify-center mr-3"
+            style={{ backgroundColor: getPositionColor(player.position) + '15' }}
           >
-            {player.position.charAt(0)}
-          </Text>
-        </View>
-
-        {/* Player Info */}
-        <View className="flex-1">
-          <Text className="text-gray-900 font-bold text-base mb-1">
-            {player.name}
-          </Text>
-          <View className="flex-row items-center">
-            <Text className="text-gray-600 text-sm">
-              {player.position}
+            <Text 
+              className="font-bold text-sm"
+              style={{ color: getPositionColor(player.position) }}
+            >
+              {player.position.charAt(0)}
             </Text>
-            {player.experience && (
-              <>
-                <View className="w-1 h-1 bg-gray-400 rounded-full mx-2" />
-                <Text className="text-gray-500 text-xs">
-                  {player.experience}
-                </Text>
-              </>
+          </View>
+
+          {/* Player Info */}
+          <View className="flex-1">
+            <View className="flex-row items-center">
+              <Text className="text-gray-900 font-bold text-base mb-1">
+                {player.name}
+              </Text>
+              {isCaptain && (
+                <View className="ml-2 bg-amber-100 rounded-full px-2 py-0.5">
+                  <Text className="text-amber-700 text-xs font-bold">CAPTAIN</Text>
+                </View>
+              )}
+            </View>
+            <View className="flex-row items-center">
+              <Text className="text-gray-600 text-sm">
+                {player.position}
+              </Text>
+              {player.experience && (
+                <>
+                  <View className="w-1 h-1 bg-gray-400 rounded-full mx-2" />
+                  <Text className="text-gray-500 text-xs">
+                    {player.experience}
+                  </Text>
+                </>
+              )}
+            </View>
+            {player.contact && (
+              <Text className="text-gray-400 text-xs mt-1">
+                {player.contact}
+              </Text>
             )}
           </View>
-          {player.contact && (
-            <Text className="text-gray-400 text-xs mt-1">
-              {player.contact}
-            </Text>
-          )}
-        </View>
 
-        {/* Jersey Number & Status */}
-        <View className="items-end">
-          <View className="bg-slate-900 w-8 h-8 rounded-lg items-center justify-center mb-2">
-            <Text className="text-white text-xs font-bold">
-              {index + 1}
-            </Text>
-          </View>
-          <View className="bg-green-100 px-2 py-1 rounded-full">
-            <Text className="text-green-700 text-xs font-medium">
-              Active
-            </Text>
+          {/* Jersey Number & Status */}
+          <View className="items-end">
+            <View className={`w-8 h-8 rounded-lg items-center justify-center mb-2 ${isCaptain ? 'bg-amber-500' : 'bg-slate-900'}`}>
+              <Text className="text-white text-xs font-bold">
+                {index + 1}
+              </Text>
+            </View>
+            <View className="bg-green-100 px-2 py-1 rounded-full">
+              <Text className="text-green-700 text-xs font-medium">
+                Active
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
-    </View>
-  );
+        
+        {/* Captain Indicator */}
+        {isCaptain && (
+          <View className="bg-amber-50 px-4 py-2 border-t border-amber-100 flex-row items-center">
+            <Ionicons name="shield" size={14} color="#b45309" />
+            <Text className="text-amber-700 text-xs font-medium ml-2">
+              Team Captain - Tap to change
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const renderEmptyState = () => (
     <View className="flex-1 justify-center items-center px-6">
@@ -217,41 +309,84 @@ export default function ViewMembersScreen() {
       </View>
 
       {/* Content */}
-      {teamPlayers.length === 0 ? (
-        renderEmptyState()
-      ) : (
-        <ScrollView 
-          className="flex-1 pt-4"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 100 }}
-        >
-          {/* Quick Stats */}
-          <View className="flex-row mx-4 mb-4 space-x-3">
-            <View className="flex-1 bg-white rounded-xl p-4 border border-gray-100">
-              <View className="flex-row items-center">
-                <Ionicons name="location" size={16} color="#0ea5e9" />
-                <Text className="text-sky-700 font-medium text-sm ml-2">
-                  {team?.city}
-                </Text>
+      <ScrollView 
+        className="flex-1 pt-4"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
+        {/* Team Logo Section */}
+        <View className="items-center mb-6">
+          <TouchableOpacity 
+            onPress={handleSelectTeamLogo}
+            activeOpacity={0.8}
+            className="mb-3"
+          >
+            {teamLogoUri ? (
+              <Image 
+                source={{ uri: teamLogoUri }} 
+                className="w-24 h-24 rounded-full"
+                style={{
+                  borderWidth: 3,
+                  borderColor: '#f8fafc',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 4,
+                  
+                }}
+              />
+            ) : (
+              <View className="w-24 h-24 bg-slate-200 rounded-full items-center justify-center">
+                <Ionicons name="image-outline" size={32} color="#64748b" />
+                <Text className="text-slate-600 text-xs mt-1 font-medium">Add Logo</Text>
               </View>
-            </View>
-            
-            <View className="flex-1 bg-white rounded-xl p-4 border border-gray-100">
-              <View className="flex-row items-center">
-                <Ionicons name="trophy" size={16} color="#f59e0b" />
-                <Text className="text-amber-600 font-medium text-sm ml-2">
-                  {team?.matchesWon || 0}W {team?.matchesLost || 0}L
-                </Text>
-              </View>
+            )}
+          </TouchableOpacity>
+          
+          <Text className="text-lg font-bold text-gray-800">{team.teamName}</Text>
+          {captain && (
+            <Text className="text-gray-500 text-sm mt-1">
+              Captain: {captain.name}
+            </Text>
+          )}
+        </View>
+
+        {/* Quick Stats */}
+        <View className="flex-row mx-4 mb-4 space-x-3">
+          <View className="flex-1 bg-white rounded-xl p-4 border border-gray-100">
+            <View className="flex-row items-center">
+              <Ionicons name="location" size={16} color="#0ea5e9" />
+              <Text className="text-sky-700 font-medium text-sm ml-2">
+                {team?.city}
+              </Text>
             </View>
           </View>
+          
+          <View className="flex-1 bg-white rounded-xl p-4 border border-gray-100">
+            <View className="flex-row items-center">
+              <Ionicons name="trophy" size={16} color="#f59e0b" />
+              <Text className="text-amber-600 font-medium text-sm ml-2">
+                {team?.matchesWon || 0}W {team?.matchesLost || 0}L
+              </Text>
+            </View>
+          </View>
+        </View>
 
-          {/* Players List */}
-          <View className="flex-1">
+        {/* Players List */}
+        {teamPlayers.length === 0 ? (
+          renderEmptyState()
+        ) : (
+          <View className="mt-2">
+            <View className="mx-4 mb-3">
+              <Text className="text-gray-900 font-bold text-lg">Players</Text>
+              <Text className="text-gray-500 text-sm">
+                Tap on a player to {captain ? 'change' : 'assign'} captain
+              </Text>
+            </View>
             {teamPlayers.map((player, index) => renderPlayerCard(player, index))}
           </View>
-        </ScrollView>
-      )}
+        )}
+      </ScrollView>
 
       {/* Floating Add Button */}
       {team && teamPlayers.length < team.maxPlayers && (

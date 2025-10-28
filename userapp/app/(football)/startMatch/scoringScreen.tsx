@@ -1,4 +1,4 @@
-// app/(football)/matches/matchScoring.tsx
+// app/(football)/matches/matchScoring.tsx - Modified version
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
@@ -86,8 +86,10 @@ export default function MatchScoringScreen() {
     startMatch,
     addEvent,
     endMatch,
+    updateCurrentMinute,
+    updateLiveMatch, // Add this from our updated store
   } = useMatchExecutionStore();
-
+  
   // Modal + event form states
   const [showEventModal, setShowEventModal] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<'my' | 'opponent' | null>(null);
@@ -98,44 +100,65 @@ export default function MatchScoringScreen() {
   const [eventMinute, setEventMinute] = useState('');
   const [isExtraTime, setIsExtraTime] = useState(false);
   const [eventDescription, setEventDescription] = useState('');
-
-  // Initialize match in execution store
+  
+  // Initialize match in execution store - now also adds to liveMatches
   useEffect(() => {
     if (!activeMatch && matchData) {
       startMatch(matchData);
     }
   }, [activeMatch, matchData, startMatch]);
 
+  // Update match time periodically - also updates liveMatch
+  useEffect(() => {
+    if (activeMatch) {
+      const timer = setInterval(() => {
+        // Calculate current minute based on match start time
+        const now = new Date();
+        const matchStart = new Date(activeMatch.startTime);
+        const minutesPassed = Math.floor((now.getTime() - matchStart.getTime()) / (1000 * 60));
+        
+        // Update the active match time
+        updateCurrentMinute(minutesPassed);
+        
+        // Also update the corresponding live match
+        updateLiveMatch(activeMatch.id, {
+          currentMinute: minutesPassed
+        });
+      }, 60000); // Update every minute
+      
+      return () => clearInterval(timer);
+    }
+  }, [activeMatch, updateCurrentMinute, updateLiveMatch]);
+  
   // Get team players
   const myTeamPlayers = useMemo(() => {
     return matchData?.myTeam?.selectedPlayers
       ?.map(id => players.find(p => p.id === id))
       ?.filter((p): p is FootballPlayer => !!p) || [];
   }, [matchData?.myTeam?.selectedPlayers, players]);
-
+  
   const opponentTeamPlayers = useMemo(() => {
     return matchData?.opponentTeam?.selectedPlayers
       ?.map(id => players.find(p => p.id === id))
       ?.filter((p): p is FootballPlayer => !!p) || [];
   }, [matchData?.opponentTeam?.selectedPlayers, players]);
-
+  
   // Get events from activeMatch
   const events = useMemo(() => {
     return activeMatch?.events || [];
   }, [activeMatch?.events]);
-
+  
   // Calculate scores from activeMatch
   const { myTeamScore, opponentTeamScore } = useMemo(() => {
     if (!activeMatch || !matchData) {
       return { myTeamScore: 0, opponentTeamScore: 0 };
     }
-
     return {
       myTeamScore: activeMatch.homeTeamScore,
       opponentTeamScore: activeMatch.awayTeamScore,
     };
   }, [activeMatch?.homeTeamScore, activeMatch?.awayTeamScore, matchData]);
-
+  
   // Reset event form
   const resetEventForm = useCallback(() => {
     setSelectedEventType(null);
@@ -147,19 +170,20 @@ export default function MatchScoringScreen() {
     setEventDescription('');
     setSelectedTeam(null);
   }, []);
-
+  
   // Create event and push to store
   const handleCreateEvent = useCallback(() => {
-    if (!selectedEventType || !selectedPlayer || !eventMinute.trim() || !selectedTeam || !matchData) {
+    if (!selectedEventType || !selectedPlayer || !eventMinute.trim() || !selectedTeam || !matchData || !activeMatch) {
       Alert.alert('Error', 'Please fill all required fields');
       return;
     }
+    
     const minute = parseInt(eventMinute);
     if (isNaN(minute) || minute < 1) {
       Alert.alert('Error', 'Invalid minute');
       return;
     }
-
+    
     const eventData = {
       teamId: selectedTeam === 'my' ? matchData.myTeam.teamId : matchData.opponentTeam.teamId,
       eventType: selectedEventType as any,
@@ -172,8 +196,48 @@ export default function MatchScoringScreen() {
       isExtraTime,
       description: eventDescription.trim() || undefined,
     };
-
+    
+    // Add event to active match
     addEvent(eventData);
+    
+    // Calculate new scores based on the event
+    if (selectedEventType === 'goal') {
+      // Calculate updated scores
+      let homeTeamScore = activeMatch.homeTeamScore;
+      let awayTeamScore = activeMatch.awayTeamScore;
+      
+      const isHomeTeam = eventData.teamId === matchData.myTeam.teamId;
+      const isOwnGoal = selectedSubType === 'own_goal';
+      
+      if (isOwnGoal) {
+        // Own goal counts for opposing team
+        if (isHomeTeam) {
+          awayTeamScore += 1;
+        } else {
+          homeTeamScore += 1;
+        }
+      } else {
+        // Regular goal
+        if (isHomeTeam) {
+          homeTeamScore += 1;
+        } else {
+          awayTeamScore += 1;
+        }
+      }
+      
+      // Update the corresponding live match with new scores
+      updateLiveMatch(activeMatch.id, {
+        homeTeamScore,
+        awayTeamScore,
+        currentMinute: minute,
+        events: [...activeMatch.events, {
+          ...eventData,
+          id: `event_${Date.now()}`,
+          timestamp: new Date(),
+        }]
+      });
+    }
+    
     setShowEventModal(false);
     resetEventForm();
   }, [
@@ -186,11 +250,14 @@ export default function MatchScoringScreen() {
     eventDescription,
     selectedSubType,
     matchData,
+    activeMatch,
     addEvent,
+    updateLiveMatch,
     resetEventForm,
   ]);
-
+  
   // Handle End Match - Save all data and navigate
+  // This will now also remove from liveMatches thanks to our updated endMatch method
   const handleEndMatch = useCallback(() => {
     Alert.alert(
       'End Match', 
@@ -201,10 +268,8 @@ export default function MatchScoringScreen() {
           text: 'End Match',
           style: 'destructive',
           onPress: () => {
-          
             const completedMatch = endMatch();
             if (completedMatch) {
-              
               router.push('/(football)/landingScreen/matches');
             }
           },
@@ -212,25 +277,37 @@ export default function MatchScoringScreen() {
       ]
     );
   }, [endMatch, router]);
-
+  
   // Handle opening event modal for specific team
   const handleAddEvent = useCallback((team: 'my' | 'opponent') => {
     setSelectedTeam(team);
     setShowEventModal(true);
   }, []);
-
+  
   // Get current players for selected team
   const getCurrentPlayers = useCallback(() => {
     return selectedTeam === 'my' ? myTeamPlayers : opponentTeamPlayers;
   }, [selectedTeam, myTeamPlayers, opponentTeamPlayers]);
-
+  
+  // Manual time update
+  const handleUpdateTime = useCallback((newMinute: number) => {
+    if (activeMatch) {
+      // Update active match minute
+      updateCurrentMinute(newMinute);
+      
+      // Also update live match
+      updateLiveMatch(activeMatch.id, {
+        currentMinute: newMinute
+      });
+    }
+  }, [activeMatch, updateCurrentMinute, updateLiveMatch]);
+  
   // Render single event card
   const renderEventCard = useCallback((event: any) => {
     const config = EVENT_CONFIGS[event.eventType as keyof typeof EVENT_CONFIGS];
     if (!config) return null;
     
     const isMyTeam = event.teamId === matchData?.myTeam?.teamId;
-
     return (
       <View
         key={event.id}
@@ -271,7 +348,7 @@ export default function MatchScoringScreen() {
       </View>
     );
   }, [matchData]);
-
+  
   if (!matchData) {
     return (
       <SafeAreaView className="flex-1 bg-slate-100 items-center justify-center">
@@ -279,7 +356,7 @@ export default function MatchScoringScreen() {
       </SafeAreaView>
     );
   }
-
+  
   return (
     <SafeAreaView className="flex-1 bg-slate-100">
       {/* Header with Image Background */}
@@ -345,7 +422,7 @@ export default function MatchScoringScreen() {
           </View>
         </View>
       </ImageBackground>
-
+      
       {/* Event List */}
       <ScrollView className="flex-1 px-4 pt-4">
         {events.length > 0 ? (
@@ -365,7 +442,7 @@ export default function MatchScoringScreen() {
           </View>
         )}
       </ScrollView>
-
+      
       {/* End Match Button */}
       <View className="p-4 bg-white border-t border-slate-200">
         <TouchableOpacity
@@ -378,7 +455,7 @@ export default function MatchScoringScreen() {
           </View>
         </TouchableOpacity>
       </View>
-
+      
       {/* Event Creation Modal */}
       <Modal
         visible={showEventModal}
@@ -413,177 +490,175 @@ export default function MatchScoringScreen() {
                 <Text className="text-white font-semibold">Save</Text>
               </TouchableOpacity>
             </View>
-
+            
             <ScrollView 
               className="flex-1 p-4"
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-            {/* Event Type Selection */}
-            <Text className="text-lg font-bold text-slate-900 mb-3">Event Type</Text>
-            <View className="flex-row flex-wrap gap-2 mb-6">
-              {Object.entries(EVENT_CONFIGS).map(([key, config]) => (
-                <TouchableOpacity
-                  key={key}
-                  onPress={() => {
-                    setSelectedEventType(key);
-                    setSelectedSubType(null);
-                  }}
-                  className={`flex-row items-center px-4 py-3 rounded-xl border ${
-                    selectedEventType === key
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-slate-200 bg-white'
-                  }`}
-                >
-                  <View
-                    className="w-6 h-6 rounded-full items-center justify-center mr-2"
-                    style={{ backgroundColor: config.color }}
-                  >
-                    <Ionicons name={config.icon as any} size={12} color="white" />
-                  </View>
-                  <Text className={`font-medium ${
-                    selectedEventType === key ? 'text-blue-700' : 'text-slate-700'
-                  }`}>
-                    {config.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Sub Type Selection */}
-            {selectedEventType && EVENT_CONFIGS[selectedEventType as keyof typeof EVENT_CONFIGS]?.subTypes?.length > 0 && (
-              <>
-                <Text className="text-lg font-bold text-slate-900 mb-3">Sub Type</Text>
-                <View className="flex-row flex-wrap gap-2 mb-6">
-                  {EVENT_CONFIGS[selectedEventType as keyof typeof EVENT_CONFIGS].subTypes.map((subType) => (
-                    <TouchableOpacity
-                      key={subType.id}
-                      onPress={() => setSelectedSubType(subType.id)}
-                      className={`px-4 py-2 rounded-lg border ${
-                        selectedSubType === subType.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-slate-200 bg-white'
-                      }`}
-                    >
-                      <Text className={`${
-                        selectedSubType === subType.id ? 'text-blue-700' : 'text-slate-700'
-                      }`}>
-                        {subType.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
-
-            {/* Player Selection */}
-            <Text className="text-lg font-bold text-slate-900 mb-3">Player</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
-              <View className="flex-row gap-2">
-                {getCurrentPlayers().map((player) => (
+              {/* Event Type Selection */}
+              <Text className="text-lg font-bold text-slate-900 mb-3">Event Type</Text>
+              <View className="flex-row flex-wrap gap-2 mb-6">
+                {Object.entries(EVENT_CONFIGS).map(([key, config]) => (
                   <TouchableOpacity
-                    key={player.id}
-                    onPress={() => setSelectedPlayer(player)}
-                    className={`px-4 py-3 rounded-xl border min-w-[120px] items-center ${
-                      selectedPlayer?.id === player.id
+                    key={key}
+                    onPress={() => {
+                      setSelectedEventType(key);
+                      setSelectedSubType(null);
+                    }}
+                    className={`flex-row items-center px-4 py-3 rounded-xl border ${
+                      selectedEventType === key
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-slate-200 bg-white'
                     }`}
                   >
+                    <View
+                      className="w-6 h-6 rounded-full items-center justify-center mr-2"
+                      style={{ backgroundColor: config.color }}
+                    >
+                      <Ionicons name={config.icon as any} size={12} color="white" />
+                    </View>
                     <Text className={`font-medium ${
-                      selectedPlayer?.id === player.id ? 'text-blue-700' : 'text-slate-700'
+                      selectedEventType === key ? 'text-blue-700' : 'text-slate-700'
                     }`}>
-                      {player.name}
+                      {config.name}
                     </Text>
-       
                   </TouchableOpacity>
                 ))}
               </View>
-            </ScrollView>
-
-            {/* Assist Player (for goals) */}
-            {selectedEventType === 'goal' && (
-              <>
-                <Text className="text-lg font-bold text-slate-900 mb-3">Assist Player (Optional)</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
-                  <View className="flex-row gap-2">
+              
+              {/* Sub Type Selection */}
+              {selectedEventType && EVENT_CONFIGS[selectedEventType as keyof typeof EVENT_CONFIGS]?.subTypes?.length > 0 && (
+                <>
+                  <Text className="text-lg font-bold text-slate-900 mb-3">Sub Type</Text>
+                  <View className="flex-row flex-wrap gap-2 mb-6">
+                    {EVENT_CONFIGS[selectedEventType as keyof typeof EVENT_CONFIGS].subTypes.map((subType) => (
+                      <TouchableOpacity
+                        key={subType.id}
+                        onPress={() => setSelectedSubType(subType.id)}
+                        className={`px-4 py-2 rounded-lg border ${
+                          selectedSubType === subType.id
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-slate-200 bg-white'
+                        }`}
+                      >
+                        <Text className={`${
+                          selectedSubType === subType.id ? 'text-blue-700' : 'text-slate-700'
+                        }`}>
+                          {subType.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+              
+              {/* Player Selection */}
+              <Text className="text-lg font-bold text-slate-900 mb-3">Player</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
+                <View className="flex-row gap-2">
+                  {getCurrentPlayers().map((player) => (
                     <TouchableOpacity
-                      onPress={() => setSelectedAssistPlayer(null)}
+                      key={player.id}
+                      onPress={() => setSelectedPlayer(player)}
                       className={`px-4 py-3 rounded-xl border min-w-[120px] items-center ${
-                        !selectedAssistPlayer
+                        selectedPlayer?.id === player.id
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-slate-200 bg-white'
                       }`}
                     >
                       <Text className={`font-medium ${
-                        !selectedAssistPlayer ? 'text-blue-700' : 'text-slate-700'
+                        selectedPlayer?.id === player.id ? 'text-blue-700' : 'text-slate-700'
                       }`}>
-                        No Assist
+                        {player.name}
                       </Text>
                     </TouchableOpacity>
-                    {getCurrentPlayers()
-                      .filter(p => p.id !== selectedPlayer?.id)
-                      .map((player) => (
+                  ))}
+                </View>
+              </ScrollView>
+              
+              {/* Assist Player (for goals) */}
+              {selectedEventType === 'goal' && (
+                <>
+                  <Text className="text-lg font-bold text-slate-900 mb-3">Assist Player (Optional)</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
+                    <View className="flex-row gap-2">
                       <TouchableOpacity
-                        key={player.id}
-                        onPress={() => setSelectedAssistPlayer(player)}
+                        onPress={() => setSelectedAssistPlayer(null)}
                         className={`px-4 py-3 rounded-xl border min-w-[120px] items-center ${
-                          selectedAssistPlayer?.id === player.id
+                          !selectedAssistPlayer
                             ? 'border-blue-500 bg-blue-50'
                             : 'border-slate-200 bg-white'
                         }`}
                       >
                         <Text className={`font-medium ${
-                          selectedAssistPlayer?.id === player.id ? 'text-blue-700' : 'text-slate-700'
+                          !selectedAssistPlayer ? 'text-blue-700' : 'text-slate-700'
                         }`}>
-                          {player.name}
+                          No Assist
                         </Text>
-                      
                       </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-              </>
-            )}
-
-            {/* Minute Input */}
-            <Text className="text-lg font-bold text-slate-900 mb-3">Minute</Text>
-            <View className="flex-row gap-3 mb-6">
+                      {getCurrentPlayers()
+                        .filter(p => p.id !== selectedPlayer?.id)
+                        .map((player) => (
+                        <TouchableOpacity
+                          key={player.id}
+                          onPress={() => setSelectedAssistPlayer(player)}
+                          className={`px-4 py-3 rounded-xl border min-w-[120px] items-center ${
+                            selectedAssistPlayer?.id === player.id
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-slate-200 bg-white'
+                          }`}
+                        >
+                          <Text className={`font-medium ${
+                            selectedAssistPlayer?.id === player.id ? 'text-blue-700' : 'text-slate-700'
+                          }`}>
+                            {player.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </>
+              )}
+              
+              {/* Minute Input */}
+              <Text className="text-lg font-bold text-slate-900 mb-3">Minute</Text>
+              <View className="flex-row gap-3 mb-6">
+                <TextInput
+                  value={eventMinute}
+                  onChangeText={setEventMinute}
+                  placeholder="45"
+                  keyboardType="numeric"
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg"
+                />
+                <TouchableOpacity
+                  onPress={() => setIsExtraTime(!isExtraTime)}
+                  className={`px-4 py-3 rounded-xl border ${
+                    isExtraTime
+                      ? 'border-orange-500 bg-orange-50'
+                      : 'border-slate-200 bg-white'
+                  }`}
+                >
+                  <Text className={`font-medium ${
+                    isExtraTime ? 'text-orange-700' : 'text-slate-700'
+                  }`}>
+                    Extra Time
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              {/* Description (Optional) */}
+              <Text className="text-lg font-bold text-slate-900 mb-3">Description (Optional)</Text>
               <TextInput
-                value={eventMinute}
-                onChangeText={setEventMinute}
-                placeholder="45"
-                keyboardType="numeric"
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg"
+                value={eventDescription}
+                onChangeText={setEventDescription}
+                placeholder="Additional notes about the event..."
+                multiline
+                numberOfLines={3}
+                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-base"
+                textAlignVertical="top"
               />
-              <TouchableOpacity
-                onPress={() => setIsExtraTime(!isExtraTime)}
-                className={`px-4 py-3 rounded-xl border ${
-                  isExtraTime
-                    ? 'border-orange-500 bg-orange-50'
-                    : 'border-slate-200 bg-white'
-                }`}
-              >
-                <Text className={`font-medium ${
-                  isExtraTime ? 'text-orange-700' : 'text-slate-700'
-                }`}>
-                  Extra Time
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Description (Optional) */}
-            <Text className="text-lg font-bold text-slate-900 mb-3">Description (Optional)</Text>
-            <TextInput
-              value={eventDescription}
-              onChangeText={setEventDescription}
-              placeholder="Additional notes about the event..."
-              multiline
-              numberOfLines={3}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-base"
-              textAlignVertical="top"
-            />
-                      </ScrollView>
+            </ScrollView>
           </SafeAreaView>
         </KeyboardAvoidingView>
       </Modal>

@@ -17,7 +17,7 @@ export default function FootballLandingLayout() {
     return (
         <SafeAreaView className="flex-1 bg-white">
             {/* Enhanced Custom Header */}
-            <View className="bg-slate-900 px-4  py-2 flex-row items-center border-b-2 border-slate-700 shadow-lg mb-44">
+            <View className="bg-slate-900 px-4  py-2 flex-row items-center border-b-2 border-slate-700 shadow-lg ">
                 <TouchableOpacity
                     onPress={() => {
                         router.navigate('/(homeScreenTabs)/sports');
