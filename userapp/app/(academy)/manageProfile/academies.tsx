@@ -1,80 +1,123 @@
-// app/(academy)/enrolledAcademies.tsx
 import React from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
+  SafeAreaView,
+  StatusBar,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { usechildStore } from "@/store/academyChildProfile";
 import { useEnrollmentStore } from "@/store/academyEnrollmentStore";
 import { useAcademyStore } from "@/store/academyStore";
 
-export default function EnrolledAcademiesScreen() {
+export default function ChildAcademiesScreen() {
   const router = useRouter();
+  const { childId, childName } = useLocalSearchParams<{ childId: string; childName: string }>();
+  
+  // Get store methods
   const childProfiles = usechildStore((state) => state.childProfiles);
-  const enrollments = useEnrollmentStore((state) => state.enrollments);
+  const getEnrollmentsByChild = useEnrollmentStore((state) => state.getEnrollmentsByChild);
   const getAcademyById = useAcademyStore((state) => state.getAcademyById);
 
-  // Get unique academies from all enrollments
-  const uniqueAcademyIds = [...new Set(enrollments.map(e => e.academyId))];
+  // Find the child profile from the store
+  const childProfile = childProfiles.find(profile => profile.id === childId);
 
-  // Empty state
-  if (childProfiles.length === 0) {
-    return (
-      <View className="flex-1 bg-white items-center justify-center px-6">
-        <Ionicons name="school-outline" size={80} color="#e2e8f0" />
-        <Text className="text-slate-900 text-2xl font-bold text-center mt-4">
-          No Child Profiles
-        </Text>
-        <Text className="text-slate-500 text-center mt-2">
-          Create a child profile to start enrolling in academies
-        </Text>
-      </View>
-    );
-  }
+  // Get enrollments for this specific child using the store method
+  const childEnrollments = getEnrollmentsByChild(childId);
+  
+  // Get unique academies for this child
+  const childAcademyIds = [...new Set(childEnrollments.map(e => e.academyId))];
 
-  if (uniqueAcademyIds.length === 0) {
-    return (
-      <View className="flex-1 bg-white items-center justify-center px-6">
-        <Ionicons name="albums-outline" size={80} color="#e2e8f0" />
-        <Text className="text-slate-900 text-2xl font-bold text-center mt-4">
-          No Enrollments Yet
-        </Text>
-        <Text className="text-slate-500 text-center mt-2">
-          Browse and enroll in academies to see them here
-        </Text>
-      </View>
-    );
-  }
+  const handleBackPress = () => {
+    router.back();
+  };
 
   const handleAcademyPress = (academyId: string) => {
-    // Get all children enrolled in this academy
-    const enrolledChildren = enrollments
-      .filter(e => e.academyId === academyId)
-      .map(e => e.childId);
-
     router.push({
       pathname: "/(academy)/enrollmentDetails",
       params: {
         academyId: academyId,
-        enrolledChildrenIds: JSON.stringify(enrolledChildren),
+        childId: childId,
       },
     });
   };
 
+  // Empty state - no enrollments
+  if (childAcademyIds.length === 0) {
+    return (
+      <SafeAreaView className="flex-1 bg-white">
+        <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+        
+        {/* Header Section */}
+        <View className="bg-slate-900 shadow-lg">
+          <View className="flex-row items-center px-4 py-3 border-b border-slate-800">
+            {/* Back Button */}
+            <TouchableOpacity
+              onPress={handleBackPress}
+              className="mr-3 p-2 rounded-lg"
+            >
+              <Ionicons name="arrow-back" size={24} color="white" />
+            </TouchableOpacity>
+
+            {/* Header Title */}
+            <View className="flex-1">
+              <Text className="text-white font-bold text-lg" numberOfLines={1}>
+                {childName}'s Academies
+              </Text>
+              <Text className="text-slate-400 text-xs mt-0.5">
+                View enrolled academies
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View className="flex-1 bg-white items-center justify-center px-6">
+          <Ionicons name="school-outline" size={80} color="#e2e8f0" />
+          <Text className="text-slate-900 text-2xl font-bold text-center mt-4">
+            No Enrollments Yet
+          </Text>
+          <Text className="text-slate-500 text-center mt-2">
+            {childName} is not enrolled in any academies
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.push("/(academy)/browseAcademies")}
+            className="mt-6 bg-blue-500 py-3 px-6 rounded-xl"
+          >
+            <Text className="text-white font-semibold text-base">Browse Academies</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <View className="flex-1 bg-white">
-      {/* Header */}
-      <View className="px-6 pt-6 pb-4 bg-white border-b border-gray-100">
-        <Text className="text-slate-900 text-2xl font-bold">
-          My Academies
-        </Text>
-        <Text className="text-slate-500 text-sm mt-1">
-          {uniqueAcademyIds.length} {uniqueAcademyIds.length === 1 ? 'academy' : 'academies'} enrolled
-        </Text>
+    <SafeAreaView className="flex-1 bg-white">
+      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+      
+      {/* Header Section */}
+      <View className="bg-slate-900 shadow-lg">
+        <View className="flex-row items-center px-4 py-3 border-b border-slate-800">
+          {/* Back Button */}
+          <TouchableOpacity
+            onPress={handleBackPress}
+            className="mr-3 p-2 rounded-lg"
+          >
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
+
+          {/* Header Title */}
+          <View className="flex-1">
+            <Text className="text-white font-bold text-lg" numberOfLines={1}>
+              {childName}'s Academies
+            </Text>
+            <Text className="text-slate-400 text-xs mt-0.5">
+              {childAcademyIds.length} {childAcademyIds.length === 1 ? 'academy' : 'academies'} enrolled
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* Academy List */}
@@ -83,13 +126,9 @@ export default function EnrolledAcademiesScreen() {
         contentContainerStyle={{ padding: 16 }}
         showsVerticalScrollIndicator={false}
       >
-        {uniqueAcademyIds.map((academyId) => {
+        {childAcademyIds.map((academyId) => {
           const academy = getAcademyById(academyId);
           if (!academy) return null;
-
-          // Get enrolled children for this academy
-          const enrolledInThisAcademy = enrollments.filter(e => e.academyId === academyId);
-          const enrolledChildrenCount = enrolledInThisAcademy.length;
 
           return (
             <TouchableOpacity
@@ -126,16 +165,6 @@ export default function EnrolledAcademiesScreen() {
 
               {/* Card Body */}
               <View className="px-5 py-4">
-                {/* Enrolled Children Badge */}
-                <View className="bg-blue-50 px-3 py-2 rounded-xl mb-4 self-start">
-                  <View className="flex-row items-center">
-                    <Ionicons name="people" size={16} color="#3b82f6" />
-                    <Text className="text-blue-600 text-sm font-semibold ml-2">
-                      {enrolledChildrenCount} {enrolledChildrenCount === 1 ? 'child' : 'children'} enrolled
-                    </Text>
-                  </View>
-                </View>
-
                 {/* Academy Info Grid */}
                 <View className="space-y-3">
                   <View className="flex-row items-center">
@@ -192,6 +221,6 @@ export default function EnrolledAcademiesScreen() {
         {/* Bottom Spacing */}
         <View className="h-4" />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

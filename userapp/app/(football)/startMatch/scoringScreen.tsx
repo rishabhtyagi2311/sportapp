@@ -1,5 +1,5 @@
-// app/(football)/matches/matchScoring.tsx - Modified version
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+// app/(football)/matches/matchScoring.tsx - Clean and error-free version
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   Modal,
   TextInput,
   Alert,
-  FlatList,
   ImageBackground,
   KeyboardAvoidingView,
   Platform,
@@ -87,8 +86,13 @@ export default function MatchScoringScreen() {
     addEvent,
     endMatch,
     updateCurrentMinute,
-    updateLiveMatch, // Add this from our updated store
+    updateLiveMatch,
   } = useMatchExecutionStore();
+  
+  // Timer state
+  const [timer, setTimer] = useState<number>(0);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timerStartedAt = useRef<Date | null>(null);
   
   // Modal + event form states
   const [showEventModal, setShowEventModal] = useState(false);
@@ -101,34 +105,63 @@ export default function MatchScoringScreen() {
   const [isExtraTime, setIsExtraTime] = useState(false);
   const [eventDescription, setEventDescription] = useState('');
   
-  // Initialize match in execution store - now also adds to liveMatches
+  // Start the timer when component mounts
+  useEffect(() => {
+    // Start timer on first load
+    if (!timerStartedAt.current) {
+      timerStartedAt.current = new Date();
+    }
+    
+    timerIntervalRef.current = setInterval(() => {
+      if (timerStartedAt.current) {
+        const now = new Date();
+        const elapsedSeconds = Math.floor((now.getTime() - timerStartedAt.current.getTime()) / 1000);
+        setTimer(elapsedSeconds);
+      }
+    }, 1000);
+    
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, []);
+  
+  // Format timer as MM:SS
+  const formattedTimer = useMemo(() => {
+    const minutes = Math.floor(timer / 60);
+    const seconds = timer % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }, [timer]);
+  
+  // Initialize match in execution store
   useEffect(() => {
     if (!activeMatch && matchData) {
       startMatch(matchData);
     }
   }, [activeMatch, matchData, startMatch]);
-
-  // Update match time periodically - also updates liveMatch
+  
+  // Update match time periodically
   useEffect(() => {
     if (activeMatch) {
-      const timer = setInterval(() => {
-        // Calculate current minute based on match start time
-        const now = new Date();
-        const matchStart = new Date(activeMatch.startTime);
-        const minutesPassed = Math.floor((now.getTime() - matchStart.getTime()) / (1000 * 60));
+      const timerForMinutes = setInterval(() => {
+        // Calculate current minute based on timer (converting seconds to minutes)
+        const minutesPassed = Math.floor(timer / 60);
         
         // Update the active match time
         updateCurrentMinute(minutesPassed);
         
         // Also update the corresponding live match
-        updateLiveMatch(activeMatch.id, {
-          currentMinute: minutesPassed
-        });
+        if (activeMatch.id) {
+          updateLiveMatch(activeMatch.id, {
+            currentMinute: minutesPassed
+          });
+        }
       }, 60000); // Update every minute
       
-      return () => clearInterval(timer);
+      return () => clearInterval(timerForMinutes);
     }
-  }, [activeMatch, updateCurrentMinute, updateLiveMatch]);
+  }, [activeMatch, timer, updateCurrentMinute, updateLiveMatch]);
   
   // Get team players
   const myTeamPlayers = useMemo(() => {
@@ -165,11 +198,15 @@ export default function MatchScoringScreen() {
     setSelectedSubType(null);
     setSelectedPlayer(null);
     setSelectedAssistPlayer(null);
-    setEventMinute('');
+    
+    // Automatically set current minute from timer
+    const currentMinute = Math.floor(timer / 60).toString();
+    setEventMinute(currentMinute);
+    
     setIsExtraTime(false);
     setEventDescription('');
     setSelectedTeam(null);
-  }, []);
+  }, [timer]);
   
   // Create event and push to store
   const handleCreateEvent = useCallback(() => {
@@ -226,16 +263,18 @@ export default function MatchScoringScreen() {
       }
       
       // Update the corresponding live match with new scores
-      updateLiveMatch(activeMatch.id, {
-        homeTeamScore,
-        awayTeamScore,
-        currentMinute: minute,
-        events: [...activeMatch.events, {
-          ...eventData,
-          id: `event_${Date.now()}`,
-          timestamp: new Date(),
-        }]
-      });
+      if (activeMatch.id) {
+        updateLiveMatch(activeMatch.id, {
+          homeTeamScore,
+          awayTeamScore,
+          currentMinute: minute,
+          events: [...activeMatch.events, {
+            ...eventData,
+            id: `event_${Date.now()}`,
+            timestamp: new Date(),
+          }]
+        });
+      }
     }
     
     setShowEventModal(false);
@@ -256,8 +295,7 @@ export default function MatchScoringScreen() {
     resetEventForm,
   ]);
   
-  // Handle End Match - Save all data and navigate
-  // This will now also remove from liveMatches thanks to our updated endMatch method
+  // Handle End Match
   const handleEndMatch = useCallback(() => {
     Alert.alert(
       'End Match', 
@@ -268,6 +306,11 @@ export default function MatchScoringScreen() {
           text: 'End Match',
           style: 'destructive',
           onPress: () => {
+            // Stop the timer
+            if (timerIntervalRef.current) {
+              clearInterval(timerIntervalRef.current);
+            }
+            
             const completedMatch = endMatch();
             if (completedMatch) {
               router.push('/(football)/landingScreen/matches');
@@ -281,68 +324,84 @@ export default function MatchScoringScreen() {
   // Handle opening event modal for specific team
   const handleAddEvent = useCallback((team: 'my' | 'opponent') => {
     setSelectedTeam(team);
+    
+    // Automatically set current minute from timer
+    const currentMinute = Math.floor(timer / 60).toString();
+    setEventMinute(currentMinute);
+    
     setShowEventModal(true);
-  }, []);
+  }, [timer]);
   
   // Get current players for selected team
   const getCurrentPlayers = useCallback(() => {
     return selectedTeam === 'my' ? myTeamPlayers : opponentTeamPlayers;
   }, [selectedTeam, myTeamPlayers, opponentTeamPlayers]);
   
-  // Manual time update
-  const handleUpdateTime = useCallback((newMinute: number) => {
-    if (activeMatch) {
-      // Update active match minute
-      updateCurrentMinute(newMinute);
-      
-      // Also update live match
-      updateLiveMatch(activeMatch.id, {
-        currentMinute: newMinute
-      });
-    }
-  }, [activeMatch, updateCurrentMinute, updateLiveMatch]);
-  
-  // Render single event card
+  // Render single event card with new design
   const renderEventCard = useCallback((event: any) => {
     const config = EVENT_CONFIGS[event.eventType as keyof typeof EVENT_CONFIGS];
     if (!config) return null;
     
     const isMyTeam = event.teamId === matchData?.myTeam?.teamId;
+    
     return (
-      <View
-        key={event.id}
-        className={`bg-white rounded-xl p-4 mb-3 border-l-4 ${
-          isMyTeam ? 'border-green-500' : 'border-red-500'
-        }`}
-      >
-        <View className="flex-row items-center justify-between mb-2">
-          <View className="flex-row items-center">
-            <View
-              className="w-8 h-8 rounded-full items-center justify-center mr-3"
-              style={{ backgroundColor: config.color }}
-            >
-              <Ionicons name={config.icon as any} size={16} color="white" />
-            </View>
-            <View>
-              <Text className="text-lg font-bold text-slate-900">
+      <View key={event.id} className="flex-row mb-4">
+        {/* Time Card */}
+        <View className="bg-slate-800 rounded-l-xl py-3 px-4 items-center justify-center">
+          <Text className="text-white text-lg font-bold">{event.minute}'</Text>
+          {event.isExtraTime && (
+            <Text className="text-amber-400 text-xs font-medium">+ET</Text>
+          )}
+        </View>
+        
+        {/* Event Card */}
+        <View 
+          className={`flex-1 bg-white rounded-r-xl py-3 px-4 border-l-4 ml-1 ${
+            isMyTeam ? 'border-green-500' : 'border-red-500'
+          }`}
+          style={{ 
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.1,
+            shadowRadius: 2,
+            elevation: 2,
+          }}
+        >
+          <View className={`flex-row items-center ${isMyTeam ? 'justify-start' : 'justify-end'}`}>
+            {isMyTeam && (
+              <View
+                className="w-8 h-8 rounded-full items-center justify-center mr-3"
+                style={{ backgroundColor: config.color }}
+              >
+                <Ionicons name={config.icon as any} size={16} color="white" />
+              </View>
+            )}
+            
+            <View className={isMyTeam ? 'items-start' : 'items-end'}>
+              <Text className="text-base font-bold text-slate-900">
                 {config.name}
                 {event.eventSubType &&
                   ` - ${config.subTypes?.find(st => st.id === event.eventSubType)?.name || ''}`}
               </Text>
+              
               <Text className="text-sm text-slate-600">
                 {event.playerName}
                 {event.assistPlayerName && ` (Assist: ${event.assistPlayerName})`}
               </Text>
+              
+              <Text className={`text-xs font-medium ${isMyTeam ? 'text-green-600' : 'text-red-600'}`}>
+                {isMyTeam ? matchData?.myTeam?.teamName : matchData?.opponentTeam?.teamName}
+              </Text>
             </View>
-          </View>
-          <View className="items-end">
-            <Text className="text-lg font-bold text-slate-900">{event.minute}'</Text>
-            {event.isExtraTime && (
-              <Text className="text-xs text-orange-600 font-medium">+ET</Text>
+            
+            {!isMyTeam && (
+              <View
+                className="w-8 h-8 rounded-full items-center justify-center ml-3"
+                style={{ backgroundColor: config.color }}
+              >
+                <Ionicons name={config.icon as any} size={16} color="white" />
+              </View>
             )}
-            <Text className={`text-xs font-medium ${isMyTeam ? 'text-green-600' : 'text-red-600'}`}>
-              {isMyTeam ? matchData?.myTeam?.teamName : matchData?.opponentTeam?.teamName}
-            </Text>
           </View>
         </View>
       </View>
@@ -413,9 +472,13 @@ export default function MatchScoringScreen() {
               </TouchableOpacity>
             </View>
             
-            {/* Match Time */}
+            {/* Live Timer Display */}
             <View className="items-center mt-4">
-              <Text className="text-white/80 text-sm">
+              <View className="bg-white/20 px-6 py-2 rounded-full flex-row items-center">
+                <View className="w-2 h-2 bg-red-500 rounded-full mr-2" />
+                <Text className="text-white font-semibold">{formattedTimer}</Text>
+              </View>
+              <Text className="text-white/80 text-sm mt-1">
                 {activeMatch?.currentMinute || 0}' {activeMatch?.isExtraTime && '+ ET'}
               </Text>
             </View>
@@ -428,7 +491,7 @@ export default function MatchScoringScreen() {
         {events.length > 0 ? (
           <>
             <Text className="text-lg font-bold text-slate-900 mb-4">
-              Match Events ({events.length})
+              Match Timeline ({events.length})
             </Text>
             {events
               .sort((a, b) => a.minute - b.minute)
@@ -467,7 +530,7 @@ export default function MatchScoringScreen() {
       >
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          className="flex-1 "
+          className="flex-1"
         >
           <SafeAreaView className="flex-1 bg-white mt-12">
             {/* Modal Header */}
