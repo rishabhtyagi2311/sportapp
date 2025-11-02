@@ -1,4 +1,5 @@
-// components/booking/EventTab.tsx
+// Modified EventTab.tsx with refined button design (no Events heading)
+
 import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { useBookingStore } from '@/store/venueStore';
@@ -32,6 +33,10 @@ const EventTab: React.FC = () => {
     setShowFilter(false);
   };
 
+  const navigateToEventManager = () => {
+    router.push('/eventManager/profile');
+  };
+
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     if (filters.sports?.length) count++;
@@ -43,10 +48,21 @@ const EventTab: React.FC = () => {
     return count;
   }, [filters]);
 
-
-
   return (
     <View className="flex-1 bg-gray-50">
+      {/* Event Manager Header */}
+      <View className="bg-sky-100 px-4 py-3 ">
+        <View className="flex-row justify-end items-center">
+          <TouchableOpacity 
+            onPress={navigateToEventManager}
+            className="flex-row items-center bg-slate-900 px-4 py-2 rounded-lg"
+          >
+            <Ionicons name="calendar-outline" size={18} color="white" />
+            <Text className="text-white font-medium ml-4 my-1">My Events</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Search and Filter Header */}
       <View className="bg-sky-100 px-4 py-3 ">
         <View className="flex-row items-center space-x-3">
@@ -106,6 +122,8 @@ const EventTab: React.FC = () => {
             </View>
           </View>
         )}
+
+        
       </View>
 
       {/* Events List */}
@@ -120,7 +138,6 @@ const EventTab: React.FC = () => {
               <EventCard 
                 key={event.id} 
                 event={event}  
-               
               />
             ))}
           </View>
