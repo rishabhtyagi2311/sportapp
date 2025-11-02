@@ -10,10 +10,9 @@ export default function AcademyLayout() {
       }}
     >
       <Stack.Screen name="profile" />
-      <Stack.Screen name="registerChildProfile" />
-      <Stack.Screen name="childAcademies" />
-      <Stack.Screen name="enrollmentDetails" />
-      <Stack.Screen name="browseAcademies" />
+    
+      <Stack.Screen name="academies" />
+       <Stack.Screen name="childAttendance" />
     </Stack>
   );
 }

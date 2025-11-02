@@ -43,7 +43,7 @@ export default function ProfileScreen() {
 
   const navigateToChildAcademies = (childId: string, childName: string) => {
     router.push({
-      pathname: "/(academy)/childAcademies",
+      pathname: "/(academy)/manageProfile/academies",
       params: { childId, childName }
     });
   };

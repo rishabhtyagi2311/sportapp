@@ -35,12 +35,13 @@ export default function ChildAcademiesScreen() {
     router.back();
   };
 
-  const handleAcademyPress = (academyId: string) => {
+  const handleAcademyPress = (academyId: string, academyName: string) => {
     router.push({
-      pathname: "/(academy)/enrollmentDetails",
+      pathname: "/(academy)/manageProfile/childAttendance",
       params: {
-        academyId: academyId,
-        childId: childId,
+        childId,
+        academyId,
+        academyName
       },
     });
   };
@@ -133,7 +134,7 @@ export default function ChildAcademiesScreen() {
           return (
             <TouchableOpacity
               key={academyId}
-              onPress={() => handleAcademyPress(academyId)}
+              onPress={() => handleAcademyPress(academyId, academy.academyName)}
               activeOpacity={0.7}
               className="bg-white rounded-2xl mb-4 overflow-hidden border border-gray-200"
               style={{
@@ -209,7 +210,7 @@ export default function ChildAcademiesScreen() {
               <View className="px-5 py-3 bg-gray-50 border-t border-gray-100">
                 <View className="flex-row items-center justify-between">
                   <Text className="text-slate-500 text-xs">
-                    Tap to view attendance & details
+                    Tap to view attendance
                   </Text>
                   <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
                 </View>
