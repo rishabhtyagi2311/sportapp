@@ -17,6 +17,7 @@ export default function TournamentSettingsScreen() {
   const [numberOfSubstitutes, setNumberOfSubstitutes] = useState('5');
   const [numberOfReferees, setNumberOfReferees] = useState('1');
   const [matchDuration, setMatchDuration] = useState('90');
+  const [advancingTeamsPerTable, setAdvancingTeamsPerTable] = useState('2');
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
 
   // Calculate max players available based on selected teams
@@ -46,6 +47,12 @@ export default function TournamentSettingsScreen() {
     };
   }, [creationDraft, getTeamById]);
 
+  // Calculate teams per table
+  const teamsPerTable = useMemo(() => {
+    if (!creationDraft) return 0;
+    return Math.floor(creationDraft.teamCount / creationDraft.tableCount);
+  }, [creationDraft]);
+
   useEffect(() => {
     if (creationDraft?.settings) {
       setVenue(creationDraft.settings.venue || '');
@@ -53,10 +60,69 @@ export default function TournamentSettingsScreen() {
       setNumberOfSubstitutes(String(creationDraft.settings.numberOfSubstitutes || 5));
       setNumberOfReferees(String(creationDraft.settings.numberOfReferees || 1));
       setMatchDuration(String(creationDraft.settings.matchDuration || 90));
+      setAdvancingTeamsPerTable(String(creationDraft.settings.advancingTeamsPerTable || 2));
     } else {
       setNumberOfPlayers(String(Math.min(11, teamLimits.maxPlayers)));
     }
+    setIsLoadingDraft(false);
   }, [creationDraft, teamLimits.maxPlayers]);
+
+  // Calculate possible values for advancing teams based on teams per table
+  const validAdvancingTeamOptions = useMemo(() => {
+    if (!teamsPerTable) return [1, 2];
+    
+    // You can't have more teams advancing than teams in a group
+    return Array.from({ length: Math.min(teamsPerTable, 4) }, (_, i) => i + 1);
+  }, [teamsPerTable]);
+
+  // Calculate total teams in knockout stage
+  const totalTeamsInKnockout = useMemo(() => {
+    if (!creationDraft) return 0;
+    if (creationDraft.format !== 'league' || !creationDraft.includeKnockoutStage) return 0;
+    
+    return creationDraft.tableCount * parseInt(advancingTeamsPerTable || '2');
+  }, [creationDraft, advancingTeamsPerTable]);
+
+  // Calculate knockout stage matches (teams - 1)
+  const knockoutStageMatches = useMemo(() => {
+    if (totalTeamsInKnockout < 2) return 0;
+    return totalTeamsInKnockout - 1;
+  }, [totalTeamsInKnockout]);
+
+  // Determine knockout stage based on number of advancing teams
+  const knockoutStartingStage = useMemo(() => {
+    const teamsCount = totalTeamsInKnockout;
+    
+    if (teamsCount >= 8) return 'Quarter Finals';
+    if (teamsCount >= 4) return 'Semi Finals';
+    if (teamsCount >= 2) return 'Final';
+    
+    return 'None';
+  }, [totalTeamsInKnockout]);
+
+  // Calculate total matches (group stage + knockout)
+  const totalMatches = useMemo(() => {
+    if (!creationDraft) return 0;
+    
+    let groupMatches = 0;
+    let knockoutMatches = 0;
+    
+    if (creationDraft.format === 'league') {
+      // Group stage matches: matches per group * number of groups
+      // Formula: Teams per group * (Teams per group - 1) / 2 * Number of groups
+      groupMatches = (teamsPerTable * (teamsPerTable - 1) / 2) * creationDraft.tableCount;
+      
+      // Knockout stage matches
+      if (creationDraft.includeKnockoutStage && totalTeamsInKnockout >= 2) {
+        knockoutMatches = totalTeamsInKnockout - 1;
+      }
+    } else {
+      // Pure knockout tournament: matches = teams - 1
+      groupMatches = creationDraft.teamCount - 1;
+    }
+    
+    return groupMatches + knockoutMatches;
+  }, [creationDraft, teamsPerTable, totalTeamsInKnockout]);
 
   const handleCreateTournament = () => {
     if (!venue.trim()) {
@@ -68,6 +134,7 @@ export default function TournamentSettingsScreen() {
     const substitutes = parseInt(numberOfSubstitutes);
     const referees = parseInt(numberOfReferees);
     const duration = parseInt(matchDuration);
+    const advancingTeams = parseInt(advancingTeamsPerTable);
 
     if (isNaN(players) || players < 1) {
       Alert.alert('Error', 'Number of players must be at least 1');
@@ -97,6 +164,19 @@ export default function TournamentSettingsScreen() {
       return;
     }
 
+    // Validate advancing teams for league format with knockout stage
+    if (creationDraft?.format === 'league' && creationDraft.includeKnockoutStage) {
+      if (isNaN(advancingTeams) || advancingTeams < 1) {
+        Alert.alert('Error', 'Number of advancing teams must be at least 1');
+        return;
+      }
+
+      if (advancingTeams > teamsPerTable) {
+        Alert.alert('Error', `Number of advancing teams cannot exceed teams per group (${teamsPerTable})`);
+        return;
+      }
+    }
+
     const settings: TournamentSettings = {
       venue: venue.trim(),
       numberOfPlayers: players,
@@ -104,6 +184,8 @@ export default function TournamentSettingsScreen() {
       numberOfReferees: referees,
       matchDuration: duration,
       format: creationDraft!.format,
+      includeKnockoutStage: creationDraft!.includeKnockoutStage,
+      advancingTeamsPerTable: advancingTeams
     };
 
     setTournamentSettings(settings);
@@ -225,7 +307,7 @@ export default function TournamentSettingsScreen() {
       </View>
 
       <ScrollView className="flex-1 px-4 pt-6" showsVerticalScrollIndicator={false}>
-        {/* Tournament Summary - IMPROVED */}
+        {/* Tournament Summary */}
         <View className="bg-white rounded-2xl border border-slate-200 p-5 mb-6 shadow-sm">
           <View className="flex-row items-start justify-between mb-4">
             <View className="flex-1 mr-3">
@@ -238,10 +320,12 @@ export default function TournamentSettingsScreen() {
               <View className="flex-row items-center flex-wrap">
                 <View className="bg-blue-50 px-3 py-1.5 rounded-lg mr-2 mb-2">
                   <Text className="text-xs font-bold text-blue-700">
-                    {creationDraft.format === 'league' ? 'League Format' : 'Knockout Format'}
+                    {creationDraft.format === 'league' 
+                      ? `${creationDraft.tableCount} ${creationDraft.tableCount > 1 ? 'Groups' : 'Group'}`
+                      : 'Knockout Format'}
                   </Text>
                 </View>
-                <View className="bg-slate-100 px-3 py-1.5 rounded-lg mb-2">
+                <View className="bg-slate-100 px-3 py-1.5 rounded-lg mr-2 mb-2">
                   <View className="flex-row items-center">
                     <Ionicons name="people" size={12} color="#475569" />
                     <Text className="text-xs font-bold text-slate-700 ml-1">
@@ -249,6 +333,13 @@ export default function TournamentSettingsScreen() {
                     </Text>
                   </View>
                 </View>
+                {creationDraft.format === 'league' && (
+                  <View className="bg-green-50 px-3 py-1.5 rounded-lg mb-2">
+                    <Text className="text-xs font-bold text-green-700">
+                      {teamsPerTable} Teams per Group
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
             <View className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl items-center justify-center shadow-md">
@@ -268,22 +359,33 @@ export default function TournamentSettingsScreen() {
               <View className="w-px h-10 bg-slate-200" />
               <View className="flex-1 items-center py-2">
                 <Text className="text-2xl font-bold text-slate-900">
-                  {creationDraft.format === 'league' 
-                    ? creationDraft.selectedTeamIds.length * (creationDraft.selectedTeamIds.length - 1)
-                    : Math.pow(2, Math.ceil(Math.log2(creationDraft.selectedTeamIds.length))) - 1
-                  }
+                  {totalMatches}
                 </Text>
-                <Text className="text-xs text-slate-500 mt-0.5">Matches</Text>
+                <Text className="text-xs text-slate-500 mt-0.5">
+                  Matches
+                  {creationDraft.format === 'league' && creationDraft.includeKnockoutStage && knockoutStageMatches > 0 && (
+                    <Text className="text-xs text-blue-500">
+                      {` (${totalMatches - knockoutStageMatches}+${knockoutStageMatches})`}
+                    </Text>
+                  )}
+                </Text>
               </View>
               <View className="w-px h-10 bg-slate-200" />
               <View className="flex-1 items-center py-2">
                 <Text className="text-2xl font-bold text-slate-900">
                   {creationDraft.format === 'league' 
-                    ? (creationDraft.selectedTeamIds.length - 1) * 2
+                    ? (teamsPerTable - 1) // Rounds per group
                     : Math.ceil(Math.log2(creationDraft.selectedTeamIds.length))
                   }
                 </Text>
-                <Text className="text-xs text-slate-500 mt-0.5">Rounds</Text>
+                <Text className="text-xs text-slate-500 mt-0.5">
+                  Rounds
+                  {creationDraft.format === 'league' && creationDraft.includeKnockoutStage && (
+                    <Text className="text-xs text-blue-500">
+                      {` +${Math.ceil(Math.log2(totalTeamsInKnockout))}`}
+                    </Text>
+                  )}
+                </Text>
               </View>
             </View>
           </View>
@@ -310,6 +412,67 @@ export default function TournamentSettingsScreen() {
                     ))}
                   </View>
                 )}
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Knockout Stage Configuration - Only for League Format */}
+        {creationDraft.format === 'league' && creationDraft.includeKnockoutStage && (
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-slate-700 mb-3">Knockout Stage Configuration</Text>
+            
+            <View className="bg-white rounded-xl border border-slate-200 p-4">
+              <View className="flex-row items-center justify-between mb-4">
+                <View className="flex-row items-center">
+                  <View className="w-10 h-10 bg-indigo-50 rounded-lg items-center justify-center mr-3">
+                    <Ionicons name="trophy" size={20} color="#6366f1" />
+                  </View>
+                  <View>
+                    <Text className="text-sm font-semibold text-slate-900">Teams Advancing per Group</Text>
+                    <Text className="text-xs text-slate-500">Top teams advance to knockout stage</Text>
+                  </View>
+                </View>
+                
+                <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
+                  {validAdvancingTeamOptions.map((num, index) => (
+                    <TouchableOpacity
+                      key={num}
+                      onPress={() => setAdvancingTeamsPerTable(String(num))}
+                      className={`px-3 py-2 ${
+                        parseInt(advancingTeamsPerTable) === num 
+                          ? 'bg-blue-500' 
+                          : index > 0 ? 'border-l border-slate-200' : ''
+                      }`}
+                    >
+                      <Text className={`text-sm font-bold ${
+                        parseInt(advancingTeamsPerTable) === num 
+                          ? 'text-white' 
+                          : 'text-slate-600'
+                      }`}>
+                        {num}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              
+              {/* Knockout Structure Preview */}
+              <View className="bg-blue-50 rounded-lg p-3">
+                <View className="flex-row items-start">
+                  <Ionicons name="information-circle" size={18} color="#3b82f6" />
+                  <View className="flex-1 ml-2">
+                    <Text className="text-sm font-semibold text-blue-700 mb-1">
+                      Knockout Structure
+                    </Text>
+                    <Text className="text-xs text-blue-600">
+                      {totalTeamsInKnockout} teams will advance to knockout stage, starting with {knockoutStartingStage}.
+                      {knockoutStageMatches > 0 && (
+                        <Text> Total knockout matches: {knockoutStageMatches}.</Text>
+                      )}
+                    </Text>
+                  </View>
+                </View>
               </View>
             </View>
           </View>
@@ -416,12 +579,42 @@ export default function TournamentSettingsScreen() {
           </View>
         </View>
 
+        {/* Match Breakdown */}
+        {creationDraft.format === 'league' && (
+          <View className="bg-white rounded-xl p-4 mb-6 border border-slate-200">
+            <Text className="text-sm font-semibold text-slate-700 mb-2">Match Breakdown</Text>
+            
+            <View className="space-y-2">
+              <View className="flex-row justify-between">
+                <Text className="text-xs text-slate-600">Group Stage Matches:</Text>
+                <Text className="text-xs font-medium text-slate-800">
+                  {(teamsPerTable * (teamsPerTable - 1) / 2) * creationDraft.tableCount}
+                </Text>
+              </View>
+              
+              {creationDraft.includeKnockoutStage && knockoutStageMatches > 0 && (
+                <View className="flex-row justify-between">
+                  <Text className="text-xs text-slate-600">Knockout Stage Matches:</Text>
+                  <Text className="text-xs font-medium text-slate-800">{knockoutStageMatches}</Text>
+                </View>
+              )}
+              
+              <View className="flex-row justify-between pt-1 border-t border-slate-100">
+                <Text className="text-xs font-semibold text-slate-700">Total Matches:</Text>
+                <Text className="text-xs font-bold text-slate-900">{totalMatches}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* Info */}
         <View className="bg-slate-100 rounded-xl p-4 mb-6">
           <View className="flex-row items-start">
             <Ionicons name="information-circle" size={18} color="#475569" />
             <Text className="flex-1 text-xs text-slate-600 ml-2 leading-5">
-              These settings will apply to all matches in the tournament. Fixtures will be automatically generated based on the {creationDraft.format} format.
+              {creationDraft.format === 'league' 
+                ? `These settings will apply to all matches. Teams will play within their respective groups${creationDraft.includeKnockoutStage ? ' before top teams advance to knockout rounds.' : '.'}`
+                : 'These settings will apply to all matches in the knockout tournament. Fixtures will be generated automatically.'}
             </Text>
           </View>
         </View>

@@ -34,7 +34,7 @@ const EventTab: React.FC = () => {
   };
 
   const navigateToEventManager = () => {
-    router.push('/eventManager/profile');
+    router.navigate('/(venue)/eventManaging');
   };
 
   const activeFiltersCount = useMemo(() => {

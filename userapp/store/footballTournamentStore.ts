@@ -6,6 +6,7 @@ import { useFootballStore } from './footballTeamStore';
 
 // Tournament Types
 export type TournamentFormat = 'league' | 'knockout';
+export type TournamentStage = 'group' | 'quarterfinals' | 'semifinals' | 'final';
 
 // Tournament Match Event (separate from regular match events)
 export interface TournamentMatchEvent {
@@ -48,6 +49,7 @@ export interface TournamentTeam {
   id: string;
   teamName: string;
   teamId: string; // Reference to original team in football store
+  tableId?: string; // Reference to which table/group the team belongs to
   logoUrl?: string;
   played: number;
   won: number;
@@ -58,10 +60,18 @@ export interface TournamentTeam {
   goalDifference: number;
   points: number;
   isEliminated?: boolean; // For knockout tournaments
+  position?: number; // Position in group/table, used for knockout qualification
+}
+
+export interface TournamentTable {
+  id: string;
+  name: string;
+  teamIds: string[]; // Teams in this table/group
 }
 
 export interface TournamentFixture {
   id: string;
+  stage: TournamentStage; // 'group', 'quarterfinals', 'semifinals', 'final'
   round: number;
   roundName?: string; // E.g., "Quarter Finals", "Semi Finals", "Final"
   matchNumber: number;
@@ -69,6 +79,7 @@ export interface TournamentFixture {
   awayTeamId: string | null; // null for TBD teams in knockout
   homeTeamName: string;
   awayTeamName: string;
+  tableId?: string; // Which table/group this fixture belongs to (for group stage)
   scheduledDate?: Date;
   status: 'upcoming' | 'in_progress' | 'completed';
   homeScore?: number;
@@ -86,6 +97,8 @@ export interface TournamentSettings {
   numberOfReferees: number;
   matchDuration: number;
   format: TournamentFormat;
+  includeKnockoutStage?: boolean; // For league format, whether to include knockout rounds
+  advancingTeamsPerTable?: number; // How many teams advance from each group
 }
 
 export interface Tournament {
@@ -95,7 +108,9 @@ export interface Tournament {
   format: TournamentFormat;
   settings: TournamentSettings;
   teams: TournamentTeam[];
+  tables: TournamentTable[]; // Groups for league format
   fixtures: TournamentFixture[];
+  currentStage: TournamentStage;
   status: 'draft' | 'active' | 'completed' | 'cancelled';
   currentRound: number;
   totalRounds: number;
@@ -110,8 +125,12 @@ export interface TournamentCreationDraft {
   name: string;
   description?: string;
   format: TournamentFormat;
+  teamCount: number; // Number of teams in tournament
+  tableCount: number; // Number of tables/groups
+  includeKnockoutStage: boolean; // For league format
   settings: Partial<TournamentSettings>;
   selectedTeamIds: string[];
+  teamTableAssignments?: Record<string, string>; // teamId -> tableId
 }
 
 interface TournamentState {
@@ -125,16 +144,19 @@ interface TournamentState {
   updateCreationDraft: (updates: Partial<TournamentCreationDraft>) => void;
   addTeamToDraft: (teamId: string) => void;
   removeTeamFromDraft: (teamId: string) => void;
+  assignTeamToTable: (teamId: string, tableId: string) => void;
   setTournamentSettings: (settings: TournamentSettings) => void;
   createTournament: () => string | null;
   cancelTournamentCreation: () => void;
 
   // Tournament Management
   generateFixtures: (tournamentId: string) => void;
+  generateGroupStageFixtures: (tournamentId: string) => void;
+  generateKnockoutStageFixtures: (tournamentId: string) => void;
   startTournament: (tournamentId: string) => void;
-  generateNextKnockoutRound: (tournamentId: string) => void;
-
-  // Tournament Match Flow (Separate System)
+  advanceToKnockoutStage: (tournamentId: string) => void;
+  
+  // Tournament Match Flow
   initializeTournamentMatch: (tournamentId: string, fixtureId: string) => {
     homeTeamId: string;
     awayTeamId: string;
@@ -152,6 +174,8 @@ interface TournamentState {
   // Queries
   getTournament: (tournamentId: string) => Tournament | null;
   getTournamentFixtures: (tournamentId: string) => TournamentFixture[];
+  getTournamentFixturesByStage: (tournamentId: string, stage: TournamentStage) => TournamentFixture[];
+  getTournamentTable: (tournamentId: string, tableId: string) => TournamentTeam[];
   getTournamentStandings: (tournamentId: string) => TournamentTeam[];
   getUpcomingFixtures: (tournamentId: string) => TournamentFixture[];
   getCompletedFixtures: (tournamentId: string) => TournamentFixture[];
@@ -163,70 +187,63 @@ interface TournamentState {
 }
 
 // Helper function to get knockout round name
-const getKnockoutRoundName = (round: number, totalRounds: number): string => {
-  const roundsFromEnd = totalRounds - round + 1;
-
-  if (roundsFromEnd === 1) return 'Final';
-  if (roundsFromEnd === 2) return 'Semi Finals';
-  if (roundsFromEnd === 3) return 'Quarter Finals';
-  if (roundsFromEnd === 4) return 'Round of 16';
-  return `Round ${round}`;
+const getKnockoutRoundName = (stage: TournamentStage): string => {
+  switch (stage) {
+    case 'quarterfinals':
+      return 'Quarter Finals';
+    case 'semifinals':
+      return 'Semi Finals';
+    case 'final':
+      return 'Final';
+    default:
+      return 'Group Stage';
+  }
 };
 
-// Helper Functions for League Format - DOUBLE Round Robin (Home & Away)
-const generateLeagueFixtures = (teams: TournamentTeam[]): TournamentFixture[] => {
+// Helper Functions for League Format
+const generateLeagueFixtures = (tournament: Tournament): TournamentFixture[] => {
   const fixtures: TournamentFixture[] = [];
-  const numTeams = teams.length;
-  if (numTeams < 2) return fixtures;
+  
+  // Process each table separately
+  tournament.tables.forEach(table => {
+    const teamIds = table.teamIds;
+    const numTeams = teamIds.length;
+    
+    if (numTeams < 2) return;
 
-  let matchNumber = 1;
-  let currentRound = 1;
+    let matchNumber = 1;
+    let currentRound = 1;
 
-  // Double round-robin: each team plays every other team TWICE (home and away)
-  // First leg: all combinations
-  for (let i = 0; i < numTeams; i++) {
-    for (let j = i + 1; j < numTeams; j++) {
-      fixtures.push({
-        id: `fixture_${Date.now()}_${matchNumber}`,
-        round: currentRound,
-        roundName: `Matchday ${currentRound}`,
-        matchNumber,
-        homeTeamId: teams[i].id,
-        awayTeamId: teams[j].id,
-        homeTeamName: teams[i].teamName,
-        awayTeamName: teams[j].teamName,
-        status: 'upcoming',
-      });
-      matchNumber++;
+    // Generate fixtures within this table (single round-robin)
+    for (let i = 0; i < numTeams; i++) {
+      for (let j = i + 1; j < numTeams; j++) {
+        const homeTeam = tournament.teams.find(t => t.id === teamIds[i]);
+        const awayTeam = tournament.teams.find(t => t.id === teamIds[j]);
+        
+        if (!homeTeam || !awayTeam) continue;
+        
+        fixtures.push({
+          id: `fixture_${Date.now()}_${table.id}_${matchNumber}`,
+          stage: 'group',
+          round: currentRound,
+          roundName: `${table.name} - Matchday ${currentRound}`,
+          matchNumber,
+          homeTeamId: homeTeam.id,
+          awayTeamId: awayTeam.id,
+          homeTeamName: homeTeam.teamName,
+          awayTeamName: awayTeam.teamName,
+          tableId: table.id,
+          status: 'upcoming',
+        });
+        matchNumber++;
 
-      // Increment round after every set of matches
-      if (matchNumber % Math.ceil(numTeams / 2) === 1 && matchNumber > 1) {
-        currentRound++;
+        // Increment round after every set of matches
+        if (matchNumber % Math.ceil(numTeams / 2) === 1 && matchNumber > 1) {
+          currentRound++;
+        }
       }
     }
-  }
-
-  // Second leg: reverse fixtures (away teams become home teams)
-  const firstLegCount = fixtures.length;
-  for (let k = 0; k < firstLegCount; k++) {
-    const firstLegFixture = fixtures[k];
-    fixtures.push({
-      id: `fixture_${Date.now()}_${matchNumber}`,
-      round: currentRound,
-      roundName: `Matchday ${currentRound}`,
-      matchNumber,
-      homeTeamId: firstLegFixture.awayTeamId,
-      awayTeamId: firstLegFixture.homeTeamId,
-      homeTeamName: firstLegFixture.awayTeamName,
-      awayTeamName: firstLegFixture.homeTeamName,
-      status: 'upcoming',
-    });
-    matchNumber++;
-
-    if (matchNumber % Math.ceil(numTeams / 2) === 1 && matchNumber > firstLegCount + 1) {
-      currentRound++;
-    }
-  }
+  });
 
   return fixtures;
 };
@@ -236,18 +253,24 @@ const generateKnockoutFixtures = (teams: TournamentTeam[]): TournamentFixture[] 
   const fixtures: TournamentFixture[] = [];
   const numTeams = teams.length;
 
-  // Calculate total number of rounds needed
-  const totalRounds = Math.ceil(Math.log2(numTeams));
+  // Determine the stage based on number of teams
+  let stage: TournamentStage = 'quarterfinals';
+  if (numTeams <= 4) {
+    stage = 'semifinals';
+  } else if (numTeams === 2) {
+    stage = 'final';
+  }
 
   let matchNumber = 1;
 
-  // Generate first round only
+  // Generate first round of knockout
   for (let i = 0; i < numTeams; i += 2) {
     if (i + 1 < numTeams) {
       fixtures.push({
-        id: `fixture_${Date.now()}_${matchNumber}`,
+        id: `fixture_${Date.now()}_knockout_${matchNumber}`,
+        stage,
         round: 1,
-        roundName: getKnockoutRoundName(1, totalRounds),
+        roundName: getKnockoutRoundName(stage),
         matchNumber,
         homeTeamId: teams[i].id,
         awayTeamId: teams[i + 1].id,
@@ -259,9 +282,10 @@ const generateKnockoutFixtures = (teams: TournamentTeam[]): TournamentFixture[] 
     } else {
       // Bye - team automatically advances
       fixtures.push({
-        id: `fixture_${Date.now()}_${matchNumber}`,
+        id: `fixture_${Date.now()}_knockout_${matchNumber}`,
+        stage,
         round: 1,
-        roundName: getKnockoutRoundName(1, totalRounds),
+        roundName: getKnockoutRoundName(stage),
         matchNumber,
         homeTeamId: teams[i].id,
         awayTeamId: null,
@@ -279,16 +303,90 @@ const generateKnockoutFixtures = (teams: TournamentTeam[]): TournamentFixture[] 
   return fixtures;
 };
 
-// Generate next round fixtures for knockout tournaments
+// Generate knockout stage fixtures from group qualifiers
+const generateKnockoutStageFixturesFromGroups = (tournament: Tournament): TournamentFixture[] => {
+  const fixtures: TournamentFixture[] = [];
+  const { settings, tables, teams } = tournament;
+  
+  // Default to 2 teams advancing per table if not specified
+  const advancingPerTable = settings.advancingTeamsPerTable || 2;
+  
+  // Get the top teams from each table
+  const qualifiedTeams: TournamentTeam[] = [];
+  
+  tables.forEach(table => {
+    // Get teams in this table and sort by standings
+    const tableTeams = teams
+      .filter(team => team.tableId === table.id)
+      .sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+        return b.goalsFor - a.goalsFor;
+      });
+    
+    // Take top teams based on advancingPerTable
+    qualifiedTeams.push(...tableTeams.slice(0, advancingPerTable));
+  });
+  
+  // Determine the stage based on qualified team count
+  let stage: TournamentStage = 'quarterfinals';
+  if (qualifiedTeams.length <= 4) {
+    stage = 'semifinals';
+  } else if (qualifiedTeams.length === 2) {
+    stage = 'final';
+  }
+  
+  // Create fixtures from qualified teams
+  let matchNumber = 1;
+  for (let i = 0; i < qualifiedTeams.length; i += 2) {
+    if (i + 1 < qualifiedTeams.length) {
+      fixtures.push({
+        id: `fixture_${Date.now()}_knockout_${matchNumber}`,
+        stage,
+        round: 1,
+        roundName: getKnockoutRoundName(stage),
+        matchNumber,
+        homeTeamId: qualifiedTeams[i].id,
+        awayTeamId: qualifiedTeams[i + 1].id,
+        homeTeamName: qualifiedTeams[i].teamName,
+        awayTeamName: qualifiedTeams[i + 1].teamName,
+        status: 'upcoming',
+      });
+      matchNumber++;
+    } else {
+      // If odd number of teams, give a bye
+      fixtures.push({
+        id: `fixture_${Date.now()}_knockout_${matchNumber}`,
+        stage,
+        round: 1,
+        roundName: getKnockoutRoundName(stage),
+        matchNumber,
+        homeTeamId: qualifiedTeams[i].id,
+        awayTeamId: null,
+        homeTeamName: qualifiedTeams[i].teamName,
+        awayTeamName: 'BYE',
+        status: 'completed',
+        homeScore: 1,
+        awayScore: 0,
+        winnerId: qualifiedTeams[i].id,
+      });
+      matchNumber++;
+    }
+  }
+  
+  return fixtures;
+};
+
+// Generate next knockout round fixtures
 const generateNextKnockoutRoundFixtures = (
   tournament: Tournament,
-  currentRound: number
+  currentStage: TournamentStage
 ): TournamentFixture[] => {
   const fixtures: TournamentFixture[] = [];
-  const previousRoundFixtures = tournament.fixtures.filter(f => f.round === currentRound);
+  const currentStageFixtures = tournament.fixtures.filter(f => f.stage === currentStage);
 
-  // Get winners from previous round
-  const winners = previousRoundFixtures
+  // Get winners from current stage
+  const winners = currentStageFixtures
     .filter(f => f.status === 'completed' && f.winnerId)
     .map(f => {
       const winnerTeam = tournament.teams.find(t => t.id === f.winnerId);
@@ -301,16 +399,26 @@ const generateNextKnockoutRoundFixtures = (
 
   if (winners.length < 2) return fixtures;
 
-  const nextRound = currentRound + 1;
-  let matchNumber = tournament.fixtures.length + 1;
+  // Determine next stage
+  let nextStage: TournamentStage;
+  if (currentStage === 'quarterfinals') {
+    nextStage = 'semifinals';
+  } else if (currentStage === 'semifinals') {
+    nextStage = 'final';
+  } else {
+    return fixtures; // No next stage after final
+  }
 
-  // Pair up winners for next round
+  let matchNumber = 1;
+
+  // Pair up winners for next stage
   for (let i = 0; i < winners.length; i += 2) {
     if (i + 1 < winners.length) {
       fixtures.push({
-        id: `fixture_${Date.now()}_${matchNumber}`,
-        round: nextRound,
-        roundName: getKnockoutRoundName(nextRound, tournament.totalRounds),
+        id: `fixture_${Date.now()}_${nextStage}_${matchNumber}`,
+        stage: nextStage,
+        round: 1, // Reset round counter for each stage
+        roundName: getKnockoutRoundName(nextStage),
         matchNumber,
         homeTeamId: winners[i].id,
         awayTeamId: winners[i + 1].id,
@@ -384,12 +492,16 @@ export const useTournamentStore = create<TournamentState>()(
           state.creationDraft = {
             name,
             format: 'league',
+            teamCount: 8,
+            tableCount: 2,
+            includeKnockoutStage: true,
             settings: {
               venue: '',
               numberOfPlayers: 11,
               numberOfSubstitutes: 5,
               numberOfReferees: 1,
               matchDuration: 90,
+              advancingTeamsPerTable: 2,
             },
             selectedTeamIds: [],
           };
@@ -410,6 +522,20 @@ export const useTournamentStore = create<TournamentState>()(
         removeTeamFromDraft: (teamId) => set((state) => {
           if (state.creationDraft) {
             state.creationDraft.selectedTeamIds = state.creationDraft.selectedTeamIds.filter(id => id !== teamId);
+            
+            // Also remove from table assignments if present
+            if (state.creationDraft.teamTableAssignments) {
+              delete state.creationDraft.teamTableAssignments[teamId];
+            }
+          }
+        }),
+
+        assignTeamToTable: (teamId, tableId) => set((state) => {
+          if (state.creationDraft) {
+            if (!state.creationDraft.teamTableAssignments) {
+              state.creationDraft.teamTableAssignments = {};
+            }
+            state.creationDraft.teamTableAssignments[teamId] = tableId;
           }
         }),
 
@@ -423,7 +549,7 @@ export const useTournamentStore = create<TournamentState>()(
           const state = get();
           const draft = state.creationDraft;
 
-          if (!draft || draft.selectedTeamIds.length < 2) return null;
+          if (!draft || draft.selectedTeamIds.length < draft.teamCount) return null;
 
           // Get actual team data from football store
           const footballStore = useFootballStore.getState();
@@ -437,33 +563,91 @@ export const useTournamentStore = create<TournamentState>()(
           }
 
           const tournamentId = `tournament_${Date.now()}`;
+          
+          // Create tables/groups for league format
+          const tables: TournamentTable[] = [];
+          if (draft.format === 'league' && draft.tableCount > 0) {
+            const teamsPerTable = Math.floor(draft.teamCount / draft.tableCount);
+            
+            for (let i = 0; i < draft.tableCount; i++) {
+              tables.push({
+                id: `table_${i + 1}_${Date.now()}`,
+                name: `Group ${String.fromCharCode(65 + i)}`, // Group A, B, C, etc.
+                teamIds: [],
+              });
+            }
+          } else {
+            // For knockout format, create a single "table" for all teams
+            tables.push({
+              id: `table_main_${Date.now()}`,
+              name: 'Main Draw',
+              teamIds: [],
+            });
+          }
 
-          // Create tournament teams with actual team data
-          const teams: TournamentTeam[] = actualTeams.map((team, index) => ({
-            id: `tourney_team_${team.id}_${Date.now()}_${index}`,
-            teamId: team.id,
-            teamName: team.teamName,
-            logoUrl: team.logoUrl,
-            played: 0,
-            won: 0,
-            drawn: 0,
-            lost: 0,
-            goalsFor: 0,
-            goalsAgainst: 0,
-            goalDifference: 0,
-            points: 0,
-            isEliminated: false,
-          }));
+          // Create tournament teams with actual team data and assign to tables
+          const teams: TournamentTeam[] = actualTeams.slice(0, draft.teamCount).map((team, index) => {
+            const teamObj: TournamentTeam = {
+              id: `tourney_team_${team.id}_${Date.now()}_${index}`,
+              teamId: team.id,
+              teamName: team.teamName,
+              logoUrl: team.logoUrl,
+              played: 0,
+              won: 0,
+              drawn: 0,
+              lost: 0,
+              goalsFor: 0,
+              goalsAgainst: 0,
+              goalDifference: 0,
+              points: 0,
+              isEliminated: false,
+            };
+            
+            // Assign team to table
+            if (draft.format === 'league') {
+              // If team assignments are specified, use them
+              if (draft.teamTableAssignments && draft.teamTableAssignments[team.id]) {
+                const tableId = draft.teamTableAssignments[team.id];
+                const table = tables.find(t => t.id === tableId);
+                if (table) {
+                  teamObj.tableId = tableId;
+                  table.teamIds.push(teamObj.id);
+                }
+              } else {
+                // Otherwise distribute teams evenly across tables
+                const tableIndex = Math.floor(index / Math.floor(draft.teamCount / draft.tableCount));
+                if (tableIndex < tables.length) {
+                  teamObj.tableId = tables[tableIndex].id;
+                  tables[tableIndex].teamIds.push(teamObj.id);
+                }
+              }
+            } else {
+              // For knockout, all teams go in the single table
+              teamObj.tableId = tables[0].id;
+              tables[0].teamIds.push(teamObj.id);
+            }
+            
+            return teamObj;
+          });
 
           // Calculate total rounds based on format
           let totalRounds: number;
           if (draft.format === 'league') {
-            // Double round-robin: n teams, each plays n-1 others twice
-            // Total matches = n * (n-1), divided into rounds
-            totalRounds = (teams.length - 1) * 2;
+            // For each table: (n-1) rounds where n is teams per table
+            const teamsPerTable = Math.floor(draft.teamCount / draft.tableCount);
+            totalRounds = teamsPerTable - 1;
+            
+            // If including knockout stages, add those rounds
+            if (draft.includeKnockoutStage) {
+              // Calculate knockout rounds based on teams advancing
+              const advancingTeams = draft.tableCount * (draft.settings.advancingTeamsPerTable || 2);
+              if (advancingTeams >= 8) totalRounds += 3; // QF, SF, F
+              else if (advancingTeams >= 4) totalRounds += 2; // SF, F
+              else totalRounds += 1; // F
+            }
           } else {
-            // Knockout: rounds = log2(teams)
-            totalRounds = Math.ceil(Math.log2(teams.length));
+            // Knockout: log2(teams) rounded up
+            totalRounds = Math.ceil(Math.log2(draft.teamCount));
           }
 
           const tournament: Tournament = {
@@ -471,9 +655,16 @@ export const useTournamentStore = create<TournamentState>()(
             name: draft.name,
             description: draft.description,
             format: draft.format,
-            settings: draft.settings as TournamentSettings,
+            settings: {
+              ...draft.settings as TournamentSettings,
+              format: draft.format,
+              includeKnockoutStage: draft.includeKnockoutStage,
+              advancingTeamsPerTable: draft.settings.advancingTeamsPerTable || 2,
+            },
             teams,
+            tables,
             fixtures: [],
+            currentStage: 'group', // Always start with group stage (even for knockout format)
             status: 'draft',
             currentRound: 0,
             totalRounds,
@@ -498,41 +689,105 @@ export const useTournamentStore = create<TournamentState>()(
           const tournament = state.tournaments.find(t => t.id === tournamentId);
           if (!tournament) return;
 
-          const fixtures = tournament.format === 'league'
-            ? generateLeagueFixtures(tournament.teams)
-            : generateKnockoutFixtures(tournament.teams);
-
-          tournament.fixtures = fixtures;
+          // For league format with knockout, generate group stage fixtures first
+          if (tournament.format === 'league') {
+            const groupFixtures = generateLeagueFixtures(tournament);
+            tournament.fixtures = groupFixtures;
+          } else {
+            // For pure knockout format
+            const knockoutFixtures = generateKnockoutFixtures(tournament.teams);
+            tournament.fixtures = knockoutFixtures;
+          }
+          
+          tournament.currentRound = 1;
+          tournament.currentStage = tournament.format === 'league' ? 'group' : 'quarterfinals';
+          tournament.updatedAt = new Date();
+        }),
+        
+        generateGroupStageFixtures: (tournamentId) => set((state) => {
+          const tournament = state.tournaments.find(t => t.id === tournamentId);
+          if (!tournament || tournament.format !== 'league') return;
+          
+          const groupFixtures = generateLeagueFixtures(tournament);
+          tournament.fixtures = groupFixtures;
+          tournament.currentStage = 'group';
           tournament.currentRound = 1;
           tournament.updatedAt = new Date();
         }),
-
-        generateNextKnockoutRound: (tournamentId) => set((state) => {
+        
+        generateKnockoutStageFixtures: (tournamentId) => set((state) => {
           const tournament = state.tournaments.find(t => t.id === tournamentId);
-          if (!tournament || tournament.format !== 'knockout') return;
-
-          const currentRoundFixtures = tournament.fixtures.filter(
-            f => f.round === tournament.currentRound
-          );
-
-          // Check if all current round matches are completed
-          const allCompleted = currentRoundFixtures.every(f => f.status === 'completed');
-          if (!allCompleted) return;
-
-          // Check if we've reached the final
-          if (tournament.currentRound >= tournament.totalRounds) return;
-
-          // Generate next round fixtures
-          const nextRoundFixtures = generateNextKnockoutRoundFixtures(
-            tournament,
-            tournament.currentRound
-          );
-
-          if (nextRoundFixtures.length > 0) {
-            tournament.fixtures.push(...nextRoundFixtures);
-            tournament.currentRound += 1;
-            tournament.updatedAt = new Date();
+          if (!tournament) return;
+          
+          let knockoutFixtures: TournamentFixture[] = [];
+          
+          if (tournament.format === 'league' && tournament.settings.includeKnockoutStage) {
+            // For league with knockout stage, generate fixtures from group standings
+            knockoutFixtures = generateKnockoutStageFixturesFromGroups(tournament);
+          } else if (tournament.format === 'knockout') {
+            // For pure knockout format
+            knockoutFixtures = generateKnockoutFixtures(tournament.teams);
           }
+          
+          // If tournament already has fixtures, append new ones
+          if (tournament.fixtures.length > 0) {
+            tournament.fixtures.push(...knockoutFixtures);
+          } else {
+            tournament.fixtures = knockoutFixtures;
+          }
+          
+          // Update tournament state
+          if (knockoutFixtures.length > 0) {
+            tournament.currentStage = knockoutFixtures[0].stage;
+            tournament.currentRound = 1; // Reset round for new stage
+          }
+          
+          tournament.updatedAt = new Date();
+        }),
+
+        advanceToKnockoutStage: (tournamentId) => set((state) => {
+          const tournament = state.tournaments.find(t => t.id === tournamentId);
+          if (!tournament || tournament.format !== 'league' || !tournament.settings.includeKnockoutStage) return;
+          
+          // Check if all group stage matches are completed
+          const groupMatches = tournament.fixtures.filter(f => f.stage === 'group');
+          const allGroupMatchesCompleted = groupMatches.every(match => match.status === 'completed');
+          
+          if (!allGroupMatchesCompleted) {
+            console.error('Cannot advance to knockout stage until all group matches are completed');
+            return;
+          }
+          
+          // Calculate final group standings and positions
+          tournament.tables.forEach(table => {
+            const tableTeams = tournament.teams
+              .filter(team => team.tableId === table.id)
+              .sort((a, b) => {
+                if (b.points !== a.points) return b.points - a.points;
+                if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+                return b.goalsFor - a.goalsFor;
+              });
+              
+            // Set position for each team in group
+            tableTeams.forEach((team, index) => {
+              const teamIndex = tournament.teams.findIndex(t => t.id === team.id);
+              if (teamIndex !== -1) {
+                tournament.teams[teamIndex].position = index + 1;
+              }
+            });
+          });
+          
+          // Generate knockout fixtures
+          const knockoutFixtures = generateKnockoutStageFixturesFromGroups(tournament);
+          tournament.fixtures.push(...knockoutFixtures);
+          
+          // Update tournament state
+          if (knockoutFixtures.length > 0) {
+            tournament.currentStage = knockoutFixtures[0].stage;
+            tournament.currentRound = 1; // Reset round for knockout stage
+          }
+          
+          tournament.updatedAt = new Date();
         }),
 
         startTournament: (tournamentId) => set((state) => {
@@ -657,18 +912,20 @@ export const useTournamentStore = create<TournamentState>()(
           fixture.awayScore = match.awayScore;
           fixture.matchData = { ...match };
 
-          // Determine winner for knockout
-          if (tournament.format === 'knockout') {
-            if (match.homeScore > match.awayScore) {
-              fixture.winnerId = match.homeTeamId;
-            } else if (match.awayScore > match.homeScore) {
-              fixture.winnerId = match.awayTeamId;
-            } else {
-              // In case of draw, home team wins (or implement penalty shootout)
+          // Determine winner
+          if (match.homeScore > match.awayScore) {
+            fixture.winnerId = match.homeTeamId;
+          } else if (match.awayScore > match.homeScore) {
+            fixture.winnerId = match.awayTeamId;
+          } else {
+            // In case of draw for knockout matches, home team wins (or implement penalty shootout)
+            if (fixture.stage !== 'group') {
               fixture.winnerId = match.homeTeamId;
             }
+          }
 
-            // Mark losing team as eliminated
+          // For knockout stages, mark losing team as eliminated
+          if (fixture.stage !== 'group') {
             const loserId = fixture.winnerId === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
             const loserTeam = tournament.teams.find(t => t.id === loserId);
             if (loserTeam) {
@@ -676,8 +933,8 @@ export const useTournamentStore = create<TournamentState>()(
             }
           }
 
-          // Update standings for league
-          if (tournament.format === 'league') {
+          // Update standings for group stage
+          if (fixture.stage === 'group' && fixture.tableId) {
             tournament.teams = updateStandings(
               tournament.teams,
               match.homeTeamId,
@@ -689,16 +946,32 @@ export const useTournamentStore = create<TournamentState>()(
 
           tournament.updatedAt = new Date();
 
-          // Check round completion and generate next knockout round
-          if (tournament.format === 'knockout') {
-            const currentRoundFixtures = tournament.fixtures.filter(
-              f => f.round === tournament.currentRound
+          // Check if current stage is completed and generate next stage if necessary
+          if (fixture.stage !== 'group') {
+            const currentStageFixtures = tournament.fixtures.filter(
+              f => f.stage === fixture.stage
             );
-            const allRoundCompleted = currentRoundFixtures.every(f => f.status === 'completed');
+            const allStageCompleted = currentStageFixtures.every(f => f.status === 'completed');
 
-            if (allRoundCompleted && tournament.currentRound < tournament.totalRounds) {
-              // Generate next round
-              get().generateNextKnockoutRound(tournament.id);
+            if (allStageCompleted) {
+              // Generate next stage if not final
+              if (fixture.stage !== 'final') {
+                const nextRoundFixtures = generateNextKnockoutRoundFixtures(tournament, fixture.stage);
+                if (nextRoundFixtures.length > 0) {
+                  tournament.fixtures.push(...nextRoundFixtures);
+                  tournament.currentStage = nextRoundFixtures[0].stage;
+                  tournament.currentRound = 1; // Reset round for new stage
+                }
+              }
+            }
+          } else {
+            // Check if all group stage matches are completed to potentially advance to knockout
+            const groupFixtures = tournament.fixtures.filter(f => f.stage === 'group');
+            const allGroupCompleted = groupFixtures.every(f => f.status === 'completed');
+            
+            if (allGroupCompleted && tournament.settings.includeKnockoutStage) {
+              // Auto-advance to knockout stage
+              get().advanceToKnockoutStage(tournament.id);
             }
           }
 
@@ -708,13 +981,15 @@ export const useTournamentStore = create<TournamentState>()(
             tournament.status = 'completed';
             tournament.endDate = new Date();
 
-            if (tournament.format === 'league') {
+            // Determine winner
+            if (tournament.format === 'league' && !tournament.settings.includeKnockoutStage) {
+              // If league format without knockout, winner is top of standings
               const winner = [...tournament.teams].sort((a, b) => b.points - a.points)[0];
               tournament.winner = winner.teamName;
             } else {
-              // For knockout, the winner of the final is the tournament winner
+              // For knockout or league+knockout, the winner is from the final match
               const finalMatch = tournament.fixtures.find(
-                f => f.round === tournament.totalRounds && f.status === 'completed'
+                f => f.stage === 'final' && f.status === 'completed'
               );
               if (finalMatch && finalMatch.winnerId) {
                 const winnerTeam = tournament.teams.find(t => t.id === finalMatch.winnerId);
@@ -732,6 +1007,7 @@ export const useTournamentStore = create<TournamentState>()(
           state.activeTournamentMatch = null;
         }),
 
+        // Queries
         getTournament: (tournamentId) => {
           return get().tournaments.find(t => t.id === tournamentId) || null;
         },
@@ -739,6 +1015,25 @@ export const useTournamentStore = create<TournamentState>()(
         getTournamentFixtures: (tournamentId) => {
           const tournament = get().tournaments.find(t => t.id === tournamentId);
           return tournament?.fixtures || [];
+        },
+
+        getTournamentFixturesByStage: (tournamentId, stage) => {
+          const tournament = get().tournaments.find(t => t.id === tournamentId);
+          return tournament?.fixtures.filter(f => f.stage === stage) || [];
+        },
+
+        getTournamentTable: (tournamentId, tableId) => {
+          const tournament = get().tournaments.find(t => t.id === tournamentId);
+          if (!tournament) return [];
+          
+          const teams = tournament.teams.filter(team => team.tableId === tableId);
+          
+          // Sort by standings criteria
+          return [...teams].sort((a, b) => {
+            if (b.points !== a.points) return b.points - a.points;
+            if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+            return b.goalsFor - a.goalsFor;
+          });
         },
 
         getTournamentStandings: (tournamentId) => {
@@ -770,23 +1065,19 @@ export const useTournamentStore = create<TournamentState>()(
         deleteTournament: (tournamentId) => set((state) => {
           if (state.activeTournamentMatch?.tournamentId === tournamentId) {
             state.activeTournamentMatch = null;
-            console.log('🧹 Cleared active tournament match for deleted tournament');
           }
 
           if (state.activeTournament?.id === tournamentId) {
             state.activeTournament = null;
-            console.log('🧹 Cleared active tournament reference');
           }
-
           
           state.tournaments = state.tournaments.filter(t => t.id !== tournamentId);
-
-          
         }),
 
         clearAllTournaments: () => set((state) => {
           state.tournaments = [];
           state.activeTournament = null;
+          state.activeTournamentMatch = null;
         }),
       })),
       {

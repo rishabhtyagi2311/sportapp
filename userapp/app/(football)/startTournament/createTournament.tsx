@@ -1,5 +1,5 @@
 // app/(football)/tournaments/create.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +13,24 @@ export default function CreateTournamentScreen() {
   const [tournamentName, setTournamentName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedFormat, setSelectedFormat] = useState<TournamentFormat>('league');
+  
+  // New state variables for team count and tables
+  const [teamCount, setTeamCount] = useState('8');
+  const [tableCount, setTableCount] = useState('2');
+  const [includeKnockoutStage, setIncludeKnockoutStage] = useState(true);
+  
+  // Calculate max tables based on team count
+  const maxTables = parseInt(teamCount) > 0 ? Math.floor(parseInt(teamCount) / 2) : 1;
+  
+  // Validate table count when team count changes
+  useEffect(() => {
+    const teams = parseInt(teamCount);
+    const tables = parseInt(tableCount);
+    
+    if (teams > 0 && tables > maxTables) {
+      setTableCount(maxTables.toString());
+    }
+  }, [teamCount, maxTables]);
 
   const handleContinue = () => {
     if (!tournamentName.trim()) {
@@ -20,11 +38,35 @@ export default function CreateTournamentScreen() {
       return;
     }
 
+    // Validate team count
+    const teams = parseInt(teamCount);
+    if (isNaN(teams) || teams < 2 || teams % 2 !== 0) {
+      Alert.alert('Error', 'Please enter an even number of teams (minimum 2)');
+      return;
+    }
+
+    // Validate table count for league format
+    if (selectedFormat === 'league') {
+      const tables = parseInt(tableCount);
+      if (isNaN(tables) || tables < 1) {
+        Alert.alert('Error', 'Please enter at least 1 table');
+        return;
+      }
+      
+      if (teams % tables !== 0) {
+        Alert.alert('Error', `Team count (${teams}) must be evenly divisible by table count (${tables})`);
+        return;
+      }
+    }
+
     // Initialize creation draft
     startTournamentCreation(tournamentName);
     updateCreationDraft({
       description: description.trim() || undefined,
       format: selectedFormat,
+      teamCount: teams,
+      tableCount: selectedFormat === 'league' ? parseInt(tableCount) : 1,
+      includeKnockoutStage: selectedFormat === 'league' ? includeKnockoutStage : true,
     });
 
     // Navigate to team selection
@@ -35,7 +77,7 @@ export default function CreateTournamentScreen() {
     {
       id: 'league' as TournamentFormat,
       name: 'League',
-      description: 'Round-robin format where every team plays every other team',
+      description: 'Group stage format with tables, optionally followed by knockout rounds',
       icon: 'list',
       color: '#10b981',
     },
@@ -115,6 +157,23 @@ export default function CreateTournamentScreen() {
           />
         </View>
 
+        {/* Team Count */}
+        <View className="mb-6">
+          <Text className="text-sm font-semibold text-slate-700 mb-2">Number of Teams *</Text>
+          <View className="flex-row items-center">
+            <TextInput
+              value={teamCount}
+              onChangeText={setTeamCount}
+              keyboardType="numeric"
+              className="bg-white border border-slate-200 rounded-xl px-4 py-3 text-base text-slate-900 flex-1"
+              placeholderTextColor="#94a3b8"
+            />
+          </View>
+          <Text className="text-xs text-slate-500 mt-2">
+            Please enter an even number (e.g., 4, 6, 8, 12, 16, etc.)
+          </Text>
+        </View>
+
         {/* Tournament Format */}
         <View className="mb-6">
           <Text className="text-sm font-semibold text-slate-700 mb-3">Tournament Format *</Text>
@@ -149,14 +208,67 @@ export default function CreateTournamentScreen() {
           ))}
         </View>
 
+        {/* League Format Options */}
+        {selectedFormat === 'league' && (
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-slate-700 mb-3">League Configuration</Text>
+            
+            {/* Table Count */}
+            <View className="bg-white rounded-xl p-4 mb-3 border border-slate-200">
+              <Text className="text-sm font-semibold text-slate-700 mb-2">Number of Tables/Groups *</Text>
+              <View className="flex-row items-center">
+                <TextInput
+                  value={tableCount}
+                  onChangeText={setTableCount}
+                  keyboardType="numeric"
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-base text-slate-900 flex-1"
+                  placeholderTextColor="#94a3b8"
+                />
+              </View>
+              <Text className="text-xs text-slate-500 mt-2">
+                Teams per table: {parseInt(teamCount) > 0 && parseInt(tableCount) > 0 ? Math.floor(parseInt(teamCount) / parseInt(tableCount)) : 0}
+                {parseInt(tableCount) > maxTables && (
+                  <Text className="text-red-500"> (Max tables: {maxTables})</Text>
+                )}
+              </Text>
+            </View>
+
+            {/* Knockout Stage Option */}
+            <View className="bg-white rounded-xl p-4 mb-3 border border-slate-200">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-slate-700">Include Knockout Stage</Text>
+                  <Text className="text-xs text-slate-500 mt-1">
+                    Top teams from each table advance to knockout rounds
+                  </Text>
+                </View>
+                <TouchableOpacity 
+                  onPress={() => setIncludeKnockoutStage(!includeKnockoutStage)}
+                  className={`w-12 h-7 rounded-full ${includeKnockoutStage ? 'bg-green-500' : 'bg-slate-300'}`}
+                >
+                  <View className={`absolute top-1 ${includeKnockoutStage ? 'right-1' : 'left-1'} w-5 h-5 bg-white rounded-full`} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* Info Box */}
         <View className="bg-blue-50 rounded-xl p-4 mb-6">
           <View className="flex-row items-start">
             <Ionicons name="information-circle" size={20} color="#3b82f6" />
             <View className="flex-1 ml-3">
-              <Text className="text-sm font-semibold text-blue-900 mb-1">Next Steps</Text>
+              <Text className="text-sm font-semibold text-blue-900 mb-1">Tournament Structure</Text>
               <Text className="text-sm text-blue-700 leading-5">
-                After setting up basic info, you'll select teams and configure tournament settings like venue, players, and referees.
+                {selectedFormat === 'league' ? (
+                  includeKnockoutStage ? (
+                    `${parseInt(teamCount)} teams will be divided into ${parseInt(tableCount)} ${parseInt(tableCount) > 1 ? 'groups' : 'group'} with ${parseInt(teamCount) > 0 && parseInt(tableCount) > 0 ? Math.floor(parseInt(teamCount) / parseInt(tableCount)) : 0} teams each. After the group stage, top teams will advance to knockout rounds.`
+                  ) : (
+                    `${parseInt(teamCount)} teams will be divided into ${parseInt(tableCount)} ${parseInt(tableCount) > 1 ? 'groups' : 'group'} with ${parseInt(teamCount) > 0 && parseInt(tableCount) > 0 ? Math.floor(parseInt(teamCount) / parseInt(tableCount)) : 0} teams each. The tournament winner will be determined by group standings.`
+                  )
+                ) : (
+                  `${parseInt(teamCount)} teams will compete in a single-elimination knockout tournament.`
+                )}
               </Text>
             </View>
           </View>

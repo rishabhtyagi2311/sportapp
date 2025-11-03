@@ -1,5 +1,5 @@
 // app/(football)/teams/viewMembers.tsx
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Image,
   Alert,
   Platform,
+  Modal,
+  FlatList
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +34,10 @@ export default function ViewMembersScreen() {
   const captain = team ? getTeamCaptain(team.id) : undefined;
   const teamLogoUri = team ? getTeamLogoUri(team.id) : undefined;
 
+  // State for captain selection modal
+  const [captainModalVisible, setCaptainModalVisible] = useState(false);
+  const [selectedPlayerForCaptain, setSelectedPlayerForCaptain] = useState<string | null>(null);
+
   const handleGoBack = () => {
     router.back();
   };
@@ -47,7 +53,6 @@ export default function ViewMembersScreen() {
       Alert.alert('Permission Required', 'We need access to your photos to set a team logo');
       return;
     }
-
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -55,7 +60,6 @@ export default function ViewMembersScreen() {
         aspect: [1, 1],
         quality: 0.8,
       });
-
       if (!result.canceled && result.assets && result.assets[0].uri) {
         // Set team logo in store
         setTeamLogo(team.id, result.assets[0].uri);
@@ -65,33 +69,48 @@ export default function ViewMembersScreen() {
     }
   };
 
+  // Open captain management modal
+  const handleOpenCaptainModal = () => {
+    if (!team) return;
+    setCaptainModalVisible(true);
+  };
+
   // Handle setting a player as team captain
   const handleSetCaptain = (playerId: string) => {
     if (!team) return;
     
-    // Check if the player is already the captain
-    const isCurrentCaptain = team.captainId === playerId;
+    // Set as new captain
+    setTeamCaptain(team.id, playerId);
+    setCaptainModalVisible(false);
+    setSelectedPlayerForCaptain(null);
+
+    // Show confirmation
+    Alert.alert('Success', 'Team captain has been updated');
+  };
+
+  // Handle removing captain
+  const handleRemoveCaptain = () => {
+    if (!team) return;
     
-    if (isCurrentCaptain) {
-      Alert.alert(
-        'Remove Captain',
-        'Do you want to remove this player as team captain?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
+    Alert.alert(
+      'Remove Captain',
+      'Are you sure you want to remove the current captain?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Remove',
+          onPress: () => {
+            setTeamCaptain(team.id, ''); // Empty string to remove captain
+            setCaptainModalVisible(false);
+            setSelectedPlayerForCaptain(null);
           },
-          {
-            text: 'Remove',
-            onPress: () => setTeamCaptain(team.id, ''), // Empty string to remove captain
-            style: 'destructive',
-          },
-        ]
-      );
-    } else {
-      // Set as new captain
-      setTeamCaptain(team.id, playerId);
-    }
+          style: 'destructive',
+        },
+      ]
+    );
   };
 
   // Get position color for better visual organization
@@ -116,10 +135,8 @@ export default function ViewMembersScreen() {
     const isCaptain = captain?.id === player.id;
     
     return (
-      <TouchableOpacity
+      <View
         key={player.id}
-        onPress={() => handleSetCaptain(player.id)}
-        activeOpacity={0.9}
         className="bg-white rounded-xl mx-4 mb-3 shadow-sm border border-gray-100"
         style={{
           elevation: 2,
@@ -148,7 +165,6 @@ export default function ViewMembersScreen() {
               {player.position.charAt(0)}
             </Text>
           </View>
-
           {/* Player Info */}
           <View className="flex-1">
             <View className="flex-row items-center">
@@ -180,7 +196,6 @@ export default function ViewMembersScreen() {
               </Text>
             )}
           </View>
-
           {/* Jersey Number & Status */}
           <View className="items-end">
             <View className={`w-8 h-8 rounded-lg items-center justify-center mb-2 ${isCaptain ? 'bg-amber-500' : 'bg-slate-900'}`}>
@@ -195,17 +210,108 @@ export default function ViewMembersScreen() {
             </View>
           </View>
         </View>
-        
-        {/* Captain Indicator */}
-        {isCaptain && (
-          <View className="bg-amber-50 px-4 py-2 border-t border-amber-100 flex-row items-center">
-            <Ionicons name="shield" size={14} color="#b45309" />
-            <Text className="text-amber-700 text-xs font-medium ml-2">
-              Team Captain - Tap to change
+      </View>
+    );
+  };
+
+  const renderCaptainSelectionModal = () => {
+    return (
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={captainModalVisible}
+        onRequestClose={() => setCaptainModalVisible(false)}
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white rounded-t-3xl p-5">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-xl font-bold text-gray-900">Manage Team Captain</Text>
+              <TouchableOpacity 
+                onPress={() => setCaptainModalVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close-outline" size={24} color="#374151" />
+              </TouchableOpacity>
+            </View>
+            
+            {captain && (
+              <View className="bg-amber-50 rounded-xl p-4 mb-4">
+                <Text className="text-amber-700 font-semibold mb-1">Current Captain</Text>
+                <View className="flex-row items-center">
+                  <View className="w-8 h-8 rounded-full bg-amber-200 items-center justify-center mr-3">
+                    <Text className="font-bold text-amber-700">{captain.name.charAt(0)}</Text>
+                  </View>
+                  <Text className="text-gray-900 font-medium flex-1">{captain.name}</Text>
+                  <TouchableOpacity 
+                    onPress={handleRemoveCaptain}
+                    className="bg-white border border-red-300 rounded-lg px-3 py-1"
+                  >
+                    <Text className="text-red-600 font-medium">Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+            
+            <Text className="text-gray-700 font-semibold mb-3">
+              {captain ? 'Select New Captain' : 'Select Captain'}
             </Text>
+            
+            <ScrollView className="max-h-96 mb-4">
+              {teamPlayers.map((player, index) => (
+                <TouchableOpacity
+                  key={player.id}
+                  onPress={() => setSelectedPlayerForCaptain(player.id)}
+                  className={`flex-row items-center p-3 rounded-xl mb-2 border ${
+                    selectedPlayerForCaptain === player.id
+                      ? 'bg-sky-50 border-sky-300'
+                      : 'bg-gray-50 border-gray-100'
+                  }`}
+                >
+                  <View 
+                    className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                    style={{ backgroundColor: getPositionColor(player.position) + '20' }}
+                  >
+                    <Text 
+                      className="font-bold text-sm"
+                      style={{ color: getPositionColor(player.position) }}
+                    >
+                      {index + 1}
+                    </Text>
+                  </View>
+                  <View className="flex-1">
+                    <Text className="font-medium text-gray-900">{player.name}</Text>
+                    <Text className="text-gray-500 text-sm">{player.position}</Text>
+                  </View>
+                  {selectedPlayerForCaptain === player.id && (
+                    <View className="bg-sky-100 rounded-full h-6 w-6 items-center justify-center">
+                      <Ionicons name="checkmark" size={16} color="#0284c7" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            <View className="flex-row">
+              <TouchableOpacity
+                onPress={() => setCaptainModalVisible(false)}
+                className="flex-1 border border-gray-300 rounded-xl py-3 mr-2"
+              >
+                <Text className="text-gray-700 font-medium text-center">Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={() => selectedPlayerForCaptain && handleSetCaptain(selectedPlayerForCaptain)}
+                className={`flex-1 rounded-xl py-3 ml-2 ${
+                  selectedPlayerForCaptain ? 'bg-blue-500' : 'bg-blue-300'
+                }`}
+                disabled={!selectedPlayerForCaptain}
+              >
+                <Text className="text-white font-bold text-center">Confirm Captain</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        )}
-      </TouchableOpacity>
+        </View>
+      </Modal>
     );
   };
 
@@ -288,7 +394,6 @@ export default function ViewMembersScreen() {
               {team?.teamName}
             </Text>
           </View>
-
           {/* Member count with progress indicator */}
           <View className="items-end">
             <View className="bg-slate-900 px-3 py-2 rounded-lg">
@@ -307,7 +412,7 @@ export default function ViewMembersScreen() {
           </View>
         </View>
       </View>
-
+      
       {/* Content */}
       <ScrollView 
         className="flex-1 pt-4"
@@ -332,7 +437,6 @@ export default function ViewMembersScreen() {
                   shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: 0.1,
                   shadowRadius: 4,
-                  
                 }}
               />
             ) : (
@@ -344,13 +448,27 @@ export default function ViewMembersScreen() {
           </TouchableOpacity>
           
           <Text className="text-lg font-bold text-gray-800">{team.teamName}</Text>
-          {captain && (
-            <Text className="text-gray-500 text-sm mt-1">
-              Captain: {captain.name}
-            </Text>
-          )}
+          
+          {/* Captain Section - New UI */}
+          <TouchableOpacity 
+            onPress={handleOpenCaptainModal}
+            className="flex-row items-center mt-2 bg-amber-50 px-3 py-1 rounded-lg border border-amber-200"
+            activeOpacity={0.7}
+          >
+            <Ionicons name="shield-outline" size={16} color="#b45309" />
+            {captain ? (
+              <Text className="text-amber-700 ml-2 font-medium">
+                Captain: {captain.name}
+              </Text>
+            ) : (
+              <Text className="text-amber-700 ml-2 font-medium">
+                Assign Captain
+              </Text>
+            )}
+            <Ionicons name="chevron-forward" size={14} color="#b45309" className="ml-1" />
+          </TouchableOpacity>
         </View>
-
+        
         {/* Quick Stats */}
         <View className="flex-row mx-4 mb-4 space-x-3">
           <View className="flex-1 bg-white rounded-xl p-4 border border-gray-100">
@@ -371,28 +489,41 @@ export default function ViewMembersScreen() {
             </View>
           </View>
         </View>
-
+        
         {/* Players List */}
         {teamPlayers.length === 0 ? (
           renderEmptyState()
         ) : (
           <View className="mt-2">
-            <View className="mx-4 mb-3">
-              <Text className="text-gray-900 font-bold text-lg">Players</Text>
-              <Text className="text-gray-500 text-sm">
-                Tap on a player to {captain ? 'change' : 'assign'} captain
-              </Text>
+            <View className="mx-4 mb-3 flex-row justify-between items-center">
+              <View>
+                <Text className="text-gray-900 font-bold text-lg">Players</Text>
+                <Text className="text-gray-500 text-sm">
+                  Roster of your team
+                </Text>
+              </View>
+              
+              <TouchableOpacity 
+                onPress={handleOpenCaptainModal}
+                className="bg-slate-100 py-1 px-3 rounded-lg border border-slate-200"
+              >
+                <Text className="text-slate-700 font-medium">Manage Captain</Text>
+              </TouchableOpacity>
             </View>
+            
             {teamPlayers.map((player, index) => renderPlayerCard(player, index))}
           </View>
         )}
       </ScrollView>
-
+      
       {/* Floating Add Button */}
       {team && teamPlayers.length < team.maxPlayers && (
         <TouchableOpacity
           onPress={() => {
-            router.push(`/(football)/TeamsNestedFiles/addTeamMembers?teamId=${team.id}`);
+            router.push({
+              pathname: '/(football)/TeamsNestedFiles/addTeamMembers',
+              params: { teamId: team.id }
+            });
           }}
           className="absolute bottom-6 right-6 w-16 h-16 mb-6 bg-slate-900 rounded-full justify-center items-center shadow-lg"
           activeOpacity={0.9}
@@ -407,6 +538,10 @@ export default function ViewMembersScreen() {
           <Ionicons name="add" size={28} color="white" />
         </TouchableOpacity>
       )}
+      
+      {/* Captain Selection Modal */}
+      {renderCaptainSelectionModal()}
+      
     </SafeAreaView>
   );
 }

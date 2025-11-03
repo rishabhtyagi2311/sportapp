@@ -1,21 +1,12 @@
-// app/(venue)/eventManager/layout.tsx
 
 import React from 'react';
 import { Stack } from 'expo-router';
-import { View } from 'react-native';
+
 
 export default function EventManagerLayout() {
   return (
     <Stack
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#1e293b', // slate-800
-        },
-        headerTintColor: '#fff',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
-      }}
+      screenOptions={{ headerShown: false }}
     >
       <Stack.Screen
         name="profile"
@@ -27,7 +18,7 @@ export default function EventManagerLayout() {
         name="createEvent"
         options={{
           title: 'Create Event',
-          presentation: 'modal',
+        
         }}
       />
       <Stack.Screen

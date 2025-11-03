@@ -8,7 +8,7 @@ import { useFootballStore } from '@/store/footballTeamStore';
 const { width } = Dimensions.get('window');
 
 export default function TeamsScreen() {
-  console.log('👥 Teams screen is rendering');
+ 
   
   const { teams } = useFootballStore();
   
