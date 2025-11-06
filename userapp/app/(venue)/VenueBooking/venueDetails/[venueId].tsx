@@ -1,4 +1,3 @@
-// app/venue-details/[venueId].tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -23,9 +22,7 @@ const VenueDetailsScreen: React.FC = () => {
   const router = useRouter();
   const venueId = params.venueId as string;
   
-  
   const [venue, setVenue] = useState<Venue | null>(null);
-  const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
   const [selectedVariety, setSelectedVariety] = useState<SportVariety | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<'main' | 'amenities'>('main');
@@ -47,39 +44,48 @@ const VenueDetailsScreen: React.FC = () => {
     );
   }
 
-  const handleSportSelect = (sport: Sport) => {
-    if (selectedSport?.id === sport.id) {
-      // If the same sport is clicked, collapse it
-      setSelectedSport(null);
-      setSelectedVariety(null);
-    } else {
-      // If a different sport is clicked, expand it
-      setSelectedSport(sport);
-      setSelectedVariety(null);
-    }
-  };
-
-  const handleVarietySelect = (variety: SportVariety) => {
+  const handleVarietySelect = (variety: SportVariety, sport: Sport) => {
     setSelectedVariety(variety);
   };
 
   const handleProceedToBooking = () => {
-    if (!selectedSport || !selectedVariety) {
+    if (!selectedVariety) {
       Alert.alert(
         'Selection Required',
-        'Please select both a sport and variety before proceeding to booking.'
+        'Please select a game type before proceeding to booking.'
       );
       return;
     }
+
+    // Find the sport for the selected variety
+    const sportForVariety = venue.sports.find(sport => 
+      sport.varieties.some(v => v.id === selectedVariety.id)
+    );
 
     router.push({
       pathname: './../slotSelection/[venueId]',
       params: {
         venueId: venue.id,
-        sportId: selectedSport.id,
+        sportId: sportForVariety?.id,
         sportVarietyId: selectedVariety.id,
       }
     });
+  };
+
+  // Get all varieties from all sports
+  const getAllVarieties = () => {
+    const allVarieties: { variety: SportVariety, sport: Sport }[] = [];
+    
+    venue.sports.forEach(sport => {
+      sport.varieties.forEach(variety => {
+        allVarieties.push({ 
+          variety,
+          sport
+        });
+      });
+    });
+    
+    return allVarieties;
   };
 
   const renderImageCarousel = () => {
@@ -129,228 +135,143 @@ const VenueDetailsScreen: React.FC = () => {
     );
   };
 
-  const renderMainContent = () => (
-    <ScrollView className="flex-1 bg-gray-50">
-      {/* Venue Information */}
-      <View className="bg-white">
-        <View className="px-6 pt-8 pb-6">
-          <Text className="text-3xl font-bold text-slate-900 leading-tight mb-4">
-            {venue.name}
-          </Text>
-          
-          <View className="flex-row items-start mb-4">
-            <Ionicons name="location" size={22} color="#64748b" className="mt-1" />
-            <View className="ml-3 flex-1">
-              <Text className="text-slate-700 text-base leading-relaxed">
-                {venue.address.street}
+  const renderMainContent = () => {
+    const allVarieties = getAllVarieties();
+    
+    return (
+      <ScrollView className="flex-1 bg-gray-50">
+        {/* Venue Information */}
+        <View className="bg-white">
+          <View className="px-6 pt-8 pb-6">
+           
+            
+            {/* BOOK YOUR SESSION SECTION - Moved above address */}
+            <View className="mb-8">
+              <Text className="text-2xl font-bold text-slate-900 mb-3">
+                Book Your Session
               </Text>
-              <Text className="text-slate-700 text-base">
-                {venue.address.city}, {venue.address.state} - {venue.address.pincode}
+              
+              <Text className="text-slate-600 text-base mb-6 leading-relaxed">
+                Select your preferred game type to check availability and proceed with booking
               </Text>
-            </View>
-          </View>
-
-          <View className="flex-row items-center mb-6">
-            <Ionicons name="call" size={22} color="#64748b" />
-            <Text className="text-slate-700 text-base ml-3 font-medium">
-              {venue.contactInfo.phone}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Booking Section */}
-      <View className="bg-white mt-2">
-        <View className="px-6 py-8">
-          <Text className="text-2xl font-bold text-slate-900 mb-3">
-            Book Your Session
-          </Text>
-          <Text className="text-slate-600 text-base mb-8 leading-relaxed">
-            Select your preferred sport and format to check availability and proceed with booking
-          </Text>
-
-          {venue.sports.map((sport) => (
-            <View key={sport.id} style={{ marginBottom: 32 }}>
-              <TouchableOpacity
-                style={{
-                  backgroundColor: 'white',
-                  borderWidth: 2,
-                  borderColor: selectedSport?.id === sport.id ? '#16a34a' : '#374151',
-                  borderRadius: 16,
-                  padding: 20,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 8,
-                  elevation: 4,
-                }}
-                onPress={() => handleSportSelect(sport)}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{
-                      width: 50,
-                      height: 50,
-                      borderRadius: 25,
-                      backgroundColor: selectedSport?.id === sport.id ? '#16a34a' : '#374151',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: 16
-                    }}>
-                      <Ionicons 
-                        name="american-football" 
-                        size={24} 
-                        color="white"
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 4 }}>
-                        {sport.name}
-                      </Text>
-                      <Text style={{
-                        fontSize: 14,
-                        color: '#374151',
-                        textTransform: 'capitalize'
-                      }}>
-                        {sport.category} Sport • {sport.varieties?.length || 0} formats available
-                      </Text>
-                    </View>
-                  </View>
-                  
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 12,
+              
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                {allVarieties.map(({variety, sport}) => (
+                  <TouchableOpacity
+                    key={variety.id}
+                    style={{
+                      backgroundColor: selectedVariety?.id === variety.id ? '#16a34a' : 'white',
                       borderWidth: 2,
-                      borderColor: selectedSport?.id === sport.id ? '#16a34a' : '#374151',
-                      backgroundColor: selectedSport?.id === sport.id ? '#16a34a' : 'transparent',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: 8
+                      borderColor: selectedVariety?.id === variety.id ? '#16a34a' : '#e5e7eb',
+                      borderRadius: 25,
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      marginRight: 8,
+                      marginBottom: 8,
+                    }}
+                    onPress={() => handleVarietySelect(variety, sport)}
+                  >
+                    <Text style={{
+                      color: selectedVariety?.id === variety.id ? 'white' : '#374151',
+                      fontSize: 14,
+                      fontWeight: '600'
                     }}>
-                      {selectedSport?.id === sport.id && (
-                        <Ionicons name="checkmark" size={14} color="white" />
-                      )}
-                    </View>
-                    <Ionicons 
-                      name={selectedSport?.id === sport.id ? "chevron-up" : "chevron-down"}
-                      size={20} 
-                      color={selectedSport?.id === sport.id ? "#16a34a" : "#374151"}
-                    />
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              {selectedSport?.id === sport.id && sport.varieties && (
-                <View style={{ marginTop: 16, paddingHorizontal: 8 }}>
-                  <Text style={{ 
-                    fontSize: 16, 
-                    fontWeight: '600', 
-                    color: '#1e293b', 
-                    marginBottom: 12,
-                    marginLeft: 8 
+                      {sport.name} - {variety.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              {selectedVariety && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#16a34a',
+                    borderRadius: 12,
+                    paddingVertical: 16,
+                    paddingHorizontal: 24,
+                    shadowColor: '#16a34a',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 8,
+                    elevation: 4,
+                  }}
+                  onPress={handleProceedToBooking}
+                >
+                  <Text style={{
+                    color: 'white',
+                    fontWeight: 'bold',
+                    fontSize: 18,
+                    textAlign: 'center'
                   }}>
-                    Choose Format:
+                    Check Available Slots
                   </Text>
-                  
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                    {sport.varieties.map((variety) => (
-                      <TouchableOpacity
-                        key={variety.id}
-                        style={{
-                          backgroundColor: selectedVariety?.id === variety.id ? '#16a34a' : 'white',
-                          borderWidth: 2,
-                          borderColor: selectedVariety?.id === variety.id ? '#16a34a' : '#e5e7eb',
-                          borderRadius: 25,
-                          paddingHorizontal: 16,
-                          paddingVertical: 8,
-                          marginBottom: 8,
-                        }}
-                        onPress={() => handleVarietySelect(variety)}
-                      >
-                        <Text style={{
-                          color: selectedVariety?.id === variety.id ? 'white' : '#374151',
-                          fontSize: 14,
-                          fontWeight: '600'
-                        }}>
-                          {variety.name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
+                </TouchableOpacity>
               )}
             </View>
-          ))}
-
-          {selectedSport && selectedVariety && (
-            <TouchableOpacity
-              style={{
-                backgroundColor: '#16a34a',
-                borderRadius: 12,
-                paddingVertical: 16,
-                paddingHorizontal: 24,
-                shadowColor: '#16a34a',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.2,
-                shadowRadius: 8,
-                elevation: 4,
-              }}
-              onPress={handleProceedToBooking}
-            >
-              <Text style={{
-                color: 'white',
-                fontWeight: 'bold',
-                fontSize: 18,
-                textAlign: 'center'
-              }}>
-                Check Available Slots
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Policies Section */}
-      <View className="bg-white mt-2">
-        <View className="px-6 py-8">
-          <Text className="text-xl font-bold text-slate-900 mb-6">
-            Booking Policies
-          </Text>
-          
-          <View className="space-y-6">
-            <View className="border-l-4 border-red-500 pl-4">
-              <Text className="font-semibold text-slate-900 mb-2 text-base">
-                Cancellation Policy
-              </Text>
-              <Text className="text-slate-700 leading-relaxed">
-                {venue.policies.cancellationPolicy}
-              </Text>
+            
+            {/* Address section - venue name removed */}
+            <View className="flex-row items-start mb-4">
+               
+              <Ionicons name="location" size={22} color="#64748b" className="mt-1" />
+              <View className="ml-3 flex-1">
+                <Text className="text-slate-700 text-base leading-relaxed">
+                  {venue.address.street}
+                </Text>
+                <Text className="text-slate-700 text-base">
+                  {venue.address.city}, {venue.address.state} - {venue.address.pincode}
+                </Text>
+              </View>
             </View>
             
-            <View className="border-l-4 border-blue-500 pl-4">
-              <Text className="font-semibold text-slate-900 mb-2 text-base">
-                Advance Booking
-              </Text>
-              <Text className="text-slate-700">
-                Bookings can be made up to {venue.policies.advanceBookingDays} days in advance
-              </Text>
-            </View>
-            
-            <View className="border-l-4 border-orange-500 pl-4">
-              <Text className="font-semibold text-slate-900 mb-2 text-base">
-                Minimum Booking Duration
-              </Text>
-              <Text className="text-slate-700">
-                Minimum booking duration is {venue.policies.minimumBookingHours} hour(s)
+            <View className="flex-row items-center mb-6">
+              <Ionicons name="call" size={22} color="#64748b" />
+              <Text className="text-slate-700 text-base ml-3 font-medium">
+                {venue.contactInfo.phone}
               </Text>
             </View>
           </View>
         </View>
-      </View>
-    </ScrollView>
-  );
+            
+        {/* Policies Section */}
+        <View className="bg-white mt-2">
+          <View className="px-6 py-8">
+            <Text className="text-xl font-bold text-slate-900 mb-6">
+              Booking Policies
+            </Text>
+            
+            <View className="space-y-6">
+              <View className="border-l-4 border-red-500 pl-4">
+                <Text className="font-semibold text-slate-900 mb-2 text-base">
+                  Cancellation Policy
+                </Text>
+                <Text className="text-slate-700 leading-relaxed">
+                  {venue.policies.cancellationPolicy}
+                </Text>
+              </View>
+              
+              <View className="border-l-4 border-blue-500 pl-4">
+                <Text className="font-semibold text-slate-900 mb-2 text-base">
+                  Advance Booking
+                </Text>
+                <Text className="text-slate-700">
+                  Bookings can be made up to {venue.policies.advanceBookingDays} days in advance
+                </Text>
+              </View>
+              
+              <View className="border-l-4 border-orange-500 pl-4">
+                <Text className="font-semibold text-slate-900 mb-2 text-base">
+                  Minimum Booking Duration
+                </Text>
+                <Text className="text-slate-700">
+                  Minimum booking duration is {venue.policies.minimumBookingHours} hour(s)
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  };
 
   const renderAmenities = () => (
     <ScrollView className="flex-1 bg-gray-50">
@@ -362,7 +283,6 @@ const VenueDetailsScreen: React.FC = () => {
         {['basic', 'facilities', 'sports_equipment', 'services'].map((category) => {
           const categoryAmenities = venue.amenities.filter(a => a.category === category);
           if (categoryAmenities.length === 0) return null;
-
           return (
             <View key={category} className="bg-white rounded-xl p-6 shadow-sm mb-6">
               <Text className="text-lg font-bold text-slate-900 mb-4 capitalize">
@@ -411,7 +331,6 @@ const VenueDetailsScreen: React.FC = () => {
           </Text>
         </View>
       </View>
-
       {/* Image Carousel */}
       {renderImageCarousel()}
       
@@ -442,7 +361,6 @@ const VenueDetailsScreen: React.FC = () => {
           ))}
         </View>
       </View>
-
       {/* Content */}
       {activeTab === 'main' && renderMainContent()}
       {activeTab === 'amenities' && renderAmenities()}

@@ -17,7 +17,7 @@ export default function EventManagerScreen() {
   }, [events]);
   
   const handleCreateEvent = () => {
-    router.push('/eventManager/createEvent');
+    router.push('/eventManaging/createEvent');
   };
   
   const handleEditEvent = (eventId: string) => {

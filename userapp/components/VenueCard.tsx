@@ -12,8 +12,6 @@ interface VenueCardProps {
 
 const VenueCard: React.FC<VenueCardProps> = ({ venue, onPress }) => {
   const router = useRouter();
-  const minPrice = Math.min(...venue.timeSlots.map((slot) => slot.price));
-  const maxPrice = Math.max(...venue.timeSlots.map((slot) => slot.price));
   
   const handlePress = () => {
     if (onPress) {
@@ -47,7 +45,7 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onPress }) => {
           </Text>
         </View>
       </View>
-
+      
       {/* Content Section */}
       <View className="p-4">
         {/* Venue Name and Location */}
@@ -61,14 +59,7 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onPress }) => {
             {venue.address.city}, {venue.address.state}
           </Text>
         </View>
-
-        {/* Price */}
-        <View>
-          <Text className="text-orange-600 text-lg font-bold">
-            ₹{minPrice}{minPrice !== maxPrice && `-${maxPrice}`}
-          </Text>
-          <Text className="text-gray-500 text-xs">per hour</Text>
-        </View>
+        {/* Pricing section removed */}
       </View>
     </TouchableOpacity>
   );

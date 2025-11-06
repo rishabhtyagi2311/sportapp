@@ -1,4 +1,4 @@
-// stores/matchExecutionStore.ts (complete updated version)
+// stores/matchExecutionStore.ts (updated to support live timer and automatic event timing)
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
@@ -16,12 +16,11 @@ export interface MatchEvent {
   assistPlayerName?: string;
   minute: number;
   isExtraTime: boolean;
-  description?: string;
+  // description field removed as per requirement
   timestamp: Date;
 }
 
 export type EventType = 'goal' | 'penalty' | 'card' | 'substitution' | 'offside' | 'foul' | 'corner' | 'free_kick';
-
 export type EventSubType = 
   // Goal types
   | 'header' | 'left_foot' | 'right_foot' | 'penalty_goal' | 'free_kick_goal' | 'own_goal'
@@ -101,21 +100,23 @@ export interface CompletedMatch {
   updatedAt: Date;
 }
 
-// Active match state
+// Active match state - added timerStartedAt field
 export interface ActiveMatch {
   id: string;
   matchSetup: MatchCreationData;
   startTime: Date;
+  timerStartedAt: Date; // Added this field to track when the timer was started
   currentMinute: number;
   status: MatchStatus;
   events: MatchEvent[];
   homeTeamScore: number;
   awayTeamScore: number;
   isExtraTime: boolean;
+  isHalfTime?: boolean; // Added to track half time state
   notes: string;
 }
 
-// Store state
+// Store state - added new timer-related fields and methods
 export interface MatchExecutionState {
   // Current active match
   activeMatch: ActiveMatch | null;
@@ -147,6 +148,8 @@ export interface MatchExecutionState {
   // Actions for match state
   updateMatchStatus: (status: MatchStatus) => void;
   updateCurrentMinute: (minute: number) => void;
+  toggleHalfTime: (isHalfTime: boolean) => void; // New method to toggle half time state
+  toggleExtraTime: (isExtraTime: boolean) => void; // New method to toggle extra time state
   addMatchNotes: (notes: string) => void;
   
   // Computed values
@@ -170,6 +173,11 @@ export interface MatchExecutionState {
   updateLiveMatch: (matchId: string, updates: Partial<ActiveMatch>) => void;
   completeLiveMatch: (matchId: string, notes?: string) => CompletedMatch | null;
   getLiveMatches: () => ActiveMatch[];
+  
+  // New timer-related methods
+  getCurrentMatchTime: () => { minutes: number, seconds: number }; // Get current time in min:sec format
+  getElapsedSeconds: () => number; // Get elapsed seconds since match start
+  resetTimer: () => void; // Reset the timer (for example at half-time)
 }
 
 // Helper functions
@@ -234,7 +242,7 @@ const calculatePlayerStats = (events: MatchEvent[], matchSetup: MatchCreationDat
 // Initial state
 const initialState = {
   activeMatch: null,
-  liveMatches: [], // Add this new field
+  liveMatches: [],
   completedMatches: [],
   isStartingMatch: false,
   isSavingEvent: false,
@@ -251,18 +259,21 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
       // Add a match to live matches
       addLiveMatch: (matchSetup) => {
         const matchId = `match_${Date.now()}`;
+        const now = new Date();
         
         set((state) => {
           const newMatch: ActiveMatch = {
             id: matchId,
             matchSetup,
-            startTime: new Date(),
+            startTime: now,
+            timerStartedAt: now, // Initialize timer start time
             currentMinute: 0,
             status: 'in_progress',
             events: [],
             homeTeamScore: 0,
             awayTeamScore: 0,
             isExtraTime: false,
+            isHalfTime: false,
             notes: '',
           };
           
@@ -327,17 +338,20 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
       // Start a new match
       startMatch: (matchSetup) => set((state) => {
         const matchId = `match_${Date.now()}`;
+        const now = new Date();
         
         const newMatch: ActiveMatch = {
           id: matchId,
           matchSetup,
-          startTime: new Date(),
+          startTime: now,
+          timerStartedAt: now, // Initialize timer start time
           currentMinute: 0,
           status: 'in_progress',
           events: [],
           homeTeamScore: 0,
           awayTeamScore: 0,
           isExtraTime: false,
+          isHalfTime: false,
           notes: '',
         };
         
@@ -411,7 +425,7 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
         }
       }),
       
-      // Add event to active match
+      // Add event to active match (updated to remove description requirement)
       addEvent: (eventData) => set((state) => {
         if (!state.activeMatch) return;
         
@@ -572,6 +586,32 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
         }
       }),
       
+      // Toggle half time state - new method
+      toggleHalfTime: (isHalfTime) => set((state) => {
+        if (state.activeMatch) {
+          state.activeMatch.isHalfTime = isHalfTime;
+          
+          // Also update in live matches
+          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+          if (liveMatchIndex !== -1) {
+            state.liveMatches[liveMatchIndex].isHalfTime = isHalfTime;
+          }
+        }
+      }),
+      
+      // Toggle extra time state - new method
+      toggleExtraTime: (isExtraTime) => set((state) => {
+        if (state.activeMatch) {
+          state.activeMatch.isExtraTime = isExtraTime;
+          
+          // Also update in live matches
+          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+          if (liveMatchIndex !== -1) {
+            state.liveMatches[liveMatchIndex].isExtraTime = isExtraTime;
+          }
+        }
+      }),
+      
       // Add match notes
       addMatchNotes: (notes) => set((state) => {
         if (state.activeMatch) {
@@ -581,6 +621,41 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
           const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
           if (liveMatchIndex !== -1) {
             state.liveMatches[liveMatchIndex].notes = notes;
+          }
+        }
+      }),
+      
+      // New timer-related methods
+      getCurrentMatchTime: () => {
+        const state = get();
+        if (!state.activeMatch) return { minutes: 0, seconds: 0 };
+        
+        const now = new Date();
+        const elapsedMilliseconds = now.getTime() - state.activeMatch.timerStartedAt.getTime();
+        const totalSeconds = Math.floor(elapsedMilliseconds / 1000);
+        
+        return {
+          minutes: Math.floor(totalSeconds / 60),
+          seconds: totalSeconds % 60
+        };
+      },
+      
+      getElapsedSeconds: () => {
+        const state = get();
+        if (!state.activeMatch) return 0;
+        
+        const now = new Date();
+        return Math.floor((now.getTime() - state.activeMatch.timerStartedAt.getTime()) / 1000);
+      },
+      
+      resetTimer: () => set((state) => {
+        if (state.activeMatch) {
+          state.activeMatch.timerStartedAt = new Date();
+          
+          // Also update in live matches
+          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+          if (liveMatchIndex !== -1) {
+            state.liveMatches[liveMatchIndex].timerStartedAt = state.activeMatch.timerStartedAt;
           }
         }
       }),
