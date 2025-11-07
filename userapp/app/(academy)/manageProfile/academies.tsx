@@ -12,6 +12,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { usechildStore } from "@/store/academyChildProfile";
 import { useEnrollmentStore } from "@/store/academyEnrollmentStore";
 import { useAcademyStore } from "@/store/academyStore";
+import { useReviewsStore } from "@/store/academyReviewStore"; // Import the reviews store
 
 export default function ChildAcademiesScreen() {
   const router = useRouter();
@@ -21,20 +22,22 @@ export default function ChildAcademiesScreen() {
   const childProfiles = usechildStore((state) => state.childProfiles);
   const getEnrollmentsByChild = useEnrollmentStore((state) => state.getEnrollmentsByChild);
   const getAcademyById = useAcademyStore((state) => state.getAcademyById);
-
+  
+  // Get reviews store methods
+  const { getAverageRatingForAcademy, getReviewsByAcademy } = useReviewsStore();
+  
   // Find the child profile from the store
   const childProfile = childProfiles.find(profile => profile.id === childId);
-
   // Get enrollments for this specific child using the store method
   const childEnrollments = getEnrollmentsByChild(childId);
   
   // Get unique academies for this child
   const childAcademyIds = [...new Set(childEnrollments.map(e => e.academyId))];
-
+  
   const handleBackPress = () => {
     router.back();
   };
-
+  
   const handleAcademyPress = (academyId: string, academyName: string) => {
     router.push({
       pathname: "/(academy)/manageProfile/childAttendance",
@@ -45,7 +48,37 @@ export default function ChildAcademiesScreen() {
       },
     });
   };
+  
+  const navigateToReviews = (academyId: string, e: any) => {
+    e.stopPropagation(); // Prevent triggering the parent TouchableOpacity
+    router.push(`/(academy)/academyDetails/${academyId}/reviews`);
+  };
 
+  // Function to render rating stars
+  const renderStars = (rating: number) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 !== 0;
+
+    for (let i = 0; i < fullStars; i++) {
+      stars.push(
+        <Ionicons key={i} name="star" size={14} color="#fbbf24" />
+      );
+    }
+    if (hasHalfStar) {
+      stars.push(
+        <Ionicons key="half" name="star-half" size={14} color="#fbbf24" />
+      );
+    }
+    const emptyStars = 5 - Math.ceil(rating);
+    for (let i = 0; i < emptyStars; i++) {
+      stars.push(
+        <Ionicons key={`empty-${i}`} name="star-outline" size={14} color="#d1d5db" />
+      );
+    }
+    return stars;
+  };
+  
   // Empty state - no enrollments
   if (childAcademyIds.length === 0) {
     return (
@@ -62,7 +95,6 @@ export default function ChildAcademiesScreen() {
             >
               <Ionicons name="arrow-back" size={24} color="white" />
             </TouchableOpacity>
-
             {/* Header Title */}
             <View className="flex-1">
               <Text className="text-white font-bold text-lg" numberOfLines={1}>
@@ -74,7 +106,6 @@ export default function ChildAcademiesScreen() {
             </View>
           </View>
         </View>
-
         <View className="flex-1 bg-white items-center justify-center px-6">
           <Ionicons name="school-outline" size={80} color="#e2e8f0" />
           <Text className="text-slate-900 text-2xl font-bold text-center mt-4">
@@ -93,7 +124,7 @@ export default function ChildAcademiesScreen() {
       </SafeAreaView>
     );
   }
-
+  
   return (
     <SafeAreaView className="flex-1 bg-white">
       <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
@@ -108,7 +139,6 @@ export default function ChildAcademiesScreen() {
           >
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
-
           {/* Header Title */}
           <View className="flex-1">
             <Text className="text-white font-bold text-lg" numberOfLines={1}>
@@ -120,7 +150,7 @@ export default function ChildAcademiesScreen() {
           </View>
         </View>
       </View>
-
+      
       {/* Academy List */}
       <ScrollView 
         className="flex-1"
@@ -130,7 +160,11 @@ export default function ChildAcademiesScreen() {
         {childAcademyIds.map((academyId) => {
           const academy = getAcademyById(academyId);
           if (!academy) return null;
-
+          
+          // Get review data for this academy
+          const averageRating = getAverageRatingForAcademy(academyId);
+          const reviewCount = getReviewsByAcademy(academyId).length;
+          
           return (
             <TouchableOpacity
               key={academyId}
@@ -163,7 +197,7 @@ export default function ChildAcademiesScreen() {
                   <Ionicons name="chevron-forward-circle" size={28} color="rgba(255,255,255,0.7)" />
                 </View>
               </View>
-
+              
               {/* Card Body */}
               <View className="px-5 py-4">
                 {/* Academy Info Grid */}
@@ -179,7 +213,6 @@ export default function ChildAcademiesScreen() {
                       </Text>
                     </View>
                   </View>
-
                   <View className="flex-row items-center">
                     <View className="w-10 h-10 bg-green-50 rounded-xl items-center justify-center mr-3">
                       <Ionicons name="location" size={20} color="#10b981" />
@@ -191,7 +224,6 @@ export default function ChildAcademiesScreen() {
                       </Text>
                     </View>
                   </View>
-
                   <View className="flex-row items-center">
                     <View className="w-10 h-10 bg-blue-50 rounded-xl items-center justify-center mr-3">
                       <Ionicons name="call" size={20} color="#3b82f6" />
@@ -203,22 +235,60 @@ export default function ChildAcademiesScreen() {
                       </Text>
                     </View>
                   </View>
+
+                  {/* Rating/Review Section */}
+                  <View className="flex-row items-center">
+                    <View className="w-10 h-10 bg-amber-50 rounded-xl items-center justify-center mr-3">
+                      <Ionicons name="star" size={20} color="#f59e0b" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-slate-500 text-xs">Rating</Text>
+                      <View className="flex-row items-center">
+                        {averageRating > 0 ? (
+                          <View className="flex-row items-center">
+                            <Text className="text-slate-900 font-semibold text-base mr-1">
+                              {averageRating.toFixed(1)}
+                            </Text>
+                            <View className="flex-row mr-1">
+                              {renderStars(averageRating)}
+                            </View>
+                            <Text className="text-gray-500 text-xs">
+                              ({reviewCount})
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text className="text-slate-900 font-semibold text-base">
+                            No ratings yet
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
                 </View>
               </View>
-
+              
               {/* Card Footer */}
               <View className="px-5 py-3 bg-gray-50 border-t border-gray-100">
                 <View className="flex-row items-center justify-between">
-                  <Text className="text-slate-500 text-xs">
-                    Tap to view attendance
-                  </Text>
-                  <Ionicons name="arrow-forward" size={16} color="#94a3b8" />
+                  <View className="flex-1">
+                    <Text className="text-slate-500 text-xs">
+                      Tap to view attendance
+                    </Text>
+                  </View>
+                  <TouchableOpacity 
+                    onPress={(e) => navigateToReviews(academyId, e)}
+                    className="bg-blue-500 py-2 px-4 rounded-full"
+                    activeOpacity={0.7}
+                  >
+                    <Text className="text-white text-xs font-medium">
+                      {reviewCount > 0 ? "View Reviews" : "Write Review"}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             </TouchableOpacity>
           );
         })}
-
         {/* Bottom Spacing */}
         <View className="h-4" />
       </ScrollView>

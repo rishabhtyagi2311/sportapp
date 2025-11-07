@@ -48,6 +48,10 @@ export default function ProfileScreen() {
     });
   };
 
+  const navigateToDemoBookings = () => {
+    router.push("/(academy)/demoBookings");
+  };
+
   const handleDelete = (id: string, childName: string) => {
     Alert.alert(
       "Delete Profile",
@@ -179,24 +183,34 @@ export default function ProfileScreen() {
       
       {/* Header Section */}
       <View className="bg-slate-900 shadow-lg">
-        <View className="flex-row items-center px-4 py-3 border-b border-slate-800">
-          {/* Back Button */}
-          <TouchableOpacity
-            onPress={handleBackPress}
-            className="mr-3 p-2 rounded-lg"
-          >
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </TouchableOpacity>
+        <View className="flex-row items-center justify-between px-4 py-3 border-b border-slate-800">
+          {/* Left side: Back Button and Title */}
+          <View className="flex-row items-center flex-1">
+            <TouchableOpacity
+              onPress={handleBackPress}
+              className="mr-3 p-2 rounded-lg"
+            >
+              <Ionicons name="arrow-back" size={24} color="white" />
+            </TouchableOpacity>
 
-          {/* Header Title */}
-          <View className="flex-1">
-            <Text className="text-white font-bold text-lg" numberOfLines={1}>
-              Manage Child Profiles
-            </Text>
-            <Text className="text-slate-400 text-xs mt-0.5">
-              Add or edit child profiles
-            </Text>
+            {/* Header Title */}
+            <View className="flex-1">
+              <Text className="text-white font-bold text-lg" numberOfLines={1}>
+                Manage Child Profiles
+              </Text>
+              <Text className="text-slate-400 text-xs mt-0.5">
+                Add or edit child profiles
+              </Text>
+            </View>
           </View>
+          
+          {/* Right side: Calendar Icon */}
+          <TouchableOpacity
+            onPress={navigateToDemoBookings}
+            className="ml-2 p-2 rounded-lg"
+          >
+            <Ionicons name="calendar" size={24} color="white" />
+          </TouchableOpacity>
         </View>
       </View>
 

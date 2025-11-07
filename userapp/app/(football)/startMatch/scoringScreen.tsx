@@ -1,4 +1,4 @@
-// app/(football)/matches/matchScoring.tsx - Clean and error-free version
+// app/(football)/matches/matchScoring.tsx - Fixed version
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
@@ -19,7 +19,6 @@ import { useMatchCreationStore } from '@/store/footballMatchCreationStore';
 import { useMatchExecutionStore } from '@/store/footballMatchEventStore';
 import { useFootballStore } from '@/store/footballTeamStore';
 import { FootballPlayer } from '@/types/addingMemberTypes';
-
 // EVENT CONFIGURATIONS
 const EVENT_CONFIGS = {
   goal: {
@@ -75,7 +74,6 @@ const EVENT_CONFIGS = {
     subTypes: [],
   },
 };
-
 export default function MatchScoringScreen() {
   const router = useRouter();
   const { matchData } = useMatchCreationStore();

@@ -12,7 +12,8 @@ export default function AcademyLayout() {
       <Stack.Screen name="profile" />
     
       <Stack.Screen name="academies" />
-       <Stack.Screen name="childAttendance" />
+      <Stack.Screen name="childAttendance" />
+      <Stack.Screen name="bookedDemo" />
     </Stack>
   );
 }
