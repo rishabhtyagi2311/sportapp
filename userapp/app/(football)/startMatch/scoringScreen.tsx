@@ -16,14 +16,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMatchCreationStore } from '@/store/footballMatchCreationStore';
-import { useMatchExecutionStore } from '@/store/footballMatchEventStore';
+import { useMatchExecutionStore, MatchEvent } from '@/store/footballMatchEventStore';
 import { useFootballStore } from '@/store/footballTeamStore';
 import { FootballPlayer } from '@/types/addingMemberTypes';
+
 // EVENT CONFIGURATIONS
 const EVENT_CONFIGS = {
   goal: {
     name: 'Goal',
-    icon: 'football',
+    icon: 'football' as const,
     color: '#10b981',
     subTypes: [
       { id: 'header', name: 'Header' },
@@ -36,7 +37,7 @@ const EVENT_CONFIGS = {
   },
   card: {
     name: 'Card',
-    icon: 'card',
+    icon: 'card' as const,
     color: '#f59e0b',
     subTypes: [
       { id: 'yellow_card', name: 'Yellow Card' },
@@ -46,13 +47,13 @@ const EVENT_CONFIGS = {
   },
   substitution: {
     name: 'Substitution',
-    icon: 'swap-horizontal',
+    icon: 'swap-horizontal' as const,
     color: '#6366f1',
     subTypes: [],
   },
   foul: {
     name: 'Foul',
-    icon: 'warning',
+    icon: 'warning' as const,
     color: '#f97316',
     subTypes: [
       { id: 'dangerous_play', name: 'Dangerous Play' },
@@ -63,17 +64,18 @@ const EVENT_CONFIGS = {
   },
   corner: {
     name: 'Corner',
-    icon: 'flag',
+    icon: 'flag' as const,
     color: '#8b5cf6',
     subTypes: [],
   },
   offside: {
     name: 'Offside',
-    icon: 'flag-outline',
+    icon: 'flag-outline' as const,
     color: '#ef4444',
     subTypes: [],
   },
 };
+
 export default function MatchScoringScreen() {
   const router = useRouter();
   const { matchData } = useMatchCreationStore();
@@ -83,14 +85,15 @@ export default function MatchScoringScreen() {
     startMatch,
     addEvent,
     endMatch,
-    updateCurrentMinute,
+    toggleExtraTime,
     updateLiveMatch,
   } = useMatchExecutionStore();
   
   // Timer state
   const [timer, setTimer] = useState<number>(0);
+  const [isTimerRunning, setIsTimerRunning] = useState(true);
+  const [extraTimeMinutes, setExtraTimeMinutes] = useState<number>(0);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const timerStartedAt = useRef<Date | null>(null);
   
   // Modal + event form states
   const [showEventModal, setShowEventModal] = useState(false);
@@ -100,30 +103,26 @@ export default function MatchScoringScreen() {
   const [selectedPlayer, setSelectedPlayer] = useState<FootballPlayer | null>(null);
   const [selectedAssistPlayer, setSelectedAssistPlayer] = useState<FootballPlayer | null>(null);
   const [eventMinute, setEventMinute] = useState('');
-  const [isExtraTime, setIsExtraTime] = useState(false);
   const [eventDescription, setEventDescription] = useState('');
   
   // Start the timer when component mounts
   useEffect(() => {
-    // Start timer on first load
-    if (!timerStartedAt.current) {
-      timerStartedAt.current = new Date();
-    }
-    
-    timerIntervalRef.current = setInterval(() => {
-      if (timerStartedAt.current) {
-        const now = new Date();
-        const elapsedSeconds = Math.floor((now.getTime() - timerStartedAt.current.getTime()) / 1000);
-        setTimer(elapsedSeconds);
+    if (isTimerRunning) {
+      timerIntervalRef.current = setInterval(() => {
+        setTimer((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
       }
-    }, 1000);
+    }
     
     return () => {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, []);
+  }, [isTimerRunning]);
   
   // Format timer as MM:SS
   const formattedTimer = useMemo(() => {
@@ -132,6 +131,18 @@ export default function MatchScoringScreen() {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }, [timer]);
   
+  // Current minute based on timer
+  const currentMinute = useMemo(() => {
+    return Math.floor(timer / 60);
+  }, [timer]);
+  
+  // Calculate if match is in extra time based on timer and extra time minutes
+  const isInExtraTime = useMemo(() => {
+    // Standard match duration is 90 minutes (or 45 for first half)
+    // If timer is beyond this, we're in extra time
+    return currentMinute > 90 && extraTimeMinutes > 0;
+  }, [currentMinute, extraTimeMinutes]);
+  
   // Initialize match in execution store
   useEffect(() => {
     if (!activeMatch && matchData) {
@@ -139,38 +150,16 @@ export default function MatchScoringScreen() {
     }
   }, [activeMatch, matchData, startMatch]);
   
-  // Update match time periodically
-  useEffect(() => {
-    if (activeMatch) {
-      const timerForMinutes = setInterval(() => {
-        // Calculate current minute based on timer (converting seconds to minutes)
-        const minutesPassed = Math.floor(timer / 60);
-        
-        // Update the active match time
-        updateCurrentMinute(minutesPassed);
-        
-        // Also update the corresponding live match
-        if (activeMatch.id) {
-          updateLiveMatch(activeMatch.id, {
-            currentMinute: minutesPassed
-          });
-        }
-      }, 60000); // Update every minute
-      
-      return () => clearInterval(timerForMinutes);
-    }
-  }, [activeMatch, timer, updateCurrentMinute, updateLiveMatch]);
-  
   // Get team players
   const myTeamPlayers = useMemo(() => {
     return matchData?.myTeam?.selectedPlayers
-      ?.map(id => players.find(p => p.id === id))
+      ?.map((id: string) => players.find((p: FootballPlayer) => p.id === id))
       ?.filter((p): p is FootballPlayer => !!p) || [];
   }, [matchData?.myTeam?.selectedPlayers, players]);
   
   const opponentTeamPlayers = useMemo(() => {
     return matchData?.opponentTeam?.selectedPlayers
-      ?.map(id => players.find(p => p.id === id))
+      ?.map((id: string) => players.find((p: FootballPlayer) => p.id === id))
       ?.filter((p): p is FootballPlayer => !!p) || [];
   }, [matchData?.opponentTeam?.selectedPlayers, players]);
   
@@ -196,15 +185,42 @@ export default function MatchScoringScreen() {
     setSelectedSubType(null);
     setSelectedPlayer(null);
     setSelectedAssistPlayer(null);
-    
-    // Automatically set current minute from timer
-    const currentMinute = Math.floor(timer / 60).toString();
-    setEventMinute(currentMinute);
-    
-    setIsExtraTime(false);
+    setEventMinute(currentMinute.toString());
     setEventDescription('');
     setSelectedTeam(null);
-  }, [timer]);
+  }, [currentMinute]);
+  
+  // Handle Play/Pause
+  const handlePlayPause = useCallback(() => {
+    setIsTimerRunning((prev) => !prev);
+  }, []);
+  
+  // Handle Add Extra Time
+  const handleAddExtraTime = useCallback(() => {
+    Alert.prompt(
+      'Add Extra Time',
+      'Enter extra time in minutes:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Add',
+          onPress: (value?: string) => {
+            if (!value) return;
+            const minutes = parseInt(value, 10);
+            if (!isNaN(minutes) && minutes > 0) {
+              setExtraTimeMinutes(minutes);
+              toggleExtraTime(true);
+            } else {
+              Alert.alert('Error', 'Please enter a valid number');
+            }
+          },
+        },
+      ],
+      'plain-text',
+      '',
+      'numeric'
+    );
+  }, [toggleExtraTime]);
   
   // Create event and push to store
   const handleCreateEvent = useCallback(() => {
@@ -213,7 +229,7 @@ export default function MatchScoringScreen() {
       return;
     }
     
-    const minute = parseInt(eventMinute);
+    const minute = parseInt(eventMinute, 10);
     if (isNaN(minute) || minute < 1) {
       Alert.alert('Error', 'Invalid minute');
       return;
@@ -228,52 +244,10 @@ export default function MatchScoringScreen() {
       assistPlayerId: selectedAssistPlayer?.id,
       assistPlayerName: selectedAssistPlayer?.name,
       minute,
-      isExtraTime,
-      description: eventDescription.trim() || undefined,
+      isExtraTime: isInExtraTime,
     };
     
-    // Add event to active match
     addEvent(eventData);
-    
-    // Calculate new scores based on the event
-    if (selectedEventType === 'goal') {
-      // Calculate updated scores
-      let homeTeamScore = activeMatch.homeTeamScore;
-      let awayTeamScore = activeMatch.awayTeamScore;
-      
-      const isHomeTeam = eventData.teamId === matchData.myTeam.teamId;
-      const isOwnGoal = selectedSubType === 'own_goal';
-      
-      if (isOwnGoal) {
-        // Own goal counts for opposing team
-        if (isHomeTeam) {
-          awayTeamScore += 1;
-        } else {
-          homeTeamScore += 1;
-        }
-      } else {
-        // Regular goal
-        if (isHomeTeam) {
-          homeTeamScore += 1;
-        } else {
-          awayTeamScore += 1;
-        }
-      }
-      
-      // Update the corresponding live match with new scores
-      if (activeMatch.id) {
-        updateLiveMatch(activeMatch.id, {
-          homeTeamScore,
-          awayTeamScore,
-          currentMinute: minute,
-          events: [...activeMatch.events, {
-            ...eventData,
-            id: `event_${Date.now()}`,
-            timestamp: new Date(),
-          }]
-        });
-      }
-    }
     
     setShowEventModal(false);
     resetEventForm();
@@ -283,14 +257,12 @@ export default function MatchScoringScreen() {
     selectedAssistPlayer,
     selectedTeam,
     eventMinute,
-    isExtraTime,
-    eventDescription,
     selectedSubType,
     matchData,
     activeMatch,
     addEvent,
-    updateLiveMatch,
     resetEventForm,
+    isInExtraTime,
   ]);
   
   // Handle End Match
@@ -304,7 +276,6 @@ export default function MatchScoringScreen() {
           text: 'End Match',
           style: 'destructive',
           onPress: () => {
-            // Stop the timer
             if (timerIntervalRef.current) {
               clearInterval(timerIntervalRef.current);
             }
@@ -322,21 +293,17 @@ export default function MatchScoringScreen() {
   // Handle opening event modal for specific team
   const handleAddEvent = useCallback((team: 'my' | 'opponent') => {
     setSelectedTeam(team);
-    
-    // Automatically set current minute from timer
-    const currentMinute = Math.floor(timer / 60).toString();
-    setEventMinute(currentMinute);
-    
+    setEventMinute(currentMinute.toString());
     setShowEventModal(true);
-  }, [timer]);
+  }, [currentMinute]);
   
   // Get current players for selected team
-  const getCurrentPlayers = useCallback(() => {
+  const getCurrentPlayers = useCallback((): FootballPlayer[] => {
     return selectedTeam === 'my' ? myTeamPlayers : opponentTeamPlayers;
   }, [selectedTeam, myTeamPlayers, opponentTeamPlayers]);
   
   // Render single event card with new design
-  const renderEventCard = useCallback((event: any) => {
+  const renderEventCard = useCallback((event: MatchEvent) => {
     const config = EVENT_CONFIGS[event.eventType as keyof typeof EVENT_CONFIGS];
     if (!config) return null;
     
@@ -347,9 +314,6 @@ export default function MatchScoringScreen() {
         {/* Time Card */}
         <View className="bg-slate-800 rounded-l-xl py-3 px-4 items-center justify-center">
           <Text className="text-white text-lg font-bold">{event.minute}'</Text>
-          {event.isExtraTime && (
-            <Text className="text-amber-400 text-xs font-medium">+ET</Text>
-          )}
         </View>
         
         {/* Event Card */}
@@ -371,7 +335,7 @@ export default function MatchScoringScreen() {
                 className="w-8 h-8 rounded-full items-center justify-center mr-3"
                 style={{ backgroundColor: config.color }}
               >
-                <Ionicons name={config.icon as any} size={16} color="white" />
+                <Ionicons name={config.icon} size={16} color="white" />
               </View>
             )}
             
@@ -379,7 +343,7 @@ export default function MatchScoringScreen() {
               <Text className="text-base font-bold text-slate-900">
                 {config.name}
                 {event.eventSubType &&
-                  ` - ${config.subTypes?.find(st => st.id === event.eventSubType)?.name || ''}`}
+                  ` - ${config.subTypes?.find((st) => st.id === event.eventSubType)?.name || ''}`}
               </Text>
               
               <Text className="text-sm text-slate-600">
@@ -397,7 +361,7 @@ export default function MatchScoringScreen() {
                 className="w-8 h-8 rounded-full items-center justify-center ml-3"
                 style={{ backgroundColor: config.color }}
               >
-                <Ionicons name={config.icon as any} size={16} color="white" />
+                <Ionicons name={config.icon} size={16} color="white" />
               </View>
             )}
           </View>
@@ -428,7 +392,10 @@ export default function MatchScoringScreen() {
               <TouchableOpacity onPress={() => router.back()} className="p-2">
                 <Ionicons name="arrow-back" size={24} color="white" />
               </TouchableOpacity>
-              <Text className="text-white text-lg font-bold">Live Match</Text>
+              <View className="items-center">
+                <Text className="text-white text-lg font-bold">Live Match</Text>
+                <Text className="text-white text-2xl font-bold mt-1">{formattedTimer}</Text>
+              </View>
               <View className="w-10" />
             </View>
           </SafeAreaView>
@@ -470,15 +437,26 @@ export default function MatchScoringScreen() {
               </TouchableOpacity>
             </View>
             
-            {/* Live Timer Display */}
-            <View className="items-center mt-4">
-              <View className="bg-white/20 px-6 py-2 rounded-full flex-row items-center">
-                <View className="w-2 h-2 bg-red-500 rounded-full mr-2" />
-                <Text className="text-white font-semibold">{formattedTimer}</Text>
-              </View>
-              <Text className="text-white/80 text-sm mt-1">
-                {activeMatch?.currentMinute || 0}' {activeMatch?.isExtraTime && '+ ET'}
-              </Text>
+            {/* Play/Pause and Controls */}
+            <View className="items-center mt-6 flex-row justify-center gap-4">
+              <TouchableOpacity
+                onPress={handlePlayPause}
+                className="bg-white/30 p-3 rounded-full"
+              >
+                <Ionicons 
+                  name={isTimerRunning ? 'pause' : 'play'} 
+                  size={28} 
+                  color="white" 
+                />
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={handleAddExtraTime}
+                className="bg-white/30 px-4 py-2 rounded-full flex-row items-center gap-2"
+              >
+                <Ionicons name="add-circle" size={20} color="white" />
+                <Text className="text-white font-semibold text-sm">Extra Time</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -492,8 +470,8 @@ export default function MatchScoringScreen() {
               Match Timeline ({events.length})
             </Text>
             {events
-              .sort((a, b) => a.minute - b.minute)
-              .map(renderEventCard)}
+              .sort((a: MatchEvent, b: MatchEvent) => a.minute - b.minute)
+              .map((event: MatchEvent) => renderEventCard(event))}
           </>
         ) : (
           <View className="items-center justify-center py-16">
@@ -577,7 +555,7 @@ export default function MatchScoringScreen() {
                       className="w-6 h-6 rounded-full items-center justify-center mr-2"
                       style={{ backgroundColor: config.color }}
                     >
-                      <Ionicons name={config.icon as any} size={12} color="white" />
+                      <Ionicons name={config.icon} size={12} color="white" />
                     </View>
                     <Text className={`font-medium ${
                       selectedEventType === key ? 'text-blue-700' : 'text-slate-700'
@@ -659,7 +637,7 @@ export default function MatchScoringScreen() {
                         </Text>
                       </TouchableOpacity>
                       {getCurrentPlayers()
-                        .filter(p => p.id !== selectedPlayer?.id)
+                        .filter((p) => p.id !== selectedPlayer?.id)
                         .map((player) => (
                         <TouchableOpacity
                           key={player.id}
@@ -682,43 +660,20 @@ export default function MatchScoringScreen() {
                 </>
               )}
               
-              {/* Minute Input */}
+              {/* Minute Input - Auto-populated from timer */}
               <Text className="text-lg font-bold text-slate-900 mb-3">Minute</Text>
-              <View className="flex-row gap-3 mb-6">
+              <View className="mb-6">
                 <TextInput
                   value={eventMinute}
                   onChangeText={setEventMinute}
-                  placeholder="45"
+                  placeholder="Auto-populated from timer"
                   keyboardType="numeric"
-                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg"
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg"
                 />
-                <TouchableOpacity
-                  onPress={() => setIsExtraTime(!isExtraTime)}
-                  className={`px-4 py-3 rounded-xl border ${
-                    isExtraTime
-                      ? 'border-orange-500 bg-orange-50'
-                      : 'border-slate-200 bg-white'
-                  }`}
-                >
-                  <Text className={`font-medium ${
-                    isExtraTime ? 'text-orange-700' : 'text-slate-700'
-                  }`}>
-                    Extra Time
-                  </Text>
-                </TouchableOpacity>
+                <Text className="text-xs text-slate-500 mt-2">
+                  Current timer minute: {currentMinute}
+                </Text>
               </View>
-              
-              {/* Description (Optional) */}
-              <Text className="text-lg font-bold text-slate-900 mb-3">Description (Optional)</Text>
-              <TextInput
-                value={eventDescription}
-                onChangeText={setEventDescription}
-                placeholder="Additional notes about the event..."
-                multiline
-                numberOfLines={3}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-base"
-                textAlignVertical="top"
-              />
             </ScrollView>
           </SafeAreaView>
         </KeyboardAvoidingView>
