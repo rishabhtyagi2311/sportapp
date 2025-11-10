@@ -15,6 +15,7 @@ export interface MatchEvent {
   assistPlayerId?: string;
   assistPlayerName?: string;
   minute: number;
+  seconds : number,
   isExtraTime: boolean;
   // description field removed as per requirement
   timestamp: Date;

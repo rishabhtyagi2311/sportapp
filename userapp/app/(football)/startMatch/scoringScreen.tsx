@@ -1,4 +1,4 @@
-// app/(football)/matches/matchScoring.tsx - Fixed version
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
@@ -185,10 +185,10 @@ export default function MatchScoringScreen() {
     setSelectedSubType(null);
     setSelectedPlayer(null);
     setSelectedAssistPlayer(null);
-    setEventMinute(currentMinute.toString());
+    setEventMinute(formattedTimer.toString());
     setEventDescription('');
     setSelectedTeam(null);
-  }, [currentMinute]);
+  }, [formattedTimer]);
   
   // Handle Play/Pause
   const handlePlayPause = useCallback(() => {
@@ -230,6 +230,10 @@ export default function MatchScoringScreen() {
     }
     
     const minute = parseInt(eventMinute, 10);
+    const seconds = parseInt(eventMinute.split(":")[1], 10);
+    
+    console.log(minute,seconds, eventMinute, formattedTimer);
+    
     if (isNaN(minute) || minute < 1) {
       Alert.alert('Error', 'Invalid minute');
       return;
@@ -244,6 +248,7 @@ export default function MatchScoringScreen() {
       assistPlayerId: selectedAssistPlayer?.id,
       assistPlayerName: selectedAssistPlayer?.name,
       minute,
+      seconds,
       isExtraTime: isInExtraTime,
     };
     
@@ -293,9 +298,9 @@ export default function MatchScoringScreen() {
   // Handle opening event modal for specific team
   const handleAddEvent = useCallback((team: 'my' | 'opponent') => {
     setSelectedTeam(team);
-    setEventMinute(currentMinute.toString());
+    setEventMinute(formattedTimer);
     setShowEventModal(true);
-  }, [currentMinute]);
+  }, [formattedTimer]);
   
   // Get current players for selected team
   const getCurrentPlayers = useCallback((): FootballPlayer[] => {
@@ -313,7 +318,7 @@ export default function MatchScoringScreen() {
       <View key={event.id} className="flex-row mb-4">
         {/* Time Card */}
         <View className="bg-slate-800 rounded-l-xl py-3 px-4 items-center justify-center">
-          <Text className="text-white text-lg font-bold">{event.minute}'</Text>
+          <Text className="text-white text-lg font-bold">{event.minute}:{event.seconds}'</Text>
         </View>
         
         {/* Event Card */}
@@ -397,6 +402,29 @@ export default function MatchScoringScreen() {
                 <Text className="text-white text-2xl font-bold mt-1">{formattedTimer}</Text>
               </View>
               <View className="w-10" />
+
+              
+            </View>
+             {/* Play/Pause and Controls */}
+            <View className="items-center mt-6 flex-row justify-center gap-4">
+              <TouchableOpacity
+                onPress={handlePlayPause}
+                className="bg-white/30 p-3 rounded-full"
+              >
+                <Ionicons 
+                  name={isTimerRunning ? 'pause' : 'play'} 
+                  size={28} 
+                  color="white" 
+                />
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={handleAddExtraTime}
+                className="bg-white/30 px-4 py-2 rounded-full flex-row items-center gap-2"
+              >
+                <Ionicons name="add-circle" size={20} color="white" />
+                <Text className="text-white font-semibold text-sm">Extra Time</Text>
+              </TouchableOpacity>
             </View>
           </SafeAreaView>
           
@@ -437,27 +465,7 @@ export default function MatchScoringScreen() {
               </TouchableOpacity>
             </View>
             
-            {/* Play/Pause and Controls */}
-            <View className="items-center mt-6 flex-row justify-center gap-4">
-              <TouchableOpacity
-                onPress={handlePlayPause}
-                className="bg-white/30 p-3 rounded-full"
-              >
-                <Ionicons 
-                  name={isTimerRunning ? 'pause' : 'play'} 
-                  size={28} 
-                  color="white" 
-                />
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                onPress={handleAddExtraTime}
-                className="bg-white/30 px-4 py-2 rounded-full flex-row items-center gap-2"
-              >
-                <Ionicons name="add-circle" size={20} color="white" />
-                <Text className="text-white font-semibold text-sm">Extra Time</Text>
-              </TouchableOpacity>
-            </View>
+           
           </View>
         </View>
       </ImageBackground>
@@ -671,7 +679,7 @@ export default function MatchScoringScreen() {
                   className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg"
                 />
                 <Text className="text-xs text-slate-500 mt-2">
-                  Current timer minute: {currentMinute}
+                  Current timer minute: {formattedTimer}
                 </Text>
               </View>
             </ScrollView>
