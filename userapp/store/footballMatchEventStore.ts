@@ -17,11 +17,11 @@ export interface MatchEvent {
   minute: number;
   seconds : number,
   isExtraTime: boolean;
-  // description field removed as per requirement
   timestamp: Date;
 }
 
 export type EventType = 'goal' | 'penalty' | 'card' | 'substitution' | 'offside' | 'foul' | 'corner' | 'free_kick';
+
 export type EventSubType = 
   // Goal types
   | 'header' | 'left_foot' | 'right_foot' | 'penalty_goal' | 'free_kick_goal' | 'own_goal'
@@ -113,7 +113,7 @@ export interface ActiveMatch {
   homeTeamScore: number;
   awayTeamScore: number;
   isExtraTime: boolean;
-  isHalfTime?: boolean; // Added to track half time state
+ 
   notes: string;
 }
 
@@ -149,8 +149,8 @@ export interface MatchExecutionState {
   // Actions for match state
   updateMatchStatus: (status: MatchStatus) => void;
   updateCurrentMinute: (minute: number) => void;
-  toggleHalfTime: (isHalfTime: boolean) => void; // New method to toggle half time state
-  toggleExtraTime: (isExtraTime: boolean) => void; // New method to toggle extra time state
+ 
+ 
   addMatchNotes: (notes: string) => void;
   
   // Computed values
@@ -274,7 +274,7 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
             homeTeamScore: 0,
             awayTeamScore: 0,
             isExtraTime: false,
-            isHalfTime: false,
+            
             notes: '',
           };
           
@@ -352,7 +352,7 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
           homeTeamScore: 0,
           awayTeamScore: 0,
           isExtraTime: false,
-          isHalfTime: false,
+       
           notes: '',
         };
         
@@ -586,32 +586,10 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
           }
         }
       }),
+     
       
-      // Toggle half time state - new method
-      toggleHalfTime: (isHalfTime) => set((state) => {
-        if (state.activeMatch) {
-          state.activeMatch.isHalfTime = isHalfTime;
-          
-          // Also update in live matches
-          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
-          if (liveMatchIndex !== -1) {
-            state.liveMatches[liveMatchIndex].isHalfTime = isHalfTime;
-          }
-        }
-      }),
       
-      // Toggle extra time state - new method
-      toggleExtraTime: (isExtraTime) => set((state) => {
-        if (state.activeMatch) {
-          state.activeMatch.isExtraTime = isExtraTime;
-          
-          // Also update in live matches
-          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
-          if (liveMatchIndex !== -1) {
-            state.liveMatches[liveMatchIndex].isExtraTime = isExtraTime;
-          }
-        }
-      }),
+      
       
       // Add match notes
       addMatchNotes: (notes) => set((state) => {
