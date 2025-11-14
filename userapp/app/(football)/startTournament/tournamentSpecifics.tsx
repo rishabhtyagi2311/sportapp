@@ -36,7 +36,7 @@ export default function TournamentSettingsScreen() {
 
     const minPlayersInTeams = Math.min(...teams.map(team => team.memberPlayerIds?.length || 0));
     const maxPlayers = Math.min(minPlayersInTeams, 11);
-    
+
     return {
       minPlayers: minPlayersInTeams,
       maxPlayers: maxPlayers,
@@ -70,7 +70,7 @@ export default function TournamentSettingsScreen() {
   // Calculate possible values for advancing teams based on teams per table
   const validAdvancingTeamOptions = useMemo(() => {
     if (!teamsPerTable) return [1, 2];
-    
+
     // You can't have more teams advancing than teams in a group
     return Array.from({ length: Math.min(teamsPerTable, 4) }, (_, i) => i + 1);
   }, [teamsPerTable]);
@@ -79,7 +79,7 @@ export default function TournamentSettingsScreen() {
   const totalTeamsInKnockout = useMemo(() => {
     if (!creationDraft) return 0;
     if (creationDraft.format !== 'league' || !creationDraft.includeKnockoutStage) return 0;
-    
+
     return creationDraft.tableCount * parseInt(advancingTeamsPerTable || '2');
   }, [creationDraft, advancingTeamsPerTable]);
 
@@ -92,26 +92,26 @@ export default function TournamentSettingsScreen() {
   // Determine knockout stage based on number of advancing teams
   const knockoutStartingStage = useMemo(() => {
     const teamsCount = totalTeamsInKnockout;
-    
+
     if (teamsCount >= 8) return 'Quarter Finals';
     if (teamsCount >= 4) return 'Semi Finals';
     if (teamsCount >= 2) return 'Final';
-    
+
     return 'None';
   }, [totalTeamsInKnockout]);
 
   // Calculate total matches (group stage + knockout)
   const totalMatches = useMemo(() => {
     if (!creationDraft) return 0;
-    
+
     let groupMatches = 0;
     let knockoutMatches = 0;
-    
+
     if (creationDraft.format === 'league') {
       // Group stage matches: matches per group * number of groups
       // Formula: Teams per group * (Teams per group - 1) / 2 * Number of groups
       groupMatches = (teamsPerTable * (teamsPerTable - 1) / 2) * creationDraft.tableCount;
-      
+
       // Knockout stage matches
       if (creationDraft.includeKnockoutStage && totalTeamsInKnockout >= 2) {
         knockoutMatches = totalTeamsInKnockout - 1;
@@ -120,7 +120,7 @@ export default function TournamentSettingsScreen() {
       // Pure knockout tournament: matches = teams - 1
       groupMatches = creationDraft.teamCount - 1;
     }
-    
+
     return groupMatches + knockoutMatches;
   }, [creationDraft, teamsPerTable, totalTeamsInKnockout]);
 
@@ -143,7 +143,7 @@ export default function TournamentSettingsScreen() {
 
     if (players > teamLimits.maxPlayers) {
       Alert.alert(
-        'Error', 
+        'Error',
         `Number of players cannot exceed ${teamLimits.maxPlayers}.\n\nThe team "${teamLimits.teamPlayerCounts?.find(t => t.count === teamLimits.minPlayers)?.name}" only has ${teamLimits.minPlayers} registered players.`
       );
       return;
@@ -190,60 +190,72 @@ export default function TournamentSettingsScreen() {
 
     setTournamentSettings(settings);
     const tournamentId = createTournament();
+    console.log(tournamentId);
+    console.log(creationDraft);
+    console.log("we are in the specifics screen ");
 
-    if (tournamentId) {
-      Alert.alert(
-        'Success',
-        'Tournament created successfully!',
-        [
-          {
-            text: 'View Tournament',
-            onPress: () => router.push(`/(football)/tournaments/${tournamentId}`),
-          },
-        ]
-      );
-    } else {
-      Alert.alert('Error', 'Failed to create tournament. Please ensure all teams have been added properly.');
+    if (tournamentId && creationDraft) {
+      router.navigate("/(football)/landingScreen/tournament")
     }
+
+
+
+
+    // if (tournamentId) {
+    //   Alert.alert(
+    //     'Success',
+    //     'Tournament created successfully!',
+    //     [
+    //       {
+    //         text: 'View Tournament',
+    //         onPress: () => router.push(`/(football)/tournaments/${tournamentId}`),
+    //       },
+    //     ]
+    //   );
+    // } else {
+    //   Alert.alert('Error', 'Failed to create tournament. Please ensure all teams have been added properly.');
+    // }
+
+
   };
 
-  if (!creationDraft) {
-    // Show loading state first
-    if (isLoadingDraft) {
-      return (
-        <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
-          <View className="items-center px-6">
-            <ActivityIndicator size="large" color="#3b82f6" />
-            <Text className="text-base font-semibold text-slate-700 mt-4">Loading draft...</Text>
-            <Text className="text-sm text-slate-500 mt-2 text-center">
-              Please wait a moment
-            </Text>
-          </View>
-        </SafeAreaView>
-      );
-    }
+  // if (!creationDraft) {
+  //   // Show loading state first
+  //   if (isLoadingDraft) {
+  //     return (
+  //       <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+  //         <View className="items-center px-6">
+  //           <ActivityIndicator size="large" color="#3b82f6" />
+  //           <Text className="text-base font-semibold text-slate-700 mt-4">Loading draft...</Text>
+  //           <Text className="text-sm text-slate-500 mt-2 text-center">
+  //             Please wait a moment
+  //           </Text>
+  //         </View>
+  //       </SafeAreaView>
+  //     );
+  //   }
 
-    // Show error message after loading
-    return (
-      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
-        <View className="items-center px-6">
-          <View className="w-20 h-20 bg-red-100 rounded-full items-center justify-center mb-4">
-            <Ionicons name="alert-circle" size={32} color="#ef4444" />
-          </View>
-          <Text className="text-lg font-bold text-slate-900 mb-2">No Tournament Draft</Text>
-          <Text className="text-slate-500 text-center mb-6">
-            Please start tournament creation from the beginning.
-          </Text>
-          <TouchableOpacity
-            onPress={() => router.push('/(football)/landingScreen/tournament')}
-            className="bg-blue-600 px-6 py-3 rounded-xl"
-          >
-            <Text className="text-white font-semibold">Go to Tournaments</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  //   // Show error message after loading
+  //   return (
+  //     <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+  //       <View className="items-center px-6">
+  //         <View className="w-20 h-20 bg-red-100 rounded-full items-center justify-center mb-4">
+  //           <Ionicons name="alert-circle" size={32} color="#ef4444" />
+  //         </View>
+  //         <Text className="text-lg font-bold text-slate-900 mb-2">No Tournament Draft</Text>
+  //         <Text className="text-slate-500 text-center mb-6">
+  //           Please start tournament creation from the beginning.
+  //         </Text>
+  //         <TouchableOpacity
+  //           onPress={() => router.push('/(football)/landingScreen/tournament')}
+  //           className="bg-blue-600 px-6 py-3 rounded-xl"
+  //         >
+  //           <Text className="text-white font-semibold">Go to Tournaments</Text>
+  //         </TouchableOpacity>
+  //       </View>
+  //     </SafeAreaView>
+  //   );
+  // }
 
   if (teamLimits.maxPlayers === 0) {
     return (
@@ -267,373 +279,373 @@ export default function TournamentSettingsScreen() {
     );
   }
 
-  return (
-    <SafeAreaView className="flex-1 bg-slate-50">
-      {/* Header */}
-      <View className="bg-white px-4 py-4 border-b border-slate-200">
-        <View className="flex-row items-center justify-between">
-          <TouchableOpacity onPress={() => router.back()} className="p-2">
-            <Ionicons name="arrow-back" size={24} color="#1e293b" />
-          </TouchableOpacity>
-          <Text className="text-lg font-bold text-slate-900">Tournament Settings</Text>
-          <View className="w-10" />
+  if (creationDraft) {
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50">
+        {/* Header */}
+        <View className="bg-white px-4 py-4 border-b border-slate-200">
+          <View className="flex-row items-center justify-between">
+            <TouchableOpacity onPress={() => router.back()} className="p-2">
+              <Ionicons name="arrow-back" size={24} color="#1e293b" />
+            </TouchableOpacity>
+            <Text className="text-lg font-bold text-slate-900">Tournament Settings</Text>
+            <View className="w-10" />
+          </View>
         </View>
-      </View>
 
-      {/* Progress Indicator */}
-      <View className="bg-white px-4 py-3 border-b border-slate-100">
-        <View className="flex-row items-center">
-          <View className="flex-1 flex-row items-center">
-            <View className="w-8 h-8 bg-green-600 rounded-full items-center justify-center">
-              <Ionicons name="checkmark" size={16} color="white" />
+        {/* Progress Indicator */}
+        <View className="bg-white px-4 py-3 border-b border-slate-100">
+          <View className="flex-row items-center">
+            <View className="flex-1 flex-row items-center">
+              <View className="w-8 h-8 bg-green-600 rounded-full items-center justify-center">
+                <Ionicons name="checkmark" size={16} color="white" />
+              </View>
+              <View className="flex-1 h-1 bg-green-600 mx-2" />
             </View>
-            <View className="flex-1 h-1 bg-green-600 mx-2" />
-          </View>
-          <View className="flex-1 flex-row items-center">
-            <View className="w-8 h-8 bg-green-600 rounded-full items-center justify-center">
-              <Ionicons name="checkmark" size={16} color="white" />
+            <View className="flex-1 flex-row items-center">
+              <View className="w-8 h-8 bg-green-600 rounded-full items-center justify-center">
+                <Ionicons name="checkmark" size={16} color="white" />
+              </View>
+              <View className="flex-1 h-1 bg-green-600 mx-2" />
             </View>
-            <View className="flex-1 h-1 bg-green-600 mx-2" />
+            <View className="w-8 h-8 bg-blue-600 rounded-full items-center justify-center">
+              <Text className="text-white font-bold text-sm">3</Text>
+            </View>
           </View>
-          <View className="w-8 h-8 bg-blue-600 rounded-full items-center justify-center">
-            <Text className="text-white font-bold text-sm">3</Text>
+          <View className="flex-row justify-between mt-2 px-1">
+            <Text className="text-xs font-medium text-green-600">Basic Info</Text>
+            <Text className="text-xs font-medium text-green-600">Teams</Text>
+            <Text className="text-xs font-medium text-blue-600">Settings</Text>
           </View>
         </View>
-        <View className="flex-row justify-between mt-2 px-1">
-          <Text className="text-xs font-medium text-green-600">Basic Info</Text>
-          <Text className="text-xs font-medium text-green-600">Teams</Text>
-          <Text className="text-xs font-medium text-blue-600">Settings</Text>
-        </View>
-      </View>
 
-      <ScrollView className="flex-1 px-4 pt-6" showsVerticalScrollIndicator={false}>
-        {/* Tournament Summary */}
-        <View className="bg-white rounded-2xl border border-slate-200 p-5 mb-6 shadow-sm">
-          <View className="flex-row items-start justify-between mb-4">
-            <View className="flex-1 mr-3">
-              <Text className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                Tournament Overview
-              </Text>
-              <Text className="text-xl font-bold text-slate-900 mb-2">
-                {creationDraft.name}
-              </Text>
-              <View className="flex-row items-center flex-wrap">
-                <View className="bg-blue-50 px-3 py-1.5 rounded-lg mr-2 mb-2">
-                  <Text className="text-xs font-bold text-blue-700">
-                    {creationDraft.format === 'league' 
-                      ? `${creationDraft.tableCount} ${creationDraft.tableCount > 1 ? 'Groups' : 'Group'}`
-                      : 'Knockout Format'}
+        <ScrollView className="flex-1 px-4 pt-6" showsVerticalScrollIndicator={false}>
+          {/* Tournament Summary */}
+          <View className="bg-white rounded-2xl border border-slate-200 p-5 mb-6 shadow-sm">
+            <View className="flex-row items-start justify-between mb-4">
+              <View className="flex-1 mr-3">
+                <Text className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  Tournament Overview
+                </Text>
+                <Text className="text-xl font-bold text-slate-900 mb-2">
+                  {creationDraft.name}
+                </Text>
+                <View className="flex-row items-center flex-wrap">
+                  <View className="bg-blue-50 px-3 py-1.5 rounded-lg mr-2 mb-2">
+                    <Text className="text-xs font-bold text-blue-700">
+                      {creationDraft.format === 'league'
+                        ? `${creationDraft.tableCount} ${creationDraft.tableCount > 1 ? 'Groups' : 'Group'}`
+                        : 'Knockout Format'}
+                    </Text>
+                  </View>
+                  <View className="bg-slate-100 px-3 py-1.5 rounded-lg mr-2 mb-2">
+                    <View className="flex-row items-center">
+                      <Ionicons name="people" size={12} color="#475569" />
+                      <Text className="text-xs font-bold text-slate-700 ml-1">
+                        {creationDraft.selectedTeamIds.length} Teams
+                      </Text>
+                    </View>
+                  </View>
+                  {creationDraft.format === 'league' && (
+                    <View className="bg-green-50 px-3 py-1.5 rounded-lg mb-2">
+                      <Text className="text-xs font-bold text-green-700">
+                        {teamsPerTable} Teams per Group
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+              <View className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl items-center justify-center shadow-md">
+                <Ionicons name="trophy" size={24} color="white" />
+              </View>
+            </View>
+
+            {/* Quick Stats */}
+            <View className="border-t border-slate-100 pt-3">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1 items-center py-2">
+                  <Text className="text-2xl font-bold text-slate-900">
+                    {creationDraft.selectedTeamIds.length}
+                  </Text>
+                  <Text className="text-xs text-slate-500 mt-0.5">Teams</Text>
+                </View>
+                <View className="w-px h-10 bg-slate-200" />
+                <View className="flex-1 items-center py-2">
+                  <Text className="text-2xl font-bold text-slate-900">
+                    {totalMatches}
+                  </Text>
+                  <Text className="text-xs text-slate-500 mt-0.5">
+                    Matches
+                    {creationDraft.format === 'league' && creationDraft.includeKnockoutStage && knockoutStageMatches > 0 && (
+                      <Text className="text-xs text-blue-500">
+                        {` (${totalMatches - knockoutStageMatches}+${knockoutStageMatches})`}
+                      </Text>
+                    )}
                   </Text>
                 </View>
-                <View className="bg-slate-100 px-3 py-1.5 rounded-lg mr-2 mb-2">
-                  <View className="flex-row items-center">
-                    <Ionicons name="people" size={12} color="#475569" />
-                    <Text className="text-xs font-bold text-slate-700 ml-1">
-                      {creationDraft.selectedTeamIds.length} Teams
-                    </Text>
-                  </View>
-                </View>
-                {creationDraft.format === 'league' && (
-                  <View className="bg-green-50 px-3 py-1.5 rounded-lg mb-2">
-                    <Text className="text-xs font-bold text-green-700">
-                      {teamsPerTable} Teams per Group
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
-            <View className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl items-center justify-center shadow-md">
-              <Ionicons name="trophy" size={24} color="white" />
-            </View>
-          </View>
-          
-          {/* Quick Stats */}
-          <View className="border-t border-slate-100 pt-3">
-            <View className="flex-row items-center justify-between">
-              <View className="flex-1 items-center py-2">
-                <Text className="text-2xl font-bold text-slate-900">
-                  {creationDraft.selectedTeamIds.length}
-                </Text>
-                <Text className="text-xs text-slate-500 mt-0.5">Teams</Text>
-              </View>
-              <View className="w-px h-10 bg-slate-200" />
-              <View className="flex-1 items-center py-2">
-                <Text className="text-2xl font-bold text-slate-900">
-                  {totalMatches}
-                </Text>
-                <Text className="text-xs text-slate-500 mt-0.5">
-                  Matches
-                  {creationDraft.format === 'league' && creationDraft.includeKnockoutStage && knockoutStageMatches > 0 && (
-                    <Text className="text-xs text-blue-500">
-                      {` (${totalMatches - knockoutStageMatches}+${knockoutStageMatches})`}
-                    </Text>
-                  )}
-                </Text>
-              </View>
-              <View className="w-px h-10 bg-slate-200" />
-              <View className="flex-1 items-center py-2">
-                <Text className="text-2xl font-bold text-slate-900">
-                  {creationDraft.format === 'league' 
-                    ? (teamsPerTable - 1) // Rounds per group
-                    : Math.ceil(Math.log2(creationDraft.selectedTeamIds.length))
-                  }
-                </Text>
-                <Text className="text-xs text-slate-500 mt-0.5">
-                  Rounds
-                  {creationDraft.format === 'league' && creationDraft.includeKnockoutStage && (
-                    <Text className="text-xs text-blue-500">
-                      {` +${Math.ceil(Math.log2(totalTeamsInKnockout))}`}
-                    </Text>
-                  )}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Team Player Count Warning */}
-        {teamLimits.maxPlayers < 11 && (
-          <View className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-            <View className="flex-row items-start">
-              <Ionicons name="warning" size={20} color="#f59e0b" />
-              <View className="flex-1 ml-3">
-                <Text className="text-sm font-semibold text-amber-900 mb-1">
-                  Player Limit Adjusted
-                </Text>
-                <Text className="text-xs text-amber-700 mb-2">
-                  Maximum {teamLimits.maxPlayers} players per match (based on team with fewest players)
-                </Text>
-                {teamLimits.teamPlayerCounts && (
-                  <View className="mt-2">
-                    {teamLimits.teamPlayerCounts.map((team, idx) => (
-                      <Text key={idx} className="text-xs text-amber-600">
-                        • {team.name}: {team.count} players
+                <View className="w-px h-10 bg-slate-200" />
+                <View className="flex-1 items-center py-2">
+                  <Text className="text-2xl font-bold text-slate-900">
+                    {creationDraft.format === 'league'
+                      ? (teamsPerTable - 1) // Rounds per group
+                      : Math.ceil(Math.log2(creationDraft.selectedTeamIds.length))
+                    }
+                  </Text>
+                  <Text className="text-xs text-slate-500 mt-0.5">
+                    Rounds
+                    {creationDraft.format === 'league' && creationDraft.includeKnockoutStage && (
+                      <Text className="text-xs text-blue-500">
+                        {` +${Math.ceil(Math.log2(totalTeamsInKnockout))}`}
                       </Text>
+                    )}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Team Player Count Warning */}
+          {teamLimits.maxPlayers < 11 && (
+            <View className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+              <View className="flex-row items-start">
+                <Ionicons name="warning" size={20} color="#f59e0b" />
+                <View className="flex-1 ml-3">
+                  <Text className="text-sm font-semibold text-amber-900 mb-1">
+                    Player Limit Adjusted
+                  </Text>
+                  <Text className="text-xs text-amber-700 mb-2">
+                    Maximum {teamLimits.maxPlayers} players per match (based on team with fewest players)
+                  </Text>
+                  {teamLimits.teamPlayerCounts && (
+                    <View className="mt-2">
+                      {teamLimits.teamPlayerCounts.map((team, idx) => (
+                        <Text key={idx} className="text-xs text-amber-600">
+                          • {team.name}: {team.count} players
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Knockout Stage Configuration - Only for League Format */}
+          {creationDraft.format === 'league' && creationDraft.includeKnockoutStage && (
+            <View className="mb-6">
+              <Text className="text-sm font-semibold text-slate-700 mb-3">Knockout Stage Configuration</Text>
+
+              <View className="bg-white rounded-xl border border-slate-200 p-4">
+                <View className="flex-row items-center justify-between mb-4">
+                  <View className="flex-row items-center">
+                    <View className="w-10 h-10 bg-indigo-50 rounded-lg items-center justify-center mr-3">
+                      <Ionicons name="trophy" size={20} color="#6366f1" />
+                    </View>
+                    <View>
+                      <Text className="text-sm font-semibold text-slate-900">Teams Advancing per Group</Text>
+                      <Text className="text-xs text-slate-500">Top teams advance to knockout stage</Text>
+                    </View>
+                  </View>
+
+                  <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
+                    {validAdvancingTeamOptions.map((num, index) => (
+                      <TouchableOpacity
+                        key={num}
+                        onPress={() => setAdvancingTeamsPerTable(String(num))}
+                        className={`px-3 py-2 ${parseInt(advancingTeamsPerTable) === num
+                            ? 'bg-blue-500'
+                            : index > 0 ? 'border-l border-slate-200' : ''
+                          }`}
+                      >
+                        <Text className={`text-sm font-bold ${parseInt(advancingTeamsPerTable) === num
+                            ? 'text-white'
+                            : 'text-slate-600'
+                          }`}>
+                          {num}
+                        </Text>
+                      </TouchableOpacity>
                     ))}
                   </View>
-                )}
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* Knockout Stage Configuration - Only for League Format */}
-        {creationDraft.format === 'league' && creationDraft.includeKnockoutStage && (
-          <View className="mb-6">
-            <Text className="text-sm font-semibold text-slate-700 mb-3">Knockout Stage Configuration</Text>
-            
-            <View className="bg-white rounded-xl border border-slate-200 p-4">
-              <View className="flex-row items-center justify-between mb-4">
-                <View className="flex-row items-center">
-                  <View className="w-10 h-10 bg-indigo-50 rounded-lg items-center justify-center mr-3">
-                    <Ionicons name="trophy" size={20} color="#6366f1" />
-                  </View>
-                  <View>
-                    <Text className="text-sm font-semibold text-slate-900">Teams Advancing per Group</Text>
-                    <Text className="text-xs text-slate-500">Top teams advance to knockout stage</Text>
-                  </View>
                 </View>
-                
-                <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
-                  {validAdvancingTeamOptions.map((num, index) => (
-                    <TouchableOpacity
-                      key={num}
-                      onPress={() => setAdvancingTeamsPerTable(String(num))}
-                      className={`px-3 py-2 ${
-                        parseInt(advancingTeamsPerTable) === num 
-                          ? 'bg-blue-500' 
-                          : index > 0 ? 'border-l border-slate-200' : ''
-                      }`}
-                    >
-                      <Text className={`text-sm font-bold ${
-                        parseInt(advancingTeamsPerTable) === num 
-                          ? 'text-white' 
-                          : 'text-slate-600'
-                      }`}>
-                        {num}
+
+                {/* Knockout Structure Preview */}
+                <View className="bg-blue-50 rounded-lg p-3">
+                  <View className="flex-row items-start">
+                    <Ionicons name="information-circle" size={18} color="#3b82f6" />
+                    <View className="flex-1 ml-2">
+                      <Text className="text-sm font-semibold text-blue-700 mb-1">
+                        Knockout Structure
                       </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-              
-              {/* Knockout Structure Preview */}
-              <View className="bg-blue-50 rounded-lg p-3">
-                <View className="flex-row items-start">
-                  <Ionicons name="information-circle" size={18} color="#3b82f6" />
-                  <View className="flex-1 ml-2">
-                    <Text className="text-sm font-semibold text-blue-700 mb-1">
-                      Knockout Structure
-                    </Text>
-                    <Text className="text-xs text-blue-600">
-                      {totalTeamsInKnockout} teams will advance to knockout stage, starting with {knockoutStartingStage}.
-                      {knockoutStageMatches > 0 && (
-                        <Text> Total knockout matches: {knockoutStageMatches}.</Text>
-                      )}
-                    </Text>
+                      <Text className="text-xs text-blue-600">
+                        {totalTeamsInKnockout} teams will advance to knockout stage, starting with {knockoutStartingStage}.
+                        {knockoutStageMatches > 0 && (
+                          <Text> Total knockout matches: {knockoutStageMatches}.</Text>
+                        )}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </View>
             </View>
+          )}
+
+          {/* Venue */}
+          <View className="mb-6">
+            <View className="flex-row items-center mb-2">
+              <Ionicons name="location" size={16} color="#475569" />
+              <Text className="text-sm font-semibold text-slate-700 ml-2">Venue *</Text>
+            </View>
+            <TextInput
+              value={venue}
+              onChangeText={setVenue}
+              placeholder="e.g. Central Stadium"
+              className="bg-white border border-slate-200 rounded-xl px-4 py-3 text-base text-slate-900"
+              placeholderTextColor="#94a3b8"
+            />
           </View>
-        )}
 
-        {/* Venue */}
-        <View className="mb-6">
-          <View className="flex-row items-center mb-2">
-            <Ionicons name="location" size={16} color="#475569" />
-            <Text className="text-sm font-semibold text-slate-700 ml-2">Venue *</Text>
-          </View>
-          <TextInput
-            value={venue}
-            onChangeText={setVenue}
-            placeholder="e.g. Central Stadium"
-            className="bg-white border border-slate-200 rounded-xl px-4 py-3 text-base text-slate-900"
-            placeholderTextColor="#94a3b8"
-          />
-        </View>
+          {/* Match Configuration */}
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-slate-700 mb-3">Match Configuration</Text>
 
-        {/* Match Configuration */}
-        <View className="mb-6">
-          <Text className="text-sm font-semibold text-slate-700 mb-3">Match Configuration</Text>
-          
-          <View className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            {/* Players */}
-            <View className="flex-row items-center justify-between p-4 border-b border-slate-100">
-              <View className="flex-row items-center flex-1">
-                <View className="w-10 h-10 bg-blue-50 rounded-lg items-center justify-center mr-3">
-                  <Ionicons name="people" size={20} color="#3b82f6" />
+            <View className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              {/* Players */}
+              <View className="flex-row items-center justify-between p-4 border-b border-slate-100">
+                <View className="flex-row items-center flex-1">
+                  <View className="w-10 h-10 bg-blue-50 rounded-lg items-center justify-center mr-3">
+                    <Ionicons name="people" size={20} color="#3b82f6" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-slate-900">Players per Team</Text>
+                    <Text className="text-xs text-slate-500">Max: {teamLimits.maxPlayers}</Text>
+                  </View>
                 </View>
-                <View className="flex-1">
-                  <Text className="text-sm font-semibold text-slate-900">Players per Team</Text>
-                  <Text className="text-xs text-slate-500">Max: {teamLimits.maxPlayers}</Text>
-                </View>
-              </View>
-              <TextInput
-                value={numberOfPlayers}
-                onChangeText={setNumberOfPlayers}
-                keyboardType="numeric"
-                className="w-16 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-center text-base font-bold text-slate-900"
-              />
-            </View>
-
-            {/* Substitutes */}
-            <View className="flex-row items-center justify-between p-4 border-b border-slate-100">
-              <View className="flex-row items-center flex-1">
-                <View className="w-10 h-10 bg-green-50 rounded-lg items-center justify-center mr-3">
-                  <Ionicons name="swap-horizontal" size={20} color="#10b981" />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-sm font-semibold text-slate-900">Substitutes Allowed</Text>
-                  <Text className="text-xs text-slate-500">Standard: 5</Text>
-                </View>
-              </View>
-              <TextInput
-                value={numberOfSubstitutes}
-                onChangeText={setNumberOfSubstitutes}
-                keyboardType="numeric"
-                className="w-16 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-center text-base font-bold text-slate-900"
-              />
-            </View>
-
-            {/* Referees */}
-            <View className="flex-row items-center justify-between p-4 border-b border-slate-100">
-              <View className="flex-row items-center flex-1">
-                <View className="w-10 h-10 bg-amber-50 rounded-lg items-center justify-center mr-3">
-                  <Ionicons name="person" size={20} color="#f59e0b" />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-sm font-semibold text-slate-900">Referees</Text>
-                  <Text className="text-xs text-slate-500">1-3 officials</Text>
-                </View>
-              </View>
-              <TextInput
-                value={numberOfReferees}
-                onChangeText={setNumberOfReferees}
-                keyboardType="numeric"
-                className="w-16 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-center text-base font-bold text-slate-900"
-              />
-            </View>
-
-            {/* Match Duration */}
-            <View className="flex-row items-center justify-between p-4">
-              <View className="flex-row items-center flex-1">
-                <View className="w-10 h-10 bg-purple-50 rounded-lg items-center justify-center mr-3">
-                  <Ionicons name="time" size={20} color="#8b5cf6" />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-sm font-semibold text-slate-900">Match Duration</Text>
-                  <Text className="text-xs text-slate-500">Minutes per match</Text>
-                </View>
-              </View>
-              <View className="flex-row items-center">
                 <TextInput
-                  value={matchDuration}
-                  onChangeText={setMatchDuration}
+                  value={numberOfPlayers}
+                  onChangeText={setNumberOfPlayers}
                   keyboardType="numeric"
                   className="w-16 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-center text-base font-bold text-slate-900"
                 />
-                <Text className="text-slate-500 text-sm ml-2">min</Text>
               </View>
-            </View>
-          </View>
-        </View>
 
-        {/* Match Breakdown */}
-        {creationDraft.format === 'league' && (
-          <View className="bg-white rounded-xl p-4 mb-6 border border-slate-200">
-            <Text className="text-sm font-semibold text-slate-700 mb-2">Match Breakdown</Text>
-            
-            <View className="space-y-2">
-              <View className="flex-row justify-between">
-                <Text className="text-xs text-slate-600">Group Stage Matches:</Text>
-                <Text className="text-xs font-medium text-slate-800">
-                  {(teamsPerTable * (teamsPerTable - 1) / 2) * creationDraft.tableCount}
-                </Text>
-              </View>
-              
-              {creationDraft.includeKnockoutStage && knockoutStageMatches > 0 && (
-                <View className="flex-row justify-between">
-                  <Text className="text-xs text-slate-600">Knockout Stage Matches:</Text>
-                  <Text className="text-xs font-medium text-slate-800">{knockoutStageMatches}</Text>
+              {/* Substitutes */}
+              <View className="flex-row items-center justify-between p-4 border-b border-slate-100">
+                <View className="flex-row items-center flex-1">
+                  <View className="w-10 h-10 bg-green-50 rounded-lg items-center justify-center mr-3">
+                    <Ionicons name="swap-horizontal" size={20} color="#10b981" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-slate-900">Substitutes Allowed</Text>
+                    <Text className="text-xs text-slate-500">Standard: 5</Text>
+                  </View>
                 </View>
-              )}
-              
-              <View className="flex-row justify-between pt-1 border-t border-slate-100">
-                <Text className="text-xs font-semibold text-slate-700">Total Matches:</Text>
-                <Text className="text-xs font-bold text-slate-900">{totalMatches}</Text>
+                <TextInput
+                  value={numberOfSubstitutes}
+                  onChangeText={setNumberOfSubstitutes}
+                  keyboardType="numeric"
+                  className="w-16 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-center text-base font-bold text-slate-900"
+                />
+              </View>
+
+              {/* Referees */}
+              <View className="flex-row items-center justify-between p-4 border-b border-slate-100">
+                <View className="flex-row items-center flex-1">
+                  <View className="w-10 h-10 bg-amber-50 rounded-lg items-center justify-center mr-3">
+                    <Ionicons name="person" size={20} color="#f59e0b" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-slate-900">Referees</Text>
+                    <Text className="text-xs text-slate-500">1-3 officials</Text>
+                  </View>
+                </View>
+                <TextInput
+                  value={numberOfReferees}
+                  onChangeText={setNumberOfReferees}
+                  keyboardType="numeric"
+                  className="w-16 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-center text-base font-bold text-slate-900"
+                />
+              </View>
+
+              {/* Match Duration */}
+              <View className="flex-row items-center justify-between p-4">
+                <View className="flex-row items-center flex-1">
+                  <View className="w-10 h-10 bg-purple-50 rounded-lg items-center justify-center mr-3">
+                    <Ionicons name="time" size={20} color="#8b5cf6" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-slate-900">Match Duration</Text>
+                    <Text className="text-xs text-slate-500">Minutes per match</Text>
+                  </View>
+                </View>
+                <View className="flex-row items-center">
+                  <TextInput
+                    value={matchDuration}
+                    onChangeText={setMatchDuration}
+                    keyboardType="numeric"
+                    className="w-16 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-center text-base font-bold text-slate-900"
+                  />
+                  <Text className="text-slate-500 text-sm ml-2">min</Text>
+                </View>
               </View>
             </View>
           </View>
-        )}
 
-        {/* Info */}
-        <View className="bg-slate-100 rounded-xl p-4 mb-6">
-          <View className="flex-row items-start">
-            <Ionicons name="information-circle" size={18} color="#475569" />
-            <Text className="flex-1 text-xs text-slate-600 ml-2 leading-5">
-              {creationDraft.format === 'league' 
-                ? `These settings will apply to all matches. Teams will play within their respective groups${creationDraft.includeKnockoutStage ? ' before top teams advance to knockout rounds.' : '.'}`
-                : 'These settings will apply to all matches in the knockout tournament. Fixtures will be generated automatically.'}
-            </Text>
+          {/* Match Breakdown */}
+          {creationDraft.format === 'league' && (
+            <View className="bg-white rounded-xl p-4 mb-6 border border-slate-200">
+              <Text className="text-sm font-semibold text-slate-700 mb-2">Match Breakdown</Text>
+
+              <View className="space-y-2">
+                <View className="flex-row justify-between">
+                  <Text className="text-xs text-slate-600">Group Stage Matches:</Text>
+                  <Text className="text-xs font-medium text-slate-800">
+                    {(teamsPerTable * (teamsPerTable - 1) / 2) * creationDraft.tableCount}
+                  </Text>
+                </View>
+
+                {creationDraft.includeKnockoutStage && knockoutStageMatches > 0 && (
+                  <View className="flex-row justify-between">
+                    <Text className="text-xs text-slate-600">Knockout Stage Matches:</Text>
+                    <Text className="text-xs font-medium text-slate-800">{knockoutStageMatches}</Text>
+                  </View>
+                )}
+
+                <View className="flex-row justify-between pt-1 border-t border-slate-100">
+                  <Text className="text-xs font-semibold text-slate-700">Total Matches:</Text>
+                  <Text className="text-xs font-bold text-slate-900">{totalMatches}</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Info */}
+          <View className="bg-slate-100 rounded-xl p-4 mb-6">
+            <View className="flex-row items-start">
+              <Ionicons name="information-circle" size={18} color="#475569" />
+              <Text className="flex-1 text-xs text-slate-600 ml-2 leading-5">
+                {creationDraft.format === 'league'
+                  ? `These settings will apply to all matches. Teams will play within their respective groups${creationDraft.includeKnockoutStage ? ' before top teams advance to knockout rounds.' : '.'}`
+                  : 'These settings will apply to all matches in the knockout tournament. Fixtures will be generated automatically.'}
+              </Text>
+            </View>
           </View>
+
+          <View className="h-24" />
+        </ScrollView>
+
+        {/* Create Button */}
+        <View className="bg-white px-4 py-4 border-t border-slate-200">
+          <TouchableOpacity
+            onPress={handleCreateTournament}
+            className="bg-green-600 rounded-xl py-4 items-center"
+          >
+            <View className="flex-row items-center">
+              <Ionicons name="checkmark-circle" size={20} color="white" />
+              <Text className="text-white font-bold text-base ml-2">Create Tournament</Text>
+            </View>
+          </TouchableOpacity>
         </View>
-
-        <View className="h-24" />
-      </ScrollView>
-
-      {/* Create Button */}
-      <View className="bg-white px-4 py-4 border-t border-slate-200">
-        <TouchableOpacity
-          onPress={handleCreateTournament}
-          className="bg-green-600 rounded-xl py-4 items-center"
-        >
-          <View className="flex-row items-center">
-            <Ionicons name="checkmark-circle" size={20} color="white" />
-            <Text className="text-white font-bold text-base ml-2">Create Tournament</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
-  );
+      </SafeAreaView>
+    );
+  }
 }

@@ -49,7 +49,7 @@ export default function ProfileScreen() {
   };
 
   const navigateToDemoBookings = () => {
-    router.push("/(academy)/demoBookings");
+    router.push("/(academy)/manageProfile/bookedDemo");
   };
 
   const handleDelete = (id: string, childName: string) => {
