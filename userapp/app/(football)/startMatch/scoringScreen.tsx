@@ -297,12 +297,12 @@ export default function MatchScoringScreen() {
       {/* Header */}
       <ImageBackground
         source={{ uri: 'https://images.unsplash.com/photo-1459865264687-595d652de67e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2340&q=80' }}
-        className="h-64"
+        className="h-72"
         resizeMode="cover"
       >
         <View className="flex-1 bg-black/50">
           <SafeAreaView>
-            <View className="flex-row items-center justify-between px-4">
+            <View className="flex-row items-center justify-center px-4 mb-4">
               
               <View className="items-center">
                 <Text className="text-white text-lg font-bold">Live Match</Text>
@@ -313,13 +313,13 @@ export default function MatchScoringScreen() {
           </SafeAreaView>
 
           {/* Score */}
-          <View className="flex-1 justify-center px-4">
+          <View className="flex-1 justify-center px-4 mb-16">
             <View className="flex-row items-center justify-between">
               <TouchableOpacity onPress={() => handleAddEvent('my')} className="items-center flex-1">
                 <View className="w-20 h-20 bg-white/20 rounded-full items-center justify-center mb-2 border-2 border-white/30">
                   <Ionicons name="shield" size={40} color="white" />
                 </View>
-                <Text className="text-white text-sm font-medium text-center mb-1">{matchData.myTeam.teamId}</Text>
+                <Text className="text-white text-sm font-medium text-center mb-1">{matchData.myTeam.teamName}</Text>
                 <Text className="text-white text-4xl font-bold">{myTeamScore}</Text>
               </TouchableOpacity>
 

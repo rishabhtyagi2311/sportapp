@@ -48,8 +48,10 @@ export default function CreateTeamForm() {
 
   const handleAddMembers = () => {
     if (!validateForm()) return;
-
+   
     const newTeam = addTeam({
+      
+      
       teamName: formData.teamName.trim(),
       maxPlayers: Number(formData.maxPlayers),
       city: formData.city.trim(),

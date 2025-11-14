@@ -14,7 +14,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { dummyVenues } from '@/constants/venueData';
-import { useMatchCreationStore, MatchVenue, MatchReferee } from '@/store/footballMatchCreationStore';
+import { useMatchCreationStore, MatchVenue, MatchReferee, } from '@/store/footballMatchCreationStore';
 interface Venue {
   id: string;
   name: string;
@@ -40,6 +40,10 @@ export default function MatchDetailsForm() {
   
   // Initialize match data from route params
   useEffect(() => {
+    console.log(params);
+    console.log(matchData);
+    
+    
     if (params.myTeamId && params.opponentTeamId) {
       initializeMatch(
         params.myTeamId as string,
