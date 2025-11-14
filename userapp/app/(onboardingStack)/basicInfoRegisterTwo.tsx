@@ -83,7 +83,7 @@ export default function InfoRegisterScreen() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View className="flex-1 bg-white">
           <ImageBackground
-            source={require('../../assets/images/coverImage.jpg')}
+            source={require('../../assets/images/onBoardingCoverImage.jpg')}
             resizeMode="cover"
             className="flex-1"
           >

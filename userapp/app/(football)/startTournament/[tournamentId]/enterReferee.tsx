@@ -31,22 +31,38 @@ export default function TournamentEnterRefereesScreen() {
   }, [tournamentId, fixtureId, activeTournamentMatch, initializeTournamentMatch]);
   
   const tournament = getTournament(tournamentId);
-  const requiredReferees = tournament?.settings.numberOfReferees || 1;
-  const [referees, setReferees] = useState<string[]>(Array(requiredReferees).fill(''));
-  
-  // Get captain names for display
-  const homeCaptainName = activeTournamentMatch?.homeCaptain 
-    ? getPlayerById(activeTournamentMatch.homeCaptain)?.name || 'Selected'
+  const requiredReferees = tournament?.settings?.numberOfReferees ?? 1;
+
+  // start with empty array, populate after tournament loads / requiredReferees becomes known
+  const [referees, setReferees] = useState<string[]>([]);
+
+  useEffect(() => {
+    // ensure referees state has the right length when the tournament/settings load or change
+    const count = Math.max(1, Number(requiredReferees || 1));
+    setReferees(prev => {
+      if (prev.length === count) return prev;
+      const newArr = Array(count).fill('');
+      // copy existing values into new array if available
+      for (let i = 0; i < Math.min(prev.length, count); i++) newArr[i] = prev[i];
+      return newArr;
+    });
+  }, [requiredReferees]);
+
+  // Get captain names for display (safe guards)
+  const homeCaptainName = activeTournamentMatch?.homeCaptain
+    ? (getPlayerById(activeTournamentMatch.homeCaptain)?.name || 'Selected')
     : null;
-  
-  const awayCaptainName = activeTournamentMatch?.awayCaptain 
-    ? getPlayerById(activeTournamentMatch.awayCaptain)?.name || 'Selected'
+
+  const awayCaptainName = activeTournamentMatch?.awayCaptain
+    ? (getPlayerById(activeTournamentMatch.awayCaptain)?.name || 'Selected')
     : null;
   
   const updateReferee = (index: number, value: string) => {
-    const updated = [...referees];
-    updated[index] = value;
-    setReferees(updated);
+    setReferees(prev => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
+    });
   };
   
   const handleStartMatch = () => {
@@ -57,13 +73,13 @@ export default function TournamentEnterRefereesScreen() {
       return;
     }
     
-    // Validate match setup
+    // Validate match setup (use optional chaining)
     if (!activeTournamentMatch?.homeCaptain || !activeTournamentMatch?.awayCaptain) {
       Alert.alert('Setup Incomplete', 'Captains not selected. Please go back and complete setup.');
       return;
     }
     
-    if (activeTournamentMatch.homeTeamPlayers.length === 0 || activeTournamentMatch.awayTeamPlayers.length === 0) {
+    if ((activeTournamentMatch?.homeTeamPlayers?.length ?? 0) === 0 || (activeTournamentMatch?.awayTeamPlayers?.length ?? 0) === 0) {
       Alert.alert('Setup Incomplete', 'Players not selected. Please go back and complete setup.');
       return;
     }
@@ -72,8 +88,8 @@ export default function TournamentEnterRefereesScreen() {
     setTournamentMatchReferees(filledReferees);
     startTournamentMatchScoring();
     
-    // Navigate to match scoring
-    router.push(`/(football)/startTournament/${tournamentId}/scoringScreen?fixtureId=${fixtureId}`);
+    // Navigate to match scoring (safely encode params)
+    router.push(`/(football)/startTournament/${encodeURIComponent(tournamentId)}/scoringScreen?fixtureId=${encodeURIComponent(fixtureId)}`);
   };
   
   if (!activeTournamentMatch) {
@@ -88,7 +104,7 @@ export default function TournamentEnterRefereesScreen() {
             No match found. Please start from the tournament dashboard.
           </Text>
           <TouchableOpacity
-            onPress={() => router.push(`/(football)/tournaments/${tournamentId}`)}
+            onPress={() => router.push(`/(football)/tournaments/${encodeURIComponent(tournamentId)}`)}
             className="bg-blue-600 px-6 py-3 rounded-xl"
           >
             <Text className="text-white font-semibold">Go to Tournament</Text>
@@ -101,7 +117,7 @@ export default function TournamentEnterRefereesScreen() {
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1"
+      style={{ flex: 1 }}
     >
       <SafeAreaView className="flex-1 bg-slate-50">
         {/* Header */}
@@ -118,11 +134,11 @@ export default function TournamentEnterRefereesScreen() {
           <View className="bg-blue-600 rounded-xl p-4">
             <Text className="text-white text-sm mb-2">Match Ready to Start</Text>
             <View className="flex-row items-center justify-between">
-              <Text className="text-white text-base font-bold">
+              <Text className="text-white text-base font-bold" numberOfLines={1}>
                 {activeTournamentMatch.homeTeamName}
               </Text>
               <Text className="text-white text-lg font-bold">VS</Text>
-              <Text className="text-white text-base font-bold">
+              <Text className="text-white text-base font-bold" numberOfLines={1}>
                 {activeTournamentMatch.awayTeamName}
               </Text>
             </View>
@@ -141,13 +157,13 @@ export default function TournamentEnterRefereesScreen() {
               </View>
             </View>
 
-            {Array.from({ length: requiredReferees }).map((_, index) => (
+            {Array.from({ length: Math.max(1, requiredReferees) }).map((_, index) => (
               <View key={index} className="mb-4">
                 <Text className="text-sm font-semibold text-slate-700 mb-2">
                   {requiredReferees === 1 ? 'Main Referee' : index === 0 ? 'Main Referee' : `Assistant Referee ${index}`}
                 </Text>
                 <TextInput
-                  value={referees[index]}
+                  value={referees[index] ?? ''}
                   onChangeText={(value) => updateReferee(index, value)}
                   placeholder="Enter referee name"
                   className="bg-white border border-slate-200 rounded-xl px-4 py-3 text-base text-slate-900"
@@ -165,14 +181,14 @@ export default function TournamentEnterRefereesScreen() {
             <View className="flex-row items-center mb-2">
               <Ionicons name="checkmark-circle" size={16} color="#10b981" />
               <Text className="text-sm text-slate-600 ml-2">
-                {activeTournamentMatch.homeTeamPlayers.length} players for {activeTournamentMatch.homeTeamName}
+                {(activeTournamentMatch.homeTeamPlayers?.length ?? 0)} players for {activeTournamentMatch.homeTeamName}
               </Text>
             </View>
             
             <View className="flex-row items-center mb-2">
               <Ionicons name="checkmark-circle" size={16} color="#10b981" />
               <Text className="text-sm text-slate-600 ml-2">
-                {activeTournamentMatch.awayTeamPlayers.length} players for {activeTournamentMatch.awayTeamName}
+                {(activeTournamentMatch.awayTeamPlayers?.length ?? 0)} players for {activeTournamentMatch.awayTeamName}
               </Text>
             </View>
             
@@ -224,9 +240,7 @@ export default function TournamentEnterRefereesScreen() {
         <View className="bg-white px-4 py-4 border-t border-slate-200">
           <TouchableOpacity
             onPress={handleStartMatch}
-            className={`rounded-xl py-4 items-center ${
-              referees.filter(r => r.trim()).length === requiredReferees ? 'bg-green-600' : 'bg-slate-300'
-            }`}
+            className={`rounded-xl py-4 items-center ${referees.filter(r => r.trim()).length === requiredReferees ? 'bg-green-600' : 'bg-slate-300'}`}
             disabled={referees.filter(r => r.trim()).length !== requiredReferees}
           >
             <View className="flex-row items-center">
