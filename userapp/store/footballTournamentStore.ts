@@ -186,30 +186,40 @@ interface TournamentState {
 const generateLeagueFixtures = (tournament: Tournament): TournamentFixture[] => {
   const fixtures: TournamentFixture[] = [];
   if (!tournament.tables || tournament.tables.length === 0) return fixtures;
+  
+  const matchesPerPair = tournament.settings?.matchesPerPair ?? 1;
   let matchNumber = 1;
+  
   for (const table of tournament.tables) {
     const teamIds = table.teamIds.slice();
     const numTeams = teamIds.length;
     if (numTeams < 2) continue;
+    
     for (let i = 0; i < numTeams; i++) {
       for (let j = i + 1; j < numTeams; j++) {
         const homeTeam = tournament.teams.find(t => t.id === teamIds[i]);
         const awayTeam = tournament.teams.find(t => t.id === teamIds[j]);
         if (!homeTeam || !awayTeam) continue;
-        fixtures.push({
-          id: `fixture_${Date.now()}_${table.id}_${matchNumber}`,
-          stage: 'group',
-          round: 1,
-          roundName: `${table.name} - Round 1`,
-          matchNumber,
-          homeTeamId: homeTeam.id,
-          awayTeamId: awayTeam.id,
-          homeTeamName: homeTeam.teamName,
-          awayTeamName: awayTeam.teamName,
-          tableId: table.id,
-          status: 'upcoming',
-        });
-        matchNumber++;
+        
+        // Generate matchesPerPair fixtures
+        for (let match = 0; match < matchesPerPair; match++) {
+          const isReturnFixture = match === 1;
+          
+          fixtures.push({
+            id: `fixture_${Date.now()}_${table.id}_${matchNumber}`,
+            stage: 'group',
+            round: isReturnFixture ? 2 : 1,
+            roundName: `${table.name} - Round ${isReturnFixture ? 2 : 1}`,
+            matchNumber,
+            homeTeamId: isReturnFixture ? awayTeam.id : homeTeam.id,
+            awayTeamId: isReturnFixture ? homeTeam.id : awayTeam.id,
+            homeTeamName: isReturnFixture ? awayTeam.teamName : homeTeam.teamName,
+            awayTeamName: isReturnFixture ? homeTeam.teamName : awayTeam.teamName,
+            tableId: table.id,
+            status: 'upcoming',
+          });
+          matchNumber++;
+        }
       }
     }
   }

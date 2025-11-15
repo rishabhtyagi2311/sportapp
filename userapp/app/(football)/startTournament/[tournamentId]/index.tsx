@@ -31,7 +31,8 @@ export default function TournamentDashboardScreen() {
   const allFixtures = useMemo(() => getTournamentFixtures(tournamentId), [tournamentId, getTournamentFixtures, refreshKey]);
   const upcomingFixtures = useMemo(() => getUpcomingFixtures(tournamentId), [tournamentId, getUpcomingFixtures, refreshKey]);
   const completedFixtures = useMemo(() => getCompletedFixtures(tournamentId), [tournamentId, getCompletedFixtures, refreshKey]);
-
+  console.log(upcomingFixtures);
+  
   // Set initial active table when tournament loads
   useEffect(() => {
     if (tournament?.tables && tournament.tables.length > 0 && !activeTableId) {
