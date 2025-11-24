@@ -6,99 +6,86 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
+  GestureResponderEvent,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { usechildStore } from "@/store/academyChildProfile";
 import { useEnrollmentStore } from "@/store/academyEnrollmentStore";
 import { useAcademyStore } from "@/store/academyStore";
-import { useReviewsStore } from "@/store/academyReviewStore"; // Import the reviews store
 
 export default function ChildAcademiesScreen() {
   const router = useRouter();
-  const { childId, childName } = useLocalSearchParams<{ childId: string; childName: string }>();
-  
-  // Get store methods
+  const { childId, childName } = useLocalSearchParams<{
+    childId: string;
+    childName: string;
+  }>();
+
+  // Stores
   const childProfiles = usechildStore((state) => state.childProfiles);
-  const getEnrollmentsByChild = useEnrollmentStore((state) => state.getEnrollmentsByChild);
+  const getEnrollmentsByChild = useEnrollmentStore(
+    (state) => state.getEnrollmentsByChild
+  );
   const getAcademyById = useAcademyStore((state) => state.getAcademyById);
-  
-  // Get reviews store methods
-  const { getAverageRatingForAcademy, getReviewsByAcademy } = useReviewsStore();
-  
-  // Find the child profile from the store
-  const childProfile = childProfiles.find(profile => profile.id === childId);
-  // Get enrollments for this specific child using the store method
+
+  // Child profile
+  const childProfile = childProfiles.find((profile) => profile.id === childId);
+  const resolvedChildName = childProfile?.childName || childName || "Child";
+
+  // Enrollments for this child
   const childEnrollments = getEnrollmentsByChild(childId);
-  
-  // Get unique academies for this child
-  const childAcademyIds = [...new Set(childEnrollments.map(e => e.academyId))];
-  
+  const childAcademyIds = [...new Set(childEnrollments.map((e) => e.academyId))];
+
   const handleBackPress = () => {
     router.back();
   };
-  
+
   const handleAcademyPress = (academyId: string, academyName: string) => {
     router.push({
       pathname: "/(academy)/manageProfile/childAttendance",
       params: {
         childId,
         academyId,
-        academyName
+        academyName,
       },
     });
   };
-  
-  const navigateToReviews = (academyId: string, e: any) => {
-    e.stopPropagation(); // Prevent triggering the parent TouchableOpacity
-    router.push(`/(academy)/academyDetails/${academyId}/reviews`);
+
+  // Navigate to Add Review screen (form only, no review display here)
+  const navigateToWriteReview = (
+    academyId: string,
+    academyName: string,
+    e: GestureResponderEvent
+  ) => {
+    e.stopPropagation();
+    router.push({
+      pathname: "/(academy)/manageProfile/addReviewForm",
+      params: {
+        academyId,
+        academyName,
+        childId,
+        childName: resolvedChildName,
+      },
+    });
   };
 
-  // Function to render rating stars
-  const renderStars = (rating: number) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(
-        <Ionicons key={i} name="star" size={14} color="#fbbf24" />
-      );
-    }
-    if (hasHalfStar) {
-      stars.push(
-        <Ionicons key="half" name="star-half" size={14} color="#fbbf24" />
-      );
-    }
-    const emptyStars = 5 - Math.ceil(rating);
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(
-        <Ionicons key={`empty-${i}`} name="star-outline" size={14} color="#d1d5db" />
-      );
-    }
-    return stars;
-  };
-  
-  // Empty state - no enrollments
+  // Empty state
   if (childAcademyIds.length === 0) {
     return (
       <SafeAreaView className="flex-1 bg-white">
         <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
-        
-        {/* Header Section */}
+
         <View className="bg-slate-900 shadow-lg">
           <View className="flex-row items-center px-4 py-3 border-b border-slate-800">
-            {/* Back Button */}
             <TouchableOpacity
               onPress={handleBackPress}
               className="mr-3 p-2 rounded-lg"
             >
               <Ionicons name="arrow-back" size={24} color="white" />
             </TouchableOpacity>
-            {/* Header Title */}
             <View className="flex-1">
               <Text className="text-white font-bold text-lg" numberOfLines={1}>
-                {childName}'s Academies
+                {resolvedChildName}'s Academies
               </Text>
               <Text className="text-slate-400 text-xs mt-0.5">
                 View enrolled academies
@@ -106,53 +93,55 @@ export default function ChildAcademiesScreen() {
             </View>
           </View>
         </View>
+
         <View className="flex-1 bg-white items-center justify-center px-6">
           <Ionicons name="school-outline" size={80} color="#e2e8f0" />
           <Text className="text-slate-900 text-2xl font-bold text-center mt-4">
             No Enrollments Yet
           </Text>
           <Text className="text-slate-500 text-center mt-2">
-            {childName} is not enrolled in any academies
+            {resolvedChildName} is not enrolled in any academies
           </Text>
           <TouchableOpacity
             onPress={() => router.push("/(academy)/browseAcademies")}
             className="mt-6 bg-blue-500 py-3 px-6 rounded-xl"
           >
-            <Text className="text-white font-semibold text-base">Browse Academies</Text>
+            <Text className="text-white font-semibold text-base">
+              Browse Academies
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
-  
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
-      
-      {/* Header Section */}
+
+      {/* Header */}
       <View className="bg-slate-900 shadow-lg">
         <View className="flex-row items-center px-4 py-3 border-b border-slate-800">
-          {/* Back Button */}
           <TouchableOpacity
             onPress={handleBackPress}
             className="mr-3 p-2 rounded-lg"
           >
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
-          {/* Header Title */}
           <View className="flex-1">
             <Text className="text-white font-bold text-lg" numberOfLines={1}>
-              {childName}'s Academies
+              {resolvedChildName}'s Academies
             </Text>
             <Text className="text-slate-400 text-xs mt-0.5">
-              {childAcademyIds.length} {childAcademyIds.length === 1 ? 'academy' : 'academies'} enrolled
+              {childAcademyIds.length}{" "}
+              {childAcademyIds.length === 1 ? "academy" : "academies"} enrolled
             </Text>
           </View>
         </View>
       </View>
-      
-      {/* Academy List */}
-      <ScrollView 
+
+      {/* List */}
+      <ScrollView
         className="flex-1"
         contentContainerStyle={{ padding: 16 }}
         showsVerticalScrollIndicator={false}
@@ -160,15 +149,13 @@ export default function ChildAcademiesScreen() {
         {childAcademyIds.map((academyId) => {
           const academy = getAcademyById(academyId);
           if (!academy) return null;
-          
-          // Get review data for this academy
-          const averageRating = getAverageRatingForAcademy(academyId);
-          const reviewCount = getReviewsByAcademy(academyId).length;
-          
+
           return (
             <TouchableOpacity
               key={academyId}
-              onPress={() => handleAcademyPress(academyId, academy.academyName)}
+              onPress={() =>
+                handleAcademyPress(academyId, academy.academyName)
+              }
               activeOpacity={0.7}
               className="bg-white rounded-2xl mb-4 overflow-hidden border border-gray-200"
               style={{
@@ -194,13 +181,16 @@ export default function ChildAcademiesScreen() {
                       </View>
                     </View>
                   </View>
-                  <Ionicons name="chevron-forward-circle" size={28} color="rgba(255,255,255,0.7)" />
+                  <Ionicons
+                    name="chevron-forward-circle"
+                    size={28}
+                    color="rgba(255,255,255,0.7)"
+                  />
                 </View>
               </View>
-              
+
               {/* Card Body */}
               <View className="px-5 py-4">
-                {/* Academy Info Grid */}
                 <View className="space-y-3">
                   <View className="flex-row items-center">
                     <View className="w-10 h-10 bg-purple-50 rounded-xl items-center justify-center mr-3">
@@ -213,6 +203,7 @@ export default function ChildAcademiesScreen() {
                       </Text>
                     </View>
                   </View>
+
                   <View className="flex-row items-center">
                     <View className="w-10 h-10 bg-green-50 rounded-xl items-center justify-center mr-3">
                       <Ionicons name="location" size={20} color="#10b981" />
@@ -224,6 +215,7 @@ export default function ChildAcademiesScreen() {
                       </Text>
                     </View>
                   </View>
+
                   <View className="flex-row items-center">
                     <View className="w-10 h-10 bg-blue-50 rounded-xl items-center justify-center mr-3">
                       <Ionicons name="call" size={20} color="#3b82f6" />
@@ -235,38 +227,9 @@ export default function ChildAcademiesScreen() {
                       </Text>
                     </View>
                   </View>
-
-                  {/* Rating/Review Section */}
-                  <View className="flex-row items-center">
-                    <View className="w-10 h-10 bg-amber-50 rounded-xl items-center justify-center mr-3">
-                      <Ionicons name="star" size={20} color="#f59e0b" />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-slate-500 text-xs">Rating</Text>
-                      <View className="flex-row items-center">
-                        {averageRating > 0 ? (
-                          <View className="flex-row items-center">
-                            <Text className="text-slate-900 font-semibold text-base mr-1">
-                              {averageRating.toFixed(1)}
-                            </Text>
-                            <View className="flex-row mr-1">
-                              {renderStars(averageRating)}
-                            </View>
-                            <Text className="text-gray-500 text-xs">
-                              ({reviewCount})
-                            </Text>
-                          </View>
-                        ) : (
-                          <Text className="text-slate-900 font-semibold text-base">
-                            No ratings yet
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  </View>
                 </View>
               </View>
-              
+
               {/* Card Footer */}
               <View className="px-5 py-3 bg-gray-50 border-t border-gray-100">
                 <View className="flex-row items-center justify-between">
@@ -275,13 +238,24 @@ export default function ChildAcademiesScreen() {
                       Tap to view attendance
                     </Text>
                   </View>
-                  <TouchableOpacity 
-                    onPress={(e) => navigateToReviews(academyId, e)}
-                    className="bg-blue-500 py-2 px-4 rounded-full"
+                  <TouchableOpacity
+                    onPress={(e) =>
+                      navigateToWriteReview(
+                        academyId,
+                        academy.academyName,
+                        e
+                      )
+                    }
+                    className="bg-blue-500 py-2 px-4 rounded-full flex-row items-center"
                     activeOpacity={0.7}
                   >
-                    <Text className="text-white text-xs font-medium">
-                      {reviewCount > 0 ? "View Reviews" : "Write Review"}
+                    <Ionicons
+                      name="create-outline"
+                      size={14}
+                      color="#ffffff"
+                    />
+                    <Text className="text-white text-xs font-medium ml-1">
+                      Review Academy
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -289,7 +263,6 @@ export default function ChildAcademiesScreen() {
             </TouchableOpacity>
           );
         })}
-        {/* Bottom Spacing */}
         <View className="h-4" />
       </ScrollView>
     </SafeAreaView>

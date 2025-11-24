@@ -10,7 +10,11 @@ export default function RootStacklayout()
   
     return (
         <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="basicInfoRegisterOne"   />
+
+          <Stack.Screen name="welcome"   />
+           <Stack.Screen name="basicInfoRegisterOne"   />
+            <Stack.Screen name="basicInfoRegisterTwo"   />
+             <Stack.Screen name="basicInfoRegisterThree"   />
     
         </Stack>
       );

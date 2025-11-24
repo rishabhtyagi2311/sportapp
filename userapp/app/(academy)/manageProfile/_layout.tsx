@@ -14,6 +14,7 @@ export default function AcademyLayout() {
       <Stack.Screen name="academies" />
       <Stack.Screen name="childAttendance" />
       <Stack.Screen name="bookedDemo" />
+      <Stack.Screen name="addReviewForm" />
     </Stack>
   );
 }

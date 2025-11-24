@@ -1,25 +1,28 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// store/academyReviewStore.ts
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export interface Review {
+export interface AcademyReview {
   id: string;
   academyId: string;
-  userId: string; // This could be used to identify the reviewer
-  userName: string;
-  rating: number;
+  academyName: string;
+  childId: string;
+  childName: string;
+  reviewerName: string; // father's name
+  rating: number; // 1-5
+  title?: string;
   comment: string;
-  date: string; // ISO string format
-  verified: boolean;
+  createdAt: string;
 }
 
 interface ReviewsStore {
-  reviews: Review[];
-  addReview: (review: Omit<Review, 'id' | 'date' | 'verified'>) => void;
-  updateReview: (id: string, updatedReview: Partial<Omit<Review, 'id' | 'date'>>) => void;
+  reviews: AcademyReview[];
+  addReview: (review: Omit<AcademyReview, "id" | "createdAt">) => void;
+  updateReview: (id: string, updates: Partial<AcademyReview>) => void;
   deleteReview: (id: string) => void;
-  getReviewsByAcademy: (academyId: string) => Review[];
-  getUserReviewForAcademy: (userId: string, academyId: string) => Review | undefined;
+  getReviewsByAcademy: (academyId: string) => AcademyReview[];
+  getReviewsByChild: (childId: string) => AcademyReview[];
   getAverageRatingForAcademy: (academyId: string) => number;
 }
 
@@ -27,57 +30,53 @@ export const useReviewsStore = create<ReviewsStore>()(
   persist(
     (set, get) => ({
       reviews: [],
-      
-      addReview: (review) => 
+
+      addReview: (reviewInput) =>
+        set((state) => {
+          const newReview: AcademyReview = {
+            ...reviewInput,
+            id: `${reviewInput.academyId}-${reviewInput.childId}-${Date.now()}`,
+            createdAt: new Date().toISOString(),
+          };
+          return {
+            reviews: [newReview, ...state.reviews],
+          };
+        }),
+
+      updateReview: (id, updates) =>
         set((state) => ({
-          reviews: [
-            ...state.reviews,
-            {
-              ...review,
-              id: `review-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              date: new Date().toISOString(),
-              verified: true, // Assuming all user-submitted reviews are verified
-            }
-          ]
+          reviews: state.reviews.map((review) =>
+            review.id === id ? { ...review, ...updates } : review
+          ),
         })),
-        
-      updateReview: (id, updatedReview) =>
-        set((state) => ({
-          reviews: state.reviews.map((review) => 
-            review.id === id ? { ...review, ...updatedReview } : review
-          )
-        })),
-        
+
       deleteReview: (id) =>
         set((state) => ({
-          reviews: state.reviews.filter((review) => review.id !== id)
+          reviews: state.reviews.filter((review) => review.id !== id),
         })),
-        
+
       getReviewsByAcademy: (academyId) => {
         const { reviews } = get();
-        return reviews
-          .filter((review) => review.academyId === academyId)
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return reviews.filter((r) => r.academyId === academyId);
       },
-      
-      getUserReviewForAcademy: (userId, academyId) => {
+
+      getReviewsByChild: (childId) => {
         const { reviews } = get();
-        return reviews.find(
-          (review) => review.userId === userId && review.academyId === academyId
-        );
+        return reviews.filter((r) => r.childId === childId);
       },
-      
+
       getAverageRatingForAcademy: (academyId) => {
         const { reviews } = get();
-        const academyReviews = reviews.filter((review) => review.academyId === academyId);
+        const academyReviews = reviews.filter(
+          (r) => r.academyId === academyId && typeof r.rating === "number"
+        );
         if (academyReviews.length === 0) return 0;
-        
-        const totalRating = academyReviews.reduce((sum, review) => sum + review.rating, 0);
-        return totalRating / academyReviews.length;
+        const total = academyReviews.reduce((sum, r) => sum + r.rating, 0);
+        return total / academyReviews.length;
       },
     }),
     {
-      name: 'academy-reviews-storage',
+      name: "academy-reviews-storage",
       storage: createJSONStorage(() => AsyncStorage),
     }
   )

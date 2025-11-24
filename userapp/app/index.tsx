@@ -13,6 +13,7 @@ export default function Index() {
       if (userId) {
         router.replace("/(homeScreenTabs)");
       } else {
+          // router.replace("/(onboardingStack)/welcome");
         // router.replace("/(onboardingStack)/basicInfoRegisterOne");
         router.replace("/(homeScreenTabs)");
       }
