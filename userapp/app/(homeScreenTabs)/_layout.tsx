@@ -1,15 +1,14 @@
-// app/(homeScreenTabs)/_layout.tsx
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-
 
 export default function TabLayout() {
   return (
     <Tabs
       initialRouteName="index"
       screenOptions={({ route }) => ({
-       headerShown : false,
+        headerShown: false,
+
         tabBarStyle: {
           position: 'absolute',
           bottom: 0,
@@ -22,27 +21,40 @@ export default function TabLayout() {
           borderTopRightRadius: 16,
           overflow: 'hidden',
         },
+
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
+        },
+
         tabBarBackground: () => (
           <BlurView
             tint="dark"
             intensity={80}
             style={{
               flex: 1,
-              backgroundColor: 'rgba(15,23,42,0.85)', // navy-ish blue for contrast
+              backgroundColor: 'rgba(15,23,42,0.85)',
             }}
           />
         ),
-        tabBarActiveTintColor: '#60a5fa', // sky-400
-        tabBarInactiveTintColor: '#cbd5e1', // slate-300
-        tabBarIcon: ({ focused, color, size }) => {
+
+        tabBarActiveTintColor: '#60a5fa',
+        tabBarInactiveTintColor: '#cbd5e1',
+
+        tabBarIcon: ({ focused, color }) => {
           let iconName: keyof typeof Ionicons.glyphMap = 'ellipse';
 
           if (route.name === 'index') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'sports') {
+          } 
+          else if (route.name === 'sports') {
             iconName = focused ? 'trophy' : 'trophy-outline';
-          } else if (route.name === 'academy') {
+          } 
+          else if (route.name === 'academy') {
             iconName = focused ? 'apps' : 'apps-outline';
+          } 
+          else if (route.name === 'profile') {
+            iconName = focused ? 'person' : 'person-outline';
           }
 
           return <Ionicons name={iconName} size={22} color={color} />;
@@ -50,24 +62,23 @@ export default function TabLayout() {
       })}
     >
       <Tabs.Screen
-        
         name="sports"
-        options={{
-          
-          title: 'Sports',
-        }}
+        options={{ title: 'Sports' }}
       />
+
       <Tabs.Screen
         name="index"
-        options={{
-          title: 'Home',
-        }}
+        options={{ title: 'Home' }}
       />
+
       <Tabs.Screen
         name="academy"
-        options={{
-          title: 'Academy',
-        }}
+        options={{ title: 'Academy' }}
+      />
+
+      <Tabs.Screen
+        name="profile"
+        options={{ title: 'Profile' }}
       />
     </Tabs>
   );
