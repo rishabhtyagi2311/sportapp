@@ -1,15 +1,10 @@
-import "../global.css"
-import { Slot } from 'expo-router';
+// app/_layout.tsx
+import "../global.css";
+import { Slot } from "expo-router";
 
+export default function RootLayout() {
+  console.log("🚀 RootLayout is rendering with RecoilRoot");
 
-
-export default function Layout() {
-  console.log("🚀 RootLayout is rendering with RecoilRoot")
-  return (
- 
-
-    <Slot/>
-        
-  
-  );
+  // No SplashScreen here, just the app tree
+  return <Slot />;
 }
