@@ -6,8 +6,11 @@ import {
   Pressable,
   SafeAreaView,
   Dimensions,
+  TextInput,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -46,22 +49,19 @@ const AnimatedBubble: FC<{
   left: number;
 }> = ({ size, color, delay, left }) => {
   const yPosition = useSharedValue(-size);
-
   useEffect(() => {
     yPosition.value = withRepeat(
       withTiming(height + size, {
-        duration: 12000 + delay * 1000,
+        duration: 15000 + delay * 1000,
         easing: Easing.linear,
       }),
       -1,
       false
     );
   }, []);
-
   const bubbleStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: yPosition.value }],
   }));
-
   return (
     <Animated.View
       className="absolute rounded-full"
@@ -71,7 +71,7 @@ const AnimatedBubble: FC<{
           height: size,
           backgroundColor: color,
           left,
-          opacity: 0.12,
+          opacity: 0.08,
         },
         bubbleStyle,
       ]}
@@ -79,36 +79,25 @@ const AnimatedBubble: FC<{
   );
 };
 
-// Sportify Logo
+// Sportify Logo - Now replaced with image
 const SportifyLogo: FC = () => {
   const scale = useSharedValue(0.85);
   const opacity = useSharedValue(0);
-
   useEffect(() => {
     scale.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.cubic) });
     opacity.value = withTiming(1, { duration: 800 });
   }, []);
-
   const logoStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
     opacity: opacity.value,
   }));
-
   return (
-    <Animated.View style={[logoStyle]} className="flex-row items-center gap-3 mb-5">
-      <View className="w-13 h-13 bg-green-500 rounded-lg justify-center items-center">
-        <MaterialCommunityIcons name="trophy" size={32} color={COLORS.white} />
-      </View>
-      <View>
-        <Text className="text-2xl font-black tracking-tighter">
-          <Text style={{ color: COLORS.logoRed }}>Spor</Text>
-          <Text style={{ color: COLORS.logoGreen }}>tif</Text>
-          <Text style={{ color: COLORS.logoRed }}>y</Text>
-        </Text>
-        <Text className="text-xs font-semibold tracking-wide" style={{ color: COLORS.skyBlue400 }}>
-          Your Sports Companion
-        </Text>
-      </View>
+    <Animated.View style={[logoStyle]} className="mb-5  -mt-12 items-center ">
+      <Image
+        source={require("@/assets/images/app_name.jpeg")}
+        style={{ width: 200, height: 100, resizeMode: 'contain' }}
+      />
+     
     </Animated.View>
   );
 };
@@ -119,44 +108,109 @@ const HeroSection: FC = () => {
   const titleOpacity = useSharedValue(0);
   const descriptionTranslateY = useSharedValue(20);
   const descriptionOpacity = useSharedValue(0);
-
   useEffect(() => {
     titleScale.value = withTiming(1, { duration: 900, easing: Easing.out(Easing.cubic) });
     titleOpacity.value = withTiming(1, { duration: 900 });
     descriptionTranslateY.value = withTiming(0, { duration: 1000, easing: Easing.out(Easing.cubic) });
     descriptionOpacity.value = withTiming(1, { duration: 1000 });
   }, []);
-
   const titleStyle = useAnimatedStyle(() => ({
     transform: [{ scale: titleScale.value }],
     opacity: titleOpacity.value,
   }));
-
   const descStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: descriptionTranslateY.value }],
     opacity: descriptionOpacity.value,
   }));
-
   return (
-    <View className="items-center mb-8">
+    <View className="items-center mb-8  ">
       <SportifyLogo />
-
       <Animated.View style={[titleStyle]} className="mb-4">
-        <Text className="text-5xl font-black text-white text-center leading-tight tracking-tight">
+        <Text className="text-5xl font-black text-slate-900 text-center leading-tight tracking-tight">
           Play.
         </Text>
-        <Text className="text-5xl font-black text-white text-center leading-tight tracking-tight">
+        <Text className="text-5xl font-black text-slate-900 text-center leading-tight tracking-tight">
           Train.
           <Text style={{ color: COLORS.logoGreen }}> Win.</Text>
         </Text>
       </Animated.View>
-
       <Animated.View style={descStyle}>
-        <Text className="text-base text-center font-medium leading-6" style={{ color: COLORS.skyBlue300 }}>
+        <Text className="text-base text-center font-medium leading-6 text-sky-700" >
           One platform. Academies. Venues. Tournaments.
         </Text>
       </Animated.View>
     </View>
+  );
+};
+
+// Premium Create Account Section
+const CreateAccountSection: FC<{ onSignUp: () => void }> = ({ onSignUp }) => {
+  const containerOpacity = useSharedValue(0);
+  const containerScale = useSharedValue(0.95);
+  
+  useEffect(() => {
+    containerOpacity.value = withTiming(1, { duration: 1000, easing: Easing.out(Easing.cubic) });
+    containerScale.value = withTiming(1, { duration: 1000, easing: Easing.out(Easing.cubic) });
+  }, []);
+
+  const containerStyle = useAnimatedStyle(() => ({
+    opacity: containerOpacity.value,
+    transform: [{ scale: containerScale.value }],
+  }));
+
+  return (
+    <Animated.View style={[containerStyle]} className="my-8">
+      <View
+        className="rounded-3xl p-8 border-2 overflow-hidden"
+        style={{
+          backgroundColor: `${COLORS.white}08`,
+          borderColor: COLORS.skyBlue400,
+        }}
+      >
+        {/* Top Accent */}
+        <View
+          className="absolute top-0 left-0 right-0 h-1"
+          style={{ backgroundColor: COLORS.logoGreen }}
+        />
+
+        {/* Header */}
+        <View className="mb-4 mx-2">
+          <View className="flex-row items-center gap-2 ">
+           
+            <Text className="text-2xl font-black text-green-600">Join the Game</Text>
+          </View>
+          
+        </View>
+
+        {/* Features List */}
+        <View className="bg-slate-900 rounded-2xl p-4 mb-6">
+          {[
+            { icon: 'check-circle' as const, text: 'Access elite academies' },
+            { icon: 'check-circle' as const, text: 'Book venues instantly' },
+            { icon: 'check-circle' as const, text: 'Join tournaments & competitions' },
+          ].map((item, idx) => (
+            <View key={idx} className="flex-row items-center gap-3 py-2">
+              <MaterialCommunityIcons name={item.icon} size={18} color={COLORS.logoGreen} />
+              <Text className="text-xs font-semibold flex-1" style={{ color: COLORS.skyBlue300 }}>
+                {item.text}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* CTA Button */}
+        <Pressable
+          onPress={onSignUp}
+          className="rounded-xl py-4 items-center justify-center active:opacity-80 overflow-hidden"
+          style={{ backgroundColor: COLORS.logoGreen }}
+        >
+          <View className="flex-row items-center gap-2">
+            <Text className="text-base font-black text-white">Create Account</Text>
+            <MaterialCommunityIcons name="arrow-right" size={20} color={COLORS.white} />
+          </View>
+        </Pressable>
+      </View>
+    </Animated.View>
   );
 };
 
@@ -178,17 +232,14 @@ const FeatureBlob: FC<{
 }) => {
   const translateX = useSharedValue(100);
   const opacity = useSharedValue(0);
-
   useEffect(() => {
     translateX.value = withTiming(0, { duration: 1000, easing: Easing.out(Easing.cubic) });
     opacity.value = withTiming(1, { duration: 1000 });
   }, []);
-
   const cardStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
     opacity: opacity.value,
   }));
-
   return (
     <Animated.View style={[cardStyle]} className="w-full my-4">
       <View
@@ -211,7 +262,6 @@ const FeatureBlob: FC<{
           className="absolute bottom-0 right-0 w-10 h-10"
           style={{ backgroundColor: gradientEnd }}
         />
-
         {/* Icon Container */}
         <View
           className="w-18 h-18 rounded-2xl justify-center items-center mb-4"
@@ -219,7 +269,6 @@ const FeatureBlob: FC<{
         >
           <MaterialCommunityIcons name={icon} size={48} color={COLORS.white} />
         </View>
-
         {/* Content */}
         <View className="flex-1">
           <Text className="text-2xl font-black mb-2 text-white leading-8">
@@ -232,7 +281,6 @@ const FeatureBlob: FC<{
             {description}
           </Text>
         </View>
-
         {/* Accent Line */}
         <View
           className="h-1 mt-4 rounded-full w-1/4"
@@ -243,101 +291,54 @@ const FeatureBlob: FC<{
   );
 };
 
-// Stats Showcase
-const StatsSection: FC = () => {
-  const stats = [
-    { number: '500+', label: 'Academies', color: COLORS.logoGreen },
-    { number: '1K+', label: 'Venues', color: COLORS.skyBlue400 },
-    { number: '50K+', label: 'Players', color: COLORS.logoRed },
-  ];
-
-  return (
-    <View className="flex-row justify-between gap-3 my-7">
-      {stats.map((stat, index) => (
-        <Animated.View
-          key={index}
-          className="flex-1 py-5 px-3 bg-amber-50 rounded-2xl items-center"
-          style={{
-            borderTopColor: stat.color,
-            borderTopWidth: 4,
-          }}
-        >
-          <Text className="text-2xl font-black mb-1" style={{ color: stat.color }}>
-            {stat.number}
-          </Text>
-          <Text className="text-xs font-semibold" style={{ color: COLORS.darkText }}>
-            {stat.label}
-          </Text>
-        </Animated.View>
-      ))}
-    </View>
-  );
-};
-
 // Navigation Section - Premium Design
 const NavigationSection: FC<{
-  onSignUp: () => void;
   onSignIn: () => void;
-}> = ({ onSignUp, onSignIn }) => {
+}> = ({ onSignIn }) => {
   const containerOpacity = useSharedValue(0);
-
+  const buttonScale = useSharedValue(0.9);
+  
   useEffect(() => {
     containerOpacity.value = withTiming(1, { duration: 1000, easing: Easing.out(Easing.cubic) });
+    buttonScale.value = withTiming(1, { duration: 1200, easing: Easing.out(Easing.cubic) });
   }, []);
-
+  
   const containerStyle = useAnimatedStyle(() => ({
     opacity: containerOpacity.value,
   }));
-
+  
+  const buttonStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: buttonScale.value }],
+  }));
+  
   return (
-    <Animated.View style={[containerStyle]} className="absolute bottom-0 left-0 right-0 px-6 py-6" >
-      <View className="flex-row gap-4">
-        {/* Sign Up Card */}
-        <Pressable
-          onPress={onSignUp}
-          className="flex-1 rounded-2xl py-6 items-center justify-center min-h-40 border-2 active:opacity-70"
-          style={{
-            backgroundColor: COLORS.logoGreen,
-            borderColor: COLORS.logoGreen,
-          }}
-        >
-          <View className="w-14 h-14 bg-green-600 rounded-lg justify-center items-center mb-3">
-            <MaterialCommunityIcons
-              name="plus-circle-outline"
-              size={32}
-              color={COLORS.white}
-            />
-          </View>
-          <Text className="text-base font-black text-white text-center">Get Started</Text>
-          <Text className="text-xs font-semibold mt-1" style={{ color: COLORS.logoGreen }}>
-            Create Account
-          </Text>
-        </Pressable>
-
-        {/* Sign In Card */}
+    <Animated.View style={[containerStyle]} className="absolute bottom-0 left-0 right-0 px-6 py-6">
+      <Animated.View style={[buttonStyle]}>
         <Pressable
           onPress={onSignIn}
-          className="flex-1 rounded-2xl py-6 items-center justify-center min-h-40 border-2 active:opacity-70"
+          className="rounded-2xl py-5 px-6 items-center justify-center overflow-hidden active:opacity-75"
           style={{
-            backgroundColor: COLORS.skyBlue,
-            borderColor: COLORS.skyBlue400,
+            backgroundColor: COLORS.white,
+            shadowColor: COLORS.logoGreen,
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.3,
+            shadowRadius: 12,
+            elevation: 15,
           }}
         >
-          <View className="w-14 h-14 bg-sky-400 rounded-lg justify-center items-center mb-3">
-            <MaterialCommunityIcons
-              name="login-variant"
-              size={32}
-              color={COLORS.white}
-            />
+          <View className="flex-row items-center gap-3 justify-center">
+            <MaterialCommunityIcons name="login-variant" size={22} color={COLORS.logoGreen} />
+            <View>
+              <Text className="text-xs font-semibold" style={{ color: COLORS.skyBlue400 }}>
+                Welcome Back
+              </Text>
+              <Text className="text-sm font-black" style={{ color: COLORS.navyBlue }}>
+                Sign In
+              </Text>
+            </View>
           </View>
-          <Text className="text-base font-black text-center" style={{ color: COLORS.navyBlue }}>
-            Welcome Back
-          </Text>
-          <Text className="text-xs font-semibold mt-1" style={{ color: COLORS.skyBlue400 }}>
-            Sign In
-          </Text>
         </Pressable>
-      </View>
+      </Animated.View>
     </Animated.View>
   );
 };
@@ -345,38 +346,45 @@ const NavigationSection: FC<{
 // Main Welcome Screen
 const WelcomeScreen: FC = () => {
   const router = useRouter();
-
   const handleSignUp = () => {
     router.push('/auth/sign-up');
   };
-
   const handleSignIn = () => {
     router.push('/auth/sign-in');
   };
-
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.darkNavy }}>
-      {/* Animated Background Bubbles */}
+    <SafeAreaView className="flex-1">
+      {/* Gradient Background */}
+      <LinearGradient
+        colors={['#FFFFFF', '#E0F2FE', '#7DD3FC']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
+      />
+      
+      {/* Animated Bubbles */}
       <View className="absolute w-full h-full overflow-hidden">
-        <AnimatedBubble size={100} color={COLORS.logoRed} delay={0} left={10} />
-        <AnimatedBubble size={80} color={COLORS.logoGreen} delay={2} left={width - 90} />
-        <AnimatedBubble size={120} color={COLORS.skyBlue400} delay={4} left={width / 2 - 60} />
-        <AnimatedBubble size={90} color={COLORS.logoRed} delay={1} left={width - 100} />
-        <AnimatedBubble size={110} color={COLORS.logoGreen} delay={3} left={20} />
+        <AnimatedBubble size={150} color={COLORS.logoGreen} delay={0} left={-20} />
+        <AnimatedBubble size={120} color={COLORS.skyBlue400} delay={2} left={width - 80} />
+        <AnimatedBubble size={100} color={COLORS.logoGreen} delay={4} left={width / 2 - 50} />
+        <AnimatedBubble size={130} color={COLORS.skyBlue400} delay={1} left={width - 120} />
+        <AnimatedBubble size={110} color={COLORS.logoGreen} delay={3} left={30} />
       </View>
-
+      
+      {/* Content */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 240 }}
       >
         <HeroSection />
-        <StatsSection />
-
+        
+        {/* Create Account Section - Replaces Stats */}
+        <CreateAccountSection onSignUp={handleSignUp} />
+        
         <View className="my-4">
-          <Text className="text-2xl font-black text-white">Everything You Need</Text>
+          <Text className="text-2xl font-black text-black">Everything You Need</Text>
         </View>
-
         <FeatureBlob
           title="Academies"
           description="Find elite training centers, book demos, track progress, and build champions."
@@ -385,7 +393,6 @@ const WelcomeScreen: FC = () => {
           gradientEnd={COLORS.logoGreen}
           rotation={-2}
         />
-
         <View className="flex-row gap-3 my-4">
           <View className="flex-1">
             <FeatureBlob
@@ -408,7 +415,6 @@ const WelcomeScreen: FC = () => {
             />
           </View>
         </View>
-
         <FeatureBlob
           title="Live Scoring"
           description="Real-time match updates with live scoring boards and instant standings"
@@ -417,13 +423,10 @@ const WelcomeScreen: FC = () => {
           gradientEnd={COLORS.brown300}
           rotation={1}
         />
-
-        <View className="h-10" />
+        
       </ScrollView>
-
-      <NavigationSection onSignUp={handleSignUp} onSignIn={handleSignIn} />
+      <NavigationSection onSignIn={handleSignIn} />
     </SafeAreaView>
   );
 };
-
 export default WelcomeScreen;
