@@ -47,10 +47,7 @@ export default function Index() {
 
   return (
     <SplashScreen
-      onFinish={() => {
-        console.log('[Index] Splash finished, navigating to', initialRoute);
-        router.replace(initialRoute);
-      }}
+      
     />
   );
 }

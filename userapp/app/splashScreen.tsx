@@ -1,237 +1,104 @@
-import React, { useEffect, useRef } from "react";
-import { View, Animated, StyleSheet, Image } from "react-native";
+import React from "react";
+import { Image, Dimensions } from "react-native";
+import Animated, { FadeIn, Keyframe } from "react-native-reanimated";
 
-interface SplashScreenProps {
-  onFinish: () => void;
-}
+const { height } = Dimensions.get("window");
 
-const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
-  // Background color animation
-  const bgAnim = useRef(new Animated.Value(0)).current;
-  
-  // Center logo animations
-  const centerScale = useRef(new Animated.Value(0.5)).current;
-  const centerOpacity = useRef(new Animated.Value(0)).current;
-  
-  // Top image animations
-  const topTranslateY = useRef(new Animated.Value(-150)).current;
-  const topRotate = useRef(new Animated.Value(0)).current;
-  const topOpacity = useRef(new Animated.Value(0)).current;
-  
-  // Bottom image animations
-  const bottomTranslateY = useRef(new Animated.Value(150)).current;
-  const bottomRotate = useRef(new Animated.Value(0)).current;
-  const bottomOpacity = useRef(new Animated.Value(0)).current;
-  
-  // Final fade out
-  const finalFadeOut = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    console.log("[SplashScreen] starting animations");
-    
-    Animated.sequence([
-      // Step 1: Background color transition + all images fade in + center grows
-      Animated.parallel([
-        Animated.timing(bgAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: false,
-        }),
-        // Top image: slide down + rotate + fade in
-        Animated.timing(topTranslateY, {
-          toValue: 0,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(topRotate, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(topOpacity, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        // Center image: scale up + fade in
-        Animated.timing(centerScale, {
-          toValue: 1,
-          duration: 1400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(centerOpacity, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        // Bottom image: slide up + rotate + fade in
-        Animated.timing(bottomTranslateY, {
-          toValue: 0,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(bottomRotate, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(bottomOpacity, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ]),
-      
-      // Step 2: Hold for display
-      Animated.delay(1500),
-      
-      // Step 3: Fade out all images (with random stagger)
-      Animated.parallel([
-        Animated.timing(topOpacity, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-          delay: Math.random() * 300,
-        }),
-        Animated.timing(centerOpacity, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-          delay: Math.random() * 300,
-        }),
-        Animated.timing(bottomOpacity, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-          delay: Math.random() * 300,
-        }),
-      ]),
-      
-      // Step 4: Final fade out of entire screen
-      Animated.timing(finalFadeOut, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      console.log("[SplashScreen] animation complete -> onFinish");
-      onFinish();
-    });
-  }, []);
-
-  // Interpolate background color
-  const backgroundColor = bgAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["#ffffff", "#1a1a2e"],
-  });
-
-  // Interpolate rotations
-  const topRotation = topRotate.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
-
-  const bottomRotation = bottomRotate.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
-
-  return (
-    <Animated.View
-      style={[
-        styles.container,
-        { 
-          backgroundColor,
-          opacity: finalFadeOut,
-        },
-      ]}
-    >
-      {/* Top Image - animates from top */}
-      <Animated.View
-        style={[
-          styles.topImageContainer,
-          {
-            transform: [
-              { translateY: topTranslateY },
-              { rotate: topRotation },
-            ],
-            opacity: topOpacity,
-          },
-        ]}
-      >
-        <Image
-          source={require("@/assets/images/logo1.png")}
-          style={styles.image}
-        />
-      </Animated.View>
-
-      {/* Center Image - scales and fades in */}
-      <Animated.View
-        style={[
-          styles.centerImageContainer,
-          {
-            transform: [{ scale: centerScale }],
-            opacity: centerOpacity,
-          },
-        ]}
-      >
-        <Image
-          source={require("@/assets/images/logo2.png")}
-          style={styles.image}
-        />
-      </Animated.View>
-
-      {/* Bottom Image - animates from bottom */}
-      <Animated.View
-        style={[
-          styles.bottomImageContainer,
-          {
-            transform: [
-              { translateY: bottomTranslateY },
-              { rotate: bottomRotation },
-            ],
-            opacity: bottomOpacity,
-          },
-        ]}
-      >
-        <Image
-          source={require("@/assets/images/logo3.png")}
-          style={styles.image}
-        />
-      </Animated.View>
-    </Animated.View>
-  );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    overflow: "hidden",
-    backgroundColor: "#ffffff",
+/**
+ * Top image movement
+ */
+export const topTranslateKeyframe = new Keyframe({
+  0: {
+    transform: [{ translateY: -height }],
   },
-  topImageContainer: {
-    position: "absolute",
-    top: 80,
-    width: "100%",
-    alignItems: "center",
+  70: {
+    transform: [{ translateY: -height * 0.2 }],
   },
-  centerImageContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  bottomImageContainer: {
-    position: "absolute",
-    bottom: 80,
-    width: "100%",
-    alignItems: "center",
-  },
-  image: {
-    width: 100,
-    height: 100,
-    resizeMode: "contain",
+  100: {
+    transform: [{ translateY: 0 }],
   },
 });
 
-export default SplashScreen;
+/**
+ * Bottom image movement
+ */
+export const bottomTranslateKeyframe = new Keyframe({
+  0: {
+    transform: [{ translateY: height }],
+  },
+  70: {
+    transform: [{ translateY: height * 0.2 }],
+  },
+  100: {
+    transform: [{ translateY: 0 }],
+  },
+});
+
+/**
+ * Rotation animation
+ */
+export const rotateKeyframe = new Keyframe({
+  0: {
+    transform: [{ rotate: "0deg" }],
+  },
+  100: {
+    transform: [{ rotate: "720deg" }],
+  },
+});
+
+export default function SplashScreen() {
+  const DURATION = 2600;
+  const DELAY = 1300;
+
+  return (
+    <Animated.View
+      className="flex-1 bg-slate-900"
+      entering={FadeIn.delay(100).duration(300)}
+    >
+      {/* Top Section */}
+      <Animated.View
+        entering={topTranslateKeyframe.duration(DURATION).delay(DELAY)}
+        className="flex-1 justify-end"
+      >
+        <Animated.View entering={rotateKeyframe.duration(DURATION).delay(DELAY)}>
+          <Image
+            style={{ width: 72, height: 72 }}
+            className="self-center aspect-square"
+            resizeMode="contain"
+            source={require("@/assets/images/logo3.png")}
+          />
+        </Animated.View>
+      </Animated.View>
+
+      {/* Center Section */}
+      <Animated.View className="h-64 bg-slate-900 flex justify-center items-center">
+        <Animated.View
+          entering={FadeIn.delay(4000)}
+          className="bg-slate-900  rounded-xl"
+        >
+          <Image
+            style={{ width: 224, height: 224 }}
+            className="aspect-square"
+            resizeMode="contain"
+            source={require("@/assets/images/logo2.png")}
+          />
+        </Animated.View>
+      </Animated.View>
+
+      {/* Bottom Section */}
+      <Animated.View
+        entering={bottomTranslateKeyframe.duration(DURATION).delay(DELAY)}
+        className="flex-1 justify-start"
+      >
+        <Animated.View entering={rotateKeyframe.duration(DURATION).delay(DELAY)}>
+          <Image
+            style={{ width: 72, height: 72 }}
+            className="self-center aspect-square"
+            resizeMode="contain"
+            source={require("@/assets/images/logo1.png")}
+          />
+        </Animated.View>
+      </Animated.View>
+    </Animated.View>
+  );
+}
