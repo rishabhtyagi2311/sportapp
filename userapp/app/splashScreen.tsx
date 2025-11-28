@@ -86,7 +86,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
 
   return (
     <Animated.View
-      className="flex-1 "
+      className="flex-1 bg-white"
     
     >
       {showContent && (
@@ -110,7 +110,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
           </Animated.View>
 
           {/* Center Section */}
-          <Animated.View className="h-64 bg-slate-900 flex justify-center items-center">
+          <Animated.View className="h-64 bg-white flex justify-center items-center">
             <Animated.View
               entering={FadeIn.delay(4000)}
               exiting={FadeOut.duration(EXIT_DURATION)}
