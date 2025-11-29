@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  SafeAreaView,
+  
   StatusBar,
   TouchableOpacity,
   ScrollView,
@@ -11,6 +11,7 @@ import {
   Platform,
   Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useReviewsStore } from "@/store/academyReviewStore";

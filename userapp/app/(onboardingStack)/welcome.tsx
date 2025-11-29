@@ -347,10 +347,10 @@ const NavigationSection: FC<{
 const WelcomeScreen: FC = () => {
   const router = useRouter();
   const handleSignUp = () => {
-    router.push('/auth/sign-up');
+    router.push('/(homeScreenTabs)');
   };
   const handleSignIn = () => {
-    router.push('/auth/sign-in');
+    router.push('/(homeScreenTabs)');
   };
   return (
     <SafeAreaView className="flex-1">

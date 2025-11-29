@@ -114,7 +114,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
             <Animated.View
               entering={FadeIn.delay(4000)}
               exiting={FadeOut.duration(EXIT_DURATION)}
-              className="bg-slate-900 rounded-xl"
+              className="bg-white rounded-xl"
             >
               <Image
                 style={{ width: 224, height: 224 }}
