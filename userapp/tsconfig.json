@@ -12,5 +12,5 @@
     "**/*.ts",
     "**/*.tsx",
     "nativewind-env.d.ts"
-, "app/(venue)/VenueBooking/venueDetails", "app/(football)/startTournament/[tournamentId]"  ]
+, "app/(venue)/VenueBooking/venueDetails", "app/(football)/startTournament/[tournamentId]", "../partnerapp/components/AttendanceCard.tsx"  ]
 }

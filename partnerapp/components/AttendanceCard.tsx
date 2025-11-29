@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
-import { Student } from "../types";
+import { Student } from "../../userapp/types";
 
 interface AttendanceCardProps {
   student: Student;
