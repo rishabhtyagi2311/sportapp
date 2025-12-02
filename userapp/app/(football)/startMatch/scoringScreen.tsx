@@ -173,45 +173,65 @@ export default function MatchScoringScreen() {
   }, []);
 
   const handleCreateEvent = useCallback(() => {
-    if (!selectedEventType || !selectedPlayer || !eventMinute.trim() || !selectedTeam || !matchData || !activeMatch) {
-      Alert.alert('Error', 'Please fill all required fields');
-      return;
-    }
-    const minute = parseInt(eventMinute, 10);
-    const seconds = parseInt(eventMinute.split(":")[1], 10);
-    if (isNaN(minute) || minute < 1) {
-      Alert.alert('Error', 'Invalid minute');
-      return;
-    }
-    const eventData = {
-      teamId: selectedTeam === 'my' ? matchData.myTeam.teamId : matchData.opponentTeam.teamId,
-      eventType: selectedEventType as any,
-      eventSubType: selectedSubType as any,
-      playerId: selectedPlayer.id,
-      playerName: selectedPlayer.name,
-      assistPlayerId: selectedAssistPlayer?.id,
-      assistPlayerName: selectedAssistPlayer?.name,
-      minute,
-      seconds,
-      isExtraTime: isInExtraTime,
-    };
-    addEvent(eventData);
-    setShowEventModal(false);
-    resetEventForm();
-  }, [
-    selectedEventType,
-    selectedPlayer,
-    selectedAssistPlayer,
-    selectedTeam,
-    eventMinute,
-    selectedSubType,
-    matchData,
-    activeMatch,
-    addEvent,
-    resetEventForm,
-    isInExtraTime,
-  ]);
+  if (!selectedEventType || !selectedPlayer || !eventMinute.trim() || !selectedTeam || !matchData || !activeMatch) {
+    Alert.alert('Error', 'Please fill all required fields');
+    return;
+  }
 
+  let minute: number;
+  let seconds: number = 0;
+
+  // Check if eventMinute contains a colon (formatted timer like "01:23")
+  if (eventMinute.includes(':')) {
+    const parts = eventMinute.split(':');
+    minute = parseInt(parts[0], 10);
+    seconds = parseInt(parts[1], 10);
+  } else {
+    // Plain minute input (just a number like "45")
+    minute = parseInt(eventMinute, 10);
+    seconds = 0;
+  }
+
+  // Validation
+  if (isNaN(minute) || minute < 0 || minute > 120) {
+    Alert.alert('Error', 'Invalid minute. Please enter a value between 0 and 120');
+    return;
+  }
+
+  if (isNaN(seconds) || seconds < 0 || seconds > 59) {
+    Alert.alert('Error', 'Invalid seconds. Please enter a value between 0 and 59');
+    return;
+  }
+
+  const eventData = {
+    teamId: selectedTeam === 'my' ? matchData.myTeam.teamId : matchData.opponentTeam.teamId,
+    eventType: selectedEventType as any,
+    eventSubType: selectedSubType as any,
+    playerId: selectedPlayer.id,
+    playerName: selectedPlayer.name,
+    assistPlayerId: selectedAssistPlayer?.id,
+    assistPlayerName: selectedAssistPlayer?.name,
+    minute,
+    seconds,
+    isExtraTime: isInExtraTime,
+  };
+
+  addEvent(eventData);
+  setShowEventModal(false);
+  resetEventForm();
+}, [
+  selectedEventType,
+  selectedPlayer,
+  selectedAssistPlayer,
+  selectedTeam,
+  eventMinute,
+  selectedSubType,
+  matchData,
+  activeMatch,
+  addEvent,
+  resetEventForm,
+  isInExtraTime,
+]);
   const handleEndMatch = useCallback(() => {
     Alert.alert(
       'End Match',

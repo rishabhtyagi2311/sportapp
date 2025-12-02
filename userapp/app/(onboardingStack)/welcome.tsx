@@ -134,11 +134,7 @@ const HeroSection: FC = () => {
           <Text style={{ color: COLORS.logoGreen }}> Win.</Text>
         </Text>
       </Animated.View>
-      <Animated.View style={descStyle}>
-        <Text className="text-base text-center font-medium leading-6 text-sky-700" >
-          One platform. Academies. Venues. Tournaments.
-        </Text>
-      </Animated.View>
+     
     </View>
   );
 };
@@ -214,82 +210,7 @@ const CreateAccountSection: FC<{ onSignUp: () => void }> = ({ onSignUp }) => {
   );
 };
 
-// Feature Blob Component
-const FeatureBlob: FC<{
-  title: string;
-  description: string;
-  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-  gradientStart: string;
-  gradientEnd: string;
-  rotation?: number;
-}> = ({
-  title,
-  description,
-  icon,
-  gradientStart,
-  gradientEnd,
-  rotation = 0,
-}) => {
-  const translateX = useSharedValue(100);
-  const opacity = useSharedValue(0);
-  useEffect(() => {
-    translateX.value = withTiming(0, { duration: 1000, easing: Easing.out(Easing.cubic) });
-    opacity.value = withTiming(1, { duration: 1000 });
-  }, []);
-  const cardStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-    opacity: opacity.value,
-  }));
-  return (
-    <Animated.View style={[cardStyle]} className="w-full my-4">
-      <View
-        className="rounded-3xl p-6 min-h-56 justify-between overflow-hidden"
-        style={[
-          {
-            backgroundColor: gradientStart,
-            borderColor: gradientEnd,
-            borderWidth: 2,
-            transform: [{ rotate: `${rotation}deg` }],
-          },
-        ]}
-      >
-        {/* Corner Decorations */}
-        <View
-          className="absolute top-0 left-0 w-10 h-10"
-          style={{ backgroundColor: gradientEnd }}
-        />
-        <View
-          className="absolute bottom-0 right-0 w-10 h-10"
-          style={{ backgroundColor: gradientEnd }}
-        />
-        {/* Icon Container */}
-        <View
-          className="w-18 h-18 rounded-2xl justify-center items-center mb-4"
-          style={{ backgroundColor: gradientEnd }}
-        >
-          <MaterialCommunityIcons name={icon} size={48} color={COLORS.white} />
-        </View>
-        {/* Content */}
-        <View className="flex-1">
-          <Text className="text-2xl font-black mb-2 text-white leading-8">
-            {title}
-          </Text>
-          <Text
-            className="text-sm font-medium leading-6"
-            style={{ color: `${COLORS.white}E6` }}
-          >
-            {description}
-          </Text>
-        </View>
-        {/* Accent Line */}
-        <View
-          className="h-1 mt-4 rounded-full w-1/4"
-          style={{ backgroundColor: gradientEnd }}
-        />
-      </View>
-    </Animated.View>
-  );
-};
+
 
 // Navigation Section - Premium Design
 const NavigationSection: FC<{
@@ -312,7 +233,7 @@ const NavigationSection: FC<{
   }));
   
   return (
-    <Animated.View style={[containerStyle]} className="absolute bottom-0 left-0 right-0 px-6 py-6">
+    <Animated.View style={[containerStyle]} className="absolute bottom-12 left-0 right-0 px-6 py-6">
       <Animated.View style={[buttonStyle]}>
         <Pressable
           onPress={onSignIn}
@@ -330,7 +251,7 @@ const NavigationSection: FC<{
             <MaterialCommunityIcons name="login-variant" size={22} color={COLORS.logoGreen} />
             <View>
               <Text className="text-xs font-semibold" style={{ color: COLORS.skyBlue400 }}>
-                Welcome Back
+                Already have an Account ? 
               </Text>
               <Text className="text-sm font-black" style={{ color: COLORS.navyBlue }}>
                 Sign In
@@ -347,7 +268,7 @@ const NavigationSection: FC<{
 const WelcomeScreen: FC = () => {
   const router = useRouter();
   const handleSignUp = () => {
-    router.push('/(homeScreenTabs)');
+    router.push('/(onboardingStack)/basicInfoRegisterOne');
   };
   const handleSignIn = () => {
     router.push('/(homeScreenTabs)');
@@ -382,47 +303,7 @@ const WelcomeScreen: FC = () => {
         {/* Create Account Section - Replaces Stats */}
         <CreateAccountSection onSignUp={handleSignUp} />
         
-        <View className="my-4">
-          <Text className="text-2xl font-black text-black">Everything You Need</Text>
-        </View>
-        <FeatureBlob
-          title="Academies"
-          description="Find elite training centers, book demos, track progress, and build champions."
-          icon="school"
-          gradientStart={COLORS.logoGreen}
-          gradientEnd={COLORS.logoGreen}
-          rotation={-2}
-        />
-        <View className="flex-row gap-3 my-4">
-          <View className="flex-1">
-            <FeatureBlob
-              title="Venues"
-              description="Book grounds, check slots instantly"
-              icon="map-marker-multiple"
-              gradientStart={COLORS.skyBlue400}
-              gradientEnd={COLORS.skyBlue400}
-              rotation={2}
-            />
-          </View>
-          <View className="flex-1">
-            <FeatureBlob
-              title="Tournaments"
-              description="Create leagues and compete"
-              icon="trophy-outline"
-              gradientStart={COLORS.logoRed}
-              gradientEnd={COLORS.logoRed}
-              rotation={-2}
-            />
-          </View>
-        </View>
-        <FeatureBlob
-          title="Live Scoring"
-          description="Real-time match updates with live scoring boards and instant standings"
-          icon="scoreboard"
-          gradientStart={COLORS.brown300}
-          gradientEnd={COLORS.brown300}
-          rotation={1}
-        />
+       
         
       </ScrollView>
       <NavigationSection onSignIn={handleSignIn} />
