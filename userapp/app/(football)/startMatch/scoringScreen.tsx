@@ -75,6 +75,18 @@ const EVENT_CONFIGS = {
   },
 };
 
+// Helper function to get card color based on event type and sub type
+const getCardColor = (eventType: string, eventSubType?: string): string => {
+  if (eventType === 'card') {
+    if (eventSubType === 'red_card' || eventSubType === 'second_yellow') {
+      return '#ef4444'; // Red
+    } else if (eventSubType === 'yellow_card') {
+      return '#fbbf24'; // Yellow
+    }
+  }
+  return '#f59e0b'; // Default orange for card
+};
+
 export default function MatchScoringScreen() {
   const router = useRouter();
   const { matchData } = useMatchCreationStore();
@@ -86,7 +98,6 @@ export default function MatchScoringScreen() {
     endMatch,
     updateLiveMatch,
   } = useMatchExecutionStore();
-
   const extraTimeAllowed = matchData?.matchSettings?.extraTimeAllowed;
   const extraTime = matchData?.matchSettings?.extraTimeDuration ?? 0;
 
@@ -173,65 +184,66 @@ export default function MatchScoringScreen() {
   }, []);
 
   const handleCreateEvent = useCallback(() => {
-  if (!selectedEventType || !selectedPlayer || !eventMinute.trim() || !selectedTeam || !matchData || !activeMatch) {
-    Alert.alert('Error', 'Please fill all required fields');
-    return;
-  }
+    if (!selectedEventType || !selectedPlayer || !eventMinute.trim() || !selectedTeam || !matchData || !activeMatch) {
+      Alert.alert('Error', 'Please fill all required fields');
+      return;
+    }
 
-  let minute: number;
-  let seconds: number = 0;
+    let minute: number;
+    let seconds: number = 0;
 
-  // Check if eventMinute contains a colon (formatted timer like "01:23")
-  if (eventMinute.includes(':')) {
-    const parts = eventMinute.split(':');
-    minute = parseInt(parts[0], 10);
-    seconds = parseInt(parts[1], 10);
-  } else {
-    // Plain minute input (just a number like "45")
-    minute = parseInt(eventMinute, 10);
-    seconds = 0;
-  }
+    // Check if eventMinute contains a colon (formatted timer like "01:23")
+    if (eventMinute.includes(':')) {
+      const parts = eventMinute.split(':');
+      minute = parseInt(parts[0], 10);
+      seconds = parseInt(parts[1], 10);
+    } else {
+      // Plain minute input (just a number like "45")
+      minute = parseInt(eventMinute, 10);
+      seconds = 0;
+    }
 
-  // Validation
-  if (isNaN(minute) || minute < 0 || minute > 120) {
-    Alert.alert('Error', 'Invalid minute. Please enter a value between 0 and 120');
-    return;
-  }
+    // Validation
+    if (isNaN(minute) || minute < 0 || minute > 120) {
+      Alert.alert('Error', 'Invalid minute. Please enter a value between 0 and 120');
+      return;
+    }
 
-  if (isNaN(seconds) || seconds < 0 || seconds > 59) {
-    Alert.alert('Error', 'Invalid seconds. Please enter a value between 0 and 59');
-    return;
-  }
+    if (isNaN(seconds) || seconds < 0 || seconds > 59) {
+      Alert.alert('Error', 'Invalid seconds. Please enter a value between 0 and 59');
+      return;
+    }
 
-  const eventData = {
-    teamId: selectedTeam === 'my' ? matchData.myTeam.teamId : matchData.opponentTeam.teamId,
-    eventType: selectedEventType as any,
-    eventSubType: selectedSubType as any,
-    playerId: selectedPlayer.id,
-    playerName: selectedPlayer.name,
-    assistPlayerId: selectedAssistPlayer?.id,
-    assistPlayerName: selectedAssistPlayer?.name,
-    minute,
-    seconds,
-    isExtraTime: isInExtraTime,
-  };
+    const eventData = {
+      teamId: selectedTeam === 'my' ? matchData.myTeam.teamId : matchData.opponentTeam.teamId,
+      eventType: selectedEventType as any,
+      eventSubType: selectedSubType as any,
+      playerId: selectedPlayer.id,
+      playerName: selectedPlayer.name,
+      assistPlayerId: selectedAssistPlayer?.id,
+      assistPlayerName: selectedAssistPlayer?.name,
+      minute,
+      seconds,
+      isExtraTime: isInExtraTime,
+    };
 
-  addEvent(eventData);
-  setShowEventModal(false);
-  resetEventForm();
-}, [
-  selectedEventType,
-  selectedPlayer,
-  selectedAssistPlayer,
-  selectedTeam,
-  eventMinute,
-  selectedSubType,
-  matchData,
-  activeMatch,
-  addEvent,
-  resetEventForm,
-  isInExtraTime,
-]);
+    addEvent(eventData);
+    setShowEventModal(false);
+    resetEventForm();
+  }, [
+    selectedEventType,
+    selectedPlayer,
+    selectedAssistPlayer,
+    selectedTeam,
+    eventMinute,
+    selectedSubType,
+    matchData,
+    activeMatch,
+    addEvent,
+    resetEventForm,
+    isInExtraTime,
+  ]);
+
   const handleEndMatch = useCallback(() => {
     Alert.alert(
       'End Match',
@@ -264,7 +276,9 @@ export default function MatchScoringScreen() {
   const renderEventCard = useCallback((event: MatchEvent) => {
     const config = EVENT_CONFIGS[event.eventType as keyof typeof EVENT_CONFIGS];
     if (!config) return null;
+
     const isMyTeam = event.teamId === matchData?.myTeam?.teamId;
+
     return (
       <View key={event.id} className="flex-row mb-4">
         <View className="bg-slate-800 rounded-l-xl py-3 px-4 items-center justify-center">
@@ -276,9 +290,15 @@ export default function MatchScoringScreen() {
         >
           <View className={`flex-row items-center ${isMyTeam ? 'justify-start' : 'justify-end'}`}>
             {isMyTeam && (
-              <View className="w-8 h-8 rounded-full items-center justify-center mr-3" style={{ backgroundColor: config.color }}>
-                <Ionicons name={config.icon} size={16} color="white" />
-              </View>
+              <>
+                {event.eventType === 'card' ? (
+                  <View className="w-8 h-12 rounded-sm items-center justify-center mr-3" style={{ backgroundColor: getCardColor(event.eventType, event.eventSubType) }} />
+                ) : (
+                  <View className="w-8 h-8 rounded-full items-center justify-center mr-3" style={{ backgroundColor: config.color }}>
+                    <Ionicons name={config.icon} size={16} color="white" />
+                  </View>
+                )}
+              </>
             )}
             <View className={isMyTeam ? 'items-start' : 'items-end'}>
               <Text className="text-base font-bold text-slate-900">
@@ -294,9 +314,15 @@ export default function MatchScoringScreen() {
               </Text>
             </View>
             {!isMyTeam && (
-              <View className="w-8 h-8 rounded-full items-center justify-center ml-3" style={{ backgroundColor: config.color }}>
-                <Ionicons name={config.icon} size={16} color="white" />
-              </View>
+              <>
+                {event.eventType === 'card' ? (
+                  <View className="w-8 h-12 rounded-sm items-center justify-center ml-3" style={{ backgroundColor: getCardColor(event.eventType, event.eventSubType) }} />
+                ) : (
+                  <View className="w-8 h-8 rounded-full items-center justify-center ml-3" style={{ backgroundColor: config.color }}>
+                    <Ionicons name={config.icon} size={16} color="white" />
+                  </View>
+                )}
+              </>
             )}
           </View>
         </View>
@@ -331,7 +357,6 @@ export default function MatchScoringScreen() {
               
             </View>
           </SafeAreaView>
-
           {/* Score */}
           <View className="flex-1 justify-center px-4 mb-16">
             <View className="flex-row items-center justify-between">
@@ -342,11 +367,9 @@ export default function MatchScoringScreen() {
                 <Text className="text-white text-sm font-medium text-center mb-1">{matchData.myTeam.teamName}</Text>
                 <Text className="text-white text-4xl font-bold">{myTeamScore}</Text>
               </TouchableOpacity>
-
               <View className="px-8">
                 <Text className="text-white text-2xl font-bold">VS</Text>
               </View>
-
               <TouchableOpacity onPress={() => handleAddEvent('opponent')} className="items-center flex-1">
                 <View className="w-20 h-20 bg-white/20 rounded-full items-center justify-center mb-2 border-2 border-white/30">
                   <Ionicons name="shield-outline" size={40} color="white" />
@@ -383,7 +406,6 @@ export default function MatchScoringScreen() {
             <Ionicons name={isTimerRunning ? 'pause' : 'play'} size={22} color="white" />
           </TouchableOpacity>
         </View>
-
         {/* Center: End Match (largest, centered) */}
         <View className="flex-1 items-center">
           <TouchableOpacity
@@ -397,7 +419,6 @@ export default function MatchScoringScreen() {
             </View>
           </TouchableOpacity>
         </View>
-
         {/* Right: Extra time indicator (small). Only when allowed and duration > 0 */}
         {extraTimeAllowed && extraTimeMinutes > 0 ? (
           <View className="w-24 items-center">
@@ -436,7 +457,6 @@ export default function MatchScoringScreen() {
                 <Text className="text-white font-semibold">Save</Text>
               </TouchableOpacity>
             </View>
-
             <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {/* Event Type selection */}
               <Text className="text-lg font-bold text-slate-900 mb-3">Event Type</Text>
@@ -447,9 +467,13 @@ export default function MatchScoringScreen() {
                     onPress={() => { setSelectedEventType(key); setSelectedSubType(null); }}
                     className={`flex-row items-center px-4 py-3 rounded-xl border ${selectedEventType === key ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'}`}
                   >
-                    <View className="w-6 h-6 rounded-full items-center justify-center mr-2" style={{ backgroundColor: config.color }}>
-                      <Ionicons name={config.icon} size={12} color="white" />
-                    </View>
+                    {key === 'card' ? (
+                      <View className="w-5 h-7 rounded-sm mr-2" style={{ backgroundColor: config.color }} />
+                    ) : (
+                      <View className="w-6 h-6 rounded-full items-center justify-center mr-2" style={{ backgroundColor: config.color }}>
+                        <Ionicons name={config.icon} size={12} color="white" />
+                      </View>
+                    )}
                     <Text className={`font-medium ${selectedEventType === key ? 'text-blue-700' : 'text-slate-700'}`}>{config.name}</Text>
                   </TouchableOpacity>
                 ))}
