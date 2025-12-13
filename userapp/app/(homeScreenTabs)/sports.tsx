@@ -1,42 +1,77 @@
-// app/(homeScreenTabs)/sports.tsx - CLEAN VERSION
-import { View, Text, TouchableOpacity, ScrollView, ImageBackground } from 'react-native';
+// app/(homeScreenTabs)/sports.tsx
+import { View, Text, TouchableOpacity, Image, ImageBackground } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
 export default function SportsScreen() {
   
-  const navigateToFootball = () => {
-    console.log('🏈 Navigating to football matches...');
-    router.push('/(football)/createFootballProfile'); 
+  const navigateToSport = (sport: string) => {
+    console.log(`🎯 Navigating to ${sport}...`);
+    if (sport === 'football') {
+      router.push('/(football)/createFootballProfile');
+    } else if (sport === 'cricket') {
+      router.push('/(cricket)/createCricketProfile');
+    } else if (sport === 'tennis') {
+      router.push('/(tennis)/createTennisProfile');
+    }
   };
 
+  const sportIcons = [
+    {
+      id: 'football',
+      name: 'Football',
+      icon: require('../../assets/images/football-icon.png'),
+    },
+    {
+      id: 'cricket',
+      name: 'Cricket',
+      icon: require('../../assets/images/cricket-icon.png'),
+    },
+    {
+      id: 'tennis',
+      name: 'Tennis',
+      icon: require('../../assets/images/tennis-icon.png'),
+    },
+  ];
+
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <ScrollView className="bg-sky-100 px-5 py-6 flex-1">
-        
-        {/* Football Card */}
-        <TouchableOpacity
-          onPress={navigateToFootball}
-          className="rounded-xl mb-4 shadow-md overflow-hidden mt-2"
-          activeOpacity={0.8}
-        >
-          <ImageBackground
-            source={require('../../assets/images/footballcard.png')} 
-            className="h-48 w-full justify-end"
-            imageStyle={{ borderRadius: 12 }}
-          >
-            <View className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-xl" />
-            
-            <View className="absolute bottom-4 left-4 z-10">
-              <Text className="text-white text-3xl font-extrabold mb-1 font-serif">
-                Football
-              </Text>
-            </View>
-          </ImageBackground>
-        </TouchableOpacity>
-        
-        {/* Add more sports cards below */}
-      </ScrollView>
+    <SafeAreaView className="flex-1">
+      <ImageBackground
+        source={require('../../assets/images/background.png')}
+        className="flex-1"
+        resizeMode="cover"
+      >
+        {/* Overlay for better visibility of icons */}
+        <View className="absolute inset-0 bg-black/20" />
+
+        {/* Sports Icons Container - Left Middle */}
+        <View className="flex-1 justify-center pl-6">
+          <View className="gap-8">
+            {sportIcons.map((sport) => (
+              <TouchableOpacity
+                key={sport.id}
+                onPress={() => navigateToSport(sport.id)}
+                className="items-center"
+                activeOpacity={0.7}
+              >
+                {/* Icon with shadow and background */}
+                <View className="rounded-full bg-white/90 p-4 shadow-lg">
+                  <Image
+                    source={sport.icon}
+                    className="w-16 h-16"
+                    resizeMode="contain"
+                  />
+                </View>
+                
+                {/* Sport Name */}
+                <Text className="text-white font-bold text-lg mt-3 text-center font-sans">
+                  {sport.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </ImageBackground>
     </SafeAreaView>
   );
 }
