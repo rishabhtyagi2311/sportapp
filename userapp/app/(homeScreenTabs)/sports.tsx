@@ -20,33 +20,33 @@ export default function SportsScreen() {
     {
       id: 'football',
       name: 'Football',
-      icon: require('../../assets/images/football-icon.png'),
+      icon: require('@/assets/images/footballIcon.png'),
     },
     {
       id: 'cricket',
       name: 'Cricket',
-      icon: require('../../assets/images/cricket-icon.png'),
+      icon: require('@/assets/images/cricketIcon.png'),
     },
     {
       id: 'tennis',
       name: 'Tennis',
-      icon: require('../../assets/images/tennis-icon.png'),
+      icon: require('@/assets/images/tennisIcon.png'),
     },
   ];
 
   return (
     <SafeAreaView className="flex-1">
       <ImageBackground
-        source={require('../../assets/images/background.png')}
+        source={require('@/assets/images/coverImageNew.png')}
         className="flex-1"
         resizeMode="cover"
       >
         {/* Overlay for better visibility of icons */}
         <View className="absolute inset-0 bg-black/20" />
 
-        {/* Sports Icons Container - Left Middle */}
+        {/* Sports Icons Container - Left Middle - Horizontal */}
         <View className="flex-1 justify-center pl-6">
-          <View className="gap-8">
+          <View className="flex-row gap-8">
             {sportIcons.map((sport) => (
               <TouchableOpacity
                 key={sport.id}
@@ -55,10 +55,10 @@ export default function SportsScreen() {
                 activeOpacity={0.7}
               >
                 {/* Icon with shadow and background */}
-                <View className="rounded-full bg-white/90 p-4 shadow-lg">
+                <View className="rounded-full bg-white p-4 shadow-lg">
                   <Image
                     source={sport.icon}
-                    className="w-16 h-16"
+                    className="w-12 h-12"
                     resizeMode="contain"
                   />
                 </View>
