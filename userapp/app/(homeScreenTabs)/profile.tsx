@@ -1,41 +1,77 @@
 import React from 'react'
-import { View, Text, ScrollView, TouchableOpacity, Alert, useWindowDimensions } from 'react-native'
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  useWindowDimensions,
+  Image,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialIcons, Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
+import * as ImagePicker from 'expo-image-picker'
 import signUpStore from '@/store/signUpStore'
 
 export default function ProfileScreen() {
   const router = useRouter()
   const { width } = useWindowDimensions()
-  const { firstName, lastName, email, contact, dob, city } = signUpStore()
 
-  // Responsive sizing
+  const {
+    firstName,
+    lastName,
+    email,
+    contact,
+    dob,
+    city,
+    profileImage,
+    setProfileImage,
+  } = signUpStore()
+
+  /* ---------------- Responsive sizing ---------------- */
   const isSmallScreen = width < 380
   const isMediumScreen = width >= 380 && width < 450
-  const isLargeScreen = width >= 450
 
   const profilePicSize = isSmallScreen ? 100 : isMediumScreen ? 120 : 140
-  const profileIconSize = isSmallScreen ? 50 : isMediumScreen ? 60 : 70
+  const profileIconSize = isSmallScreen ? 48 : isMediumScreen ? 60 : 72
 
-  // Calculate age from DOB
+  /* ---------------- Helpers ---------------- */
   const calculateAge = (dateString: string) => {
     if (!dateString) return 'N/A'
     const today = new Date()
     const birthDate = new Date(dateString)
     let age = today.getFullYear() - birthDate.getFullYear()
-    const monthDiff = today.getMonth() - birthDate.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--
-    }
+    const m = today.getMonth() - birthDate.getMonth()
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--
     return age.toString()
+  }
+
+  const handlePickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!permission.granted) {
+      Alert.alert('Permission required', 'Please allow gallery access')
+      return
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    })
+
+    if (!result.canceled) {
+      setProfileImage(result.assets[0].uri)
+    }
   }
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', onPress: () => {}, style: 'cancel' },
+      { text: 'Cancel', style: 'cancel' },
       {
         text: 'Logout',
+        style: 'destructive',
         onPress: () => {
           signUpStore.setState({
             firstName: '',
@@ -44,14 +80,15 @@ export default function ProfileScreen() {
             contact: '',
             city: '',
             dob: '',
+            profileImage: '',
           })
           router.replace('/(onboardingStack)/basicInfoRegisterOne')
         },
-        style: 'destructive',
       },
     ])
   }
 
+  /* ---------------- UI helpers ---------------- */
   const ProfileSection = ({
     title,
     children,
@@ -59,11 +96,11 @@ export default function ProfileScreen() {
     title: string
     children: React.ReactNode
   }) => (
-    <View className={`mb-6 ${isSmallScreen ? 'px-3' : isMediumScreen ? 'px-4' : 'px-6'}`}>
+    <View className="mb-6 px-5">
       <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
         {title}
       </Text>
-      <View className="bg-slate-800 rounded-2xl overflow-hidden border border-slate-700">
+      <View className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
         {children}
       </View>
     </View>
@@ -95,21 +132,23 @@ export default function ProfileScreen() {
         >
           {icon}
         </View>
+
         <View className="ml-4 flex-1">
           <Text
             className={`font-semibold ${
               isDestructive ? 'text-red-500' : 'text-white'
-            } ${isSmallScreen ? 'text-sm' : 'text-base'}`}
+            }`}
           >
             {label}
           </Text>
           {value && (
-            <Text className="text-xs text-slate-400 mt-1.5" numberOfLines={1}>
+            <Text className="text-xs text-slate-400 mt-1" numberOfLines={1}>
               {value}
             </Text>
           )}
         </View>
       </View>
+
       <MaterialIcons
         name="chevron-right"
         size={24}
@@ -118,179 +157,128 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   )
 
-  const fullName = `${firstName} ${lastName}`.trim()
-  const displayName = fullName || 'User Profile'
-  const displayContact = contact || '+1 (555) 000-0000'
+  /* ---------------- Display values ---------------- */
+  const fullName = `${firstName} ${lastName}`.trim() || 'User Profile'
   const displayEmail = email || 'email@example.com'
+  const displayContact = contact || 'Not provided'
   const displayCity = city || 'City not set'
-  const userAge = calculateAge(dob)
+  const age = calculateAge(dob)
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-900" edges={['top', 'left', 'right']}>
+    <SafeAreaView className="flex-1 bg-slate-900">
       <ScrollView
-        className="flex-1"
         showsVerticalScrollIndicator={false}
-        bounces={true}
-        scrollEventThrottle={16}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
-        {/* Top Spacing */}
-        <View className="h-6" />
-
-        {/* Hero Profile Section */}
-        <View className="bg-gradient-to-b from-slate-800 to-slate-900 pt-4 pb-8">
-          <View
-            className={`${
-              isSmallScreen ? 'px-4' : isMediumScreen ? 'px-5' : 'px-8'
-            }`}
-          >
-            {/* Profile Picture */}
-            <View className="items-center mb-6">
+        {/* ---------------- Header ---------------- */}
+        <View className="pt-6 pb-8 px-5 bg-slate-800">
+          {/* Profile Image */}
+          <View className="items-center mb-5">
+            <TouchableOpacity onPress={handlePickImage} activeOpacity={0.85}>
               <View
                 style={{ width: profilePicSize, height: profilePicSize }}
-                className="rounded-full bg-gradient-to-br from-slate-700 to-slate-800 items-center justify-center border-2 border-slate-600 shadow-lg"
+                className="rounded-full border-2 border-slate-600 bg-slate-700 overflow-hidden items-center justify-center"
               >
-                <Ionicons
-                  name="person"
-                  size={profileIconSize}
-                  color="#e2e8f0"
-                />
+                {profileImage ? (
+                  <Image
+                    source={{ uri: profileImage }}
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                ) : (
+                  <Ionicons
+                    name="person"
+                    size={profileIconSize}
+                    color="#e2e8f0"
+                  />
+                )}
               </View>
-            </View>
 
-            {/* User Info */}
-            <View className="items-center mb-6">
-              <Text
-                className={`font-bold text-white text-center ${
-                  isSmallScreen ? 'text-2xl' : isMediumScreen ? 'text-3xl' : 'text-4xl'
-                }`}
-                numberOfLines={1}
-              >
-                {displayName}
-              </Text>
-              <Text className="text-slate-400 mt-1.5 text-sm">
-                {displayCity}
-              </Text>
-            </View>
+              <View className="absolute bottom-1 right-1 bg-slate-900 p-2 rounded-full border border-slate-700">
+                <MaterialIcons name="photo-camera" size={18} color="#e2e8f0" />
+              </View>
+            </TouchableOpacity>
 
-            {/* Quick Stats */}
-            <View className="flex-row justify-around gap-3">
-              <View className="flex-1 bg-slate-700/50 rounded-xl py-3 px-4 border border-slate-600">
-                <Text className="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">
-                  Age
-                </Text>
-                <Text className="text-white font-bold text-lg">{userAge}</Text>
-              </View>
-              <View className="flex-1 bg-slate-700/50 rounded-xl py-3 px-4 border border-slate-600">
-                <Text className="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">
-                  Contact
-                </Text>
-                <Text className="text-white font-bold text-sm truncate">
-                  {displayContact}
-                </Text>
-              </View>
+            <Text className="text-slate-400 text-xs mt-2">
+              Tap to change profile photo
+            </Text>
+          </View>
+
+          {/* Name & City */}
+          <View className="items-center">
+            <Text className="text-white text-3xl font-bold" numberOfLines={1}>
+              {fullName}
+            </Text>
+            <Text className="text-slate-400 mt-1 text-sm">{displayCity}</Text>
+          </View>
+
+          {/* Stats */}
+          <View className="flex-row gap-3 mt-6">
+            <View className="flex-1 bg-slate-700/50 rounded-xl p-4 border border-slate-600">
+              <Text className="text-slate-400 text-xs uppercase">Age</Text>
+              <Text className="text-white font-bold text-lg mt-1">{age}</Text>
+            </View>
+            <View className="flex-1 bg-slate-700/50 rounded-xl p-4 border border-slate-600">
+              <Text className="text-slate-400 text-xs uppercase">Contact</Text>
+              <Text className="text-white font-bold text-sm mt-1" numberOfLines={1}>
+                {displayContact}
+              </Text>
             </View>
           </View>
         </View>
 
-        {/* Contact Details */}
-        <View className={`mt-8 ${isSmallScreen ? 'px-4' : isMediumScreen ? 'px-5' : 'px-6'}`}>
-          <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
-            Contact Information
-          </Text>
-          <View className="bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 p-4 space-y-4">
-            <View className="flex-row items-start gap-3">
-              <View className="w-10 h-10 rounded-full bg-slate-700 items-center justify-center flex-shrink-0 mt-0.5">
-                <MaterialIcons name="phone" size={20} color="#94a3b8" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">
-                  Phone
-                </Text>
-                <Text className="text-white font-medium text-sm">{displayContact}</Text>
-              </View>
+        {/* ---------------- Contact Info ---------------- */}
+        <ProfileSection title="Contact Information">
+          <View className="p-4 space-y-4">
+            <View className="flex-row items-center gap-3">
+              <MaterialIcons name="email" size={20} color="#94a3b8" />
+              <Text className="text-white text-sm">{displayEmail}</Text>
             </View>
-            <View className="border-t border-slate-700" />
-            <View className="flex-row items-start gap-3">
-              <View className="w-10 h-10 rounded-full bg-slate-700 items-center justify-center flex-shrink-0 mt-0.5">
-                <MaterialIcons name="email" size={20} color="#94a3b8" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">
-                  Email
-                </Text>
-                <Text className="text-white font-medium text-sm truncate">
-                  {displayEmail}
-                </Text>
-              </View>
+            <View className="h-px bg-slate-700" />
+            <View className="flex-row items-center gap-3">
+              <MaterialIcons name="phone" size={20} color="#94a3b8" />
+              <Text className="text-white text-sm">{displayContact}</Text>
             </View>
           </View>
-        </View>
+        </ProfileSection>
 
-        {/* Edit Profile Section */}
+        {/* ---------------- Profile ---------------- */}
         <ProfileSection title="Profile">
           <ActionItem
-            icon={<MaterialIcons name="person" size={24} color="#e2e8f0" />}
-            label="Edit Name"
-            value={displayName}
-            onPress={() => router.push('/(tabs)/profile/edit-name')}
-          />
-          <ActionItem
-            icon={<MaterialIcons name="phone" size={24} color="#e2e8f0" />}
-            label="Edit Contact"
-            value={displayContact}
-            onPress={() => router.push('/(tabs)/profile/edit-contact')}
-          />
-          <ActionItem
-            icon={<MaterialIcons name="email" size={24} color="#e2e8f0" />}
-            label="Edit Email"
-            value={displayEmail}
-            onPress={() => router.push('/(tabs)/profile/edit-email')}
+            icon={<MaterialIcons name="edit" size={24} color="#e2e8f0" />}
+            label="Edit Personal Details"
+            value="Name, email, phone, city"
+            onPress={() =>
+              router.push('/(tabs)/profile/edit-personal-details')
+            }
           />
         </ProfileSection>
 
-        {/* Account Section */}
+        {/* ---------------- Account ---------------- */}
         <ProfileSection title="Account">
           <ActionItem
             icon={<MaterialIcons name="vpn-key" size={24} color="#e2e8f0" />}
             label="Change Password"
-            onPress={() => router.push('/(tabs)/profile/change-password')}
+            onPress={() =>
+              router.push('/(tabs)/profile/change-password')
+            }
           />
         </ProfileSection>
 
-        {/* Subscriptions & Features Section */}
-        <ProfileSection title="Subscriptions & Features">
-          <ActionItem
-            icon={<MaterialIcons name="card-membership" size={24} color="#e2e8f0" />}
-            label="Subscriptions"
-            onPress={() => router.push('/(tabs)/profile/subscriptions')}
-          />
-          <ActionItem
-            icon={<MaterialIcons name="event" size={24} color="#e2e8f0" />}
-            label="Events"
-            onPress={() => router.push('/(eventHandling)/eventManaging')}
-          />
-        </ProfileSection>
-
-        {/* Support Section */}
+        {/* ---------------- Support ---------------- */}
         <ProfileSection title="Support">
           <ActionItem
             icon={<MaterialIcons name="help" size={24} color="#e2e8f0" />}
             label="Help & Support"
-            onPress={() => {
-              Alert.alert('Help', 'Support page would open here')
-            }}
+            onPress={() => Alert.alert('Support', 'Support page')}
           />
           <ActionItem
             icon={<MaterialIcons name="info" size={24} color="#e2e8f0" />}
             label="About"
-            onPress={() => {
-              Alert.alert('About', 'App version 1.0.0')
-            }}
+            onPress={() => Alert.alert('About', 'App version 1.0.0')}
           />
         </ProfileSection>
 
-        {/* Danger Zone */}
+        {/* ---------------- Danger Zone ---------------- */}
         <ProfileSection title="Danger Zone">
           <ActionItem
             icon={<MaterialIcons name="logout" size={24} color="#ef4444" />}
@@ -299,7 +287,6 @@ export default function ProfileScreen() {
             isDestructive
           />
         </ProfileSection>
-
       </ScrollView>
     </SafeAreaView>
   )
