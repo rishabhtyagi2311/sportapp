@@ -1,4 +1,3 @@
-// app/splashScreen.tsx
 import React, { useEffect, useState } from "react";
 import { Image, Dimensions } from "react-native";
 import Animated, {
@@ -53,21 +52,32 @@ export const rotateKeyframe = new Keyframe({
   },
 });
 
-type SplashScreenProps = {
+interface SplashScreenProps {
+  ready: boolean;
+  initialRoute: string | null;
   onFinish: () => void;
-};
+}
 
-export default function SplashScreen({ onFinish }: SplashScreenProps) {
+export default function SplashScreen(
+  props: SplashScreenProps
+): React.ReactNode {
+  const { ready, initialRoute, onFinish } = props
   const DURATION = 2600;
   const DELAY = 1300;
 
   // how long total until we start exit
   const MAIN_ANIM_END = 4500; // ms
-  const EXIT_DURATION = 500;  // ms
+  const EXIT_DURATION = 500; // ms
 
   const [showContent, setShowContent] = useState(true);
 
+  // ✅ Only set up timers when ready AND we have a route
   useEffect(() => {
+    if (!ready || !initialRoute) {
+      // Not ready yet, don't start animation timers
+      return;
+    }
+
     // 1) after main animation, trigger exit
     const exitTimer = setTimeout(() => {
       setShowContent(false); // this causes exiting animations to run
@@ -82,20 +92,14 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       clearTimeout(exitTimer);
       clearTimeout(navTimer);
     };
-  }, [onFinish]);
+  }, [ready, initialRoute, onFinish]); // ✅ Added deps
 
   return (
-    <Animated.View
-      className="flex-1 bg-white"
-    
-    >
+    <Animated.View className="flex-1 bg-white">
       {showContent && (
         <>
           {/* Top Section */}
-          <Animated.View
-            entering={topTranslateKeyframe.duration(DURATION).delay(DELAY)}
-            className="flex-1 justify-end"
-          >
+          <Animated.View entering={topTranslateKeyframe.duration(DURATION).delay(DELAY)} className="flex-1 justify-end">
             <Animated.View
               entering={rotateKeyframe.duration(DURATION).delay(DELAY)}
               exiting={RotateOutDownLeft.duration(EXIT_DURATION)}

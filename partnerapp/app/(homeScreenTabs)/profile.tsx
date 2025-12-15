@@ -1,12 +1,14 @@
+
 import React from "react";
-import { View, Text } from "react-native";
+import { View, Text, ScrollView, SafeAreaView } from "react-native";
 
-
-export default function Home()
-{
+export default function ProfileScreen() {
   return (
-    <View>
-      <Text>kwswbqnv</Text> 
-    </View>
-  )
+    <SafeAreaView className="flex-1 bg-slate-50">
+      <View className="flex-1 px-6 py-6">
+        <Text className="text-3xl font-bold text-slate-900 mb-2">Profile</Text>
+        <Text className="text-slate-600">Profile coming soon</Text>
+      </View>
+    </SafeAreaView>
+  );
 }

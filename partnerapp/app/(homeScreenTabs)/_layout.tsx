@@ -47,9 +47,7 @@ export default function TabLayout() {
           if (route.name === 'index') {
             iconName = focused ? 'home' : 'home-outline';
           } 
-          else if (route.name === 'sports') {
-            iconName = focused ? 'trophy' : 'trophy-outline';
-          } 
+        
           else if (route.name === 'academy') {
             iconName = focused ? 'apps' : 'apps-outline';
           } 

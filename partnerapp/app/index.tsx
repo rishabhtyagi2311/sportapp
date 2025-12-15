@@ -3,15 +3,13 @@ import "react-native-gesture-handler";
 
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
+import { View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import SplashScreen from "./splashScreen";
 
-// 🔥 Pull correct route type from expo-router
-type RouterReplaceArg = Parameters<typeof router.replace>[0];
-
 export default function Index() {
-  const [initialRoute, setInitialRoute] =
-    useState<RouterReplaceArg | null>(null);
+  // ✅ Use string | null instead of complex RouterReplaceArg type
+  const [initialRoute, setInitialRoute] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
   console.log("[Index] render. ready =", ready, "initialRoute =", initialRoute);
@@ -41,24 +39,14 @@ export default function Index() {
     checkAuth();
   }, []);
 
-  // Keep native splash while deciding
-  if (!ready || !initialRoute) {
-    console.log(
-      "[Index] not ready yet, returning null to keep native splash visible"
-    );
-    return null;
-  }
-
-  console.log(
-    "[Index] ready, rendering SplashScreen that will navigate to",
-    initialRoute
-  );
-
+  // ✅ Always render SplashScreen
   return (
     <SplashScreen
+      ready={ready}
+      initialRoute={initialRoute}
       onFinish={() => {
         if (initialRoute) {
-          router.replace(initialRoute);
+          router.replace(initialRoute as any); // ✅ Cast as any for complex type
         }
       }}
     />
