@@ -1,13 +1,64 @@
-// stores/bookingStore.ts
+import { create } from 'zustand'
+import { devtools } from 'zustand/middleware'
+import { immer } from 'zustand/middleware/immer'
+import {
+  Venue,
+  Event,
+  Booking,
+  VenueFilters,
+  EventFilters,
+  Sport,
+  Amenity,
+  TimeSlot,
+} from '@/types/booking'
 
-import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
-import { immer } from 'zustand/middleware/immer';
-import { BookingState, Venue, Event, Booking, VenueFilters, EventFilters, Sport, Amenity, TimeSlot } from '../types/booking';
+/* -------------------------------------------------------------------------- */
+/*                                  STATE                                     */
+/* -------------------------------------------------------------------------- */
 
-export const useBookingStore = create<BookingState>()(
+export interface BookingStoreState {
+  // Public catalog
+  venues: Venue[]
+  events: Event[]
+  bookings: Booking[]
+
+  // Master data
+  amenities: Amenity[]
+  sports: Sport[]
+
+  // UI state
+  isLoading: boolean
+  error: string | null
+
+  /* ----------------------------- SETTERS ----------------------------- */
+  setVenues: (venues: Venue[]) => void
+  setEvents: (events: Event[]) => void
+  setAmenities: (amenities: Amenity[]) => void
+  setSports: (sports: Sport[]) => void
+
+  /* ----------------------------- EVENTS (SNAPSHOT) ----------------------------- */
+  addEvent: (event: Event) => void
+  updateEvent: (id: string, update: Partial<Event>) => void
+  deleteEvent: (id: string) => void
+
+  /* ----------------------------- READ ----------------------------- */
+  getVenueById: (id: string) => Venue | undefined
+  getEventById: (id: string) => Event | undefined
+  getEventsByVenue: (venueId: string) => Event[]
+
+  /* ----------------------------- SEARCH ----------------------------- */
+  searchVenues: (query: string, filters?: VenueFilters) => Venue[]
+  searchEvents: (query: string, filters?: EventFilters) => Event[]
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                   STORE                                    */
+/* -------------------------------------------------------------------------- */
+
+export const useBookingStore = create<BookingStoreState>()(
   devtools(
     immer((set, get) => ({
+      /* ---------- INITIAL STATE ---------- */
       venues: [],
       events: [],
       bookings: [],
@@ -16,240 +67,136 @@ export const useBookingStore = create<BookingState>()(
       isLoading: false,
       error: null,
 
-      // Venue actions
-      setVenues: (venues: Venue[]) => set((state) => {
-        state.venues = venues;
-        state.isLoading = false;
-        state.error = null;
-      }),
+      /* ---------- SETTERS ---------- */
+      setVenues: (venues) =>
+        set((state) => {
+          state.venues = venues
+          state.isLoading = false
+          state.error = null
+        }),
 
-      addVenue: (venue: Venue) => set((state) => {
-        state.venues.push(venue);
-      }),
+      setEvents: (events) =>
+        set((state) => {
+          state.events = events
+          state.isLoading = false
+          state.error = null
+        }),
 
-      updateVenue: (id: string, venueUpdate: Partial<Venue>) => set((state) => {
-        const index = state.venues.findIndex((v: Venue) => v.id === id);
-        if (index !== -1) {
-          state.venues[index] = { ...state.venues[index], ...venueUpdate };
-          state.venues[index].updatedAt = new Date().toISOString();
-        }
-      }),
+      setAmenities: (amenities) =>
+        set((state) => {
+          state.amenities = amenities
+        }),
 
-      deleteVenue: (id: string) => set((state) => {
-        state.venues = state.venues.filter((v: Venue) => v.id !== id);
-        // Also remove related events
-        state.events = state.events.filter((e: Event) => e.venueId !== id);
-        // Also remove related bookings
-        state.bookings = state.bookings.filter((b: Booking) => b.venueId !== id);
-      }),
+      setSports: (sports) =>
+        set((state) => {
+          state.sports = sports
+        }),
 
-      // Event actions
-      setEvents: (events: Event[]) => set((state) => {
-        state.events = events;
-        state.isLoading = false;
-        state.error = null;
-      }),
+      /* ---------- EVENT SNAPSHOT (FROM MANAGER) ---------- */
+      addEvent: (event) =>
+        set((state) => {
+          state.events.push(event)
+        }),
 
-      addEvent: (event: Event) => set((state) => {
-        state.events.push(event);
-      }),
+      updateEvent: (id, update) =>
+        set((state) => {
+          const index = state.events.findIndex((e) => e.id === id)
+          if (index !== -1) {
+            state.events[index] = {
+              ...state.events[index],
+              ...update,
+              updatedAt: new Date().toISOString(),
+            }
+          }
+        }),
 
-      updateEvent: (id: string, eventUpdate: Partial<Event>) => set((state) => {
-        const index = state.events.findIndex((e: Event) => e.id === id);
-        if (index !== -1) {
-          state.events[index] = { ...state.events[index], ...eventUpdate };
-          state.events[index].updatedAt = new Date().toISOString();
-        }
-      }),
+      deleteEvent: (id) =>
+        set((state) => {
+          state.events = state.events.filter((e) => e.id !== id)
+        }),
 
-      deleteEvent: (id: string) => set((state) => {
-        state.events = state.events.filter((e: Event) => e.id !== id);
-        // Also remove related bookings
-        state.bookings = state.bookings.filter((b: Booking) => b.eventId !== id);
-      }),
+      /* ---------- READ ---------- */
+      getVenueById: (id) =>
+        get().venues.find((v) => v.id === id),
 
-      // Booking actions
-      setBookings: (bookings: Booking[]) => set((state) => {
-        state.bookings = bookings;
-        state.isLoading = false;
-        state.error = null;
-      }),
+      getEventById: (id) =>
+        get().events.find((e) => e.id === id),
 
-      addBooking: (booking: Booking) => set((state) => {
-        state.bookings.push(booking);
-      }),
+      getEventsByVenue: (venueId) =>
+        get().events.filter((e) => e.venueId === venueId),
 
-      updateBooking: (id: string, bookingUpdate: Partial<Booking>) => set((state) => {
-        const index = state.bookings.findIndex((b: Booking) => b.id === id);
-        if (index !== -1) {
-          state.bookings[index] = { ...state.bookings[index], ...bookingUpdate };
-          state.bookings[index].updatedAt = new Date().toISOString();
-        }
-      }),
+      /* ---------- SEARCH VENUES ---------- */
+      searchVenues: (query, filters) => {
+        let results = get().venues
 
-      // Utility actions
-      getVenueById: (id: string) => {
-        return get().venues.find((v: Venue) => v.id === id);
-      },
-
-      getEventById: (id: string) => {
-        return get().events.find((e: Event) => e.id === id);
-      },
-
-      getEventsByVenue: (venueId: string) => {
-        return get().events.filter((e: Event) => e.venueId === venueId);
-      },
-
-      getVenuesBySport: (sportId: string) => {
-        return get().venues.filter((v: Venue) => 
-          v.sports.some((sport: Sport) => sport.id === sportId)
-        );
-      },
-
-      getVenuesBySportVariety: (sportId: string, varietyId: string) => {
-        return get().venues.filter((v: Venue) => 
-          v.sports.some((sport: Sport) => 
-            sport.id === sportId && 
-            sport.varieties.some((variety) => variety.id === varietyId)
+        if (query.trim()) {
+          const q = query.toLowerCase()
+          results = results.filter(
+            (v) =>
+              v.name.toLowerCase().includes(q) ||
+              v.address.city.toLowerCase().includes(q)
           )
-        );
+        }
+
+        if (filters?.city) {
+          results = results.filter(
+            (v) =>
+              v.address.city.toLowerCase() === filters.city!.toLowerCase()
+          )
+        }
+
+        if (filters?.sports?.length) {
+          results = results.filter((v) =>
+            v.sports.some((s) => filters.sports!.includes(s.id))
+          )
+        }
+
+        return results
       },
 
-      getSportVarietiesBySport: (sportId: string) => {
-        const venues = get().venues;
-        const sport = venues
-          .flatMap(v => v.sports)
-          .find(s => s.id === sportId);
-        
-        return sport ? sport.varieties : [];
-      },
+      /* ---------- SEARCH EVENTS ---------- */
+      searchEvents: (query, filters) => {
+        let results = get().events
 
-      // Search and filter functions
-      searchVenues: (query: string, filters?: VenueFilters) => {
-        const venues = get().venues;
-        let filteredVenues = venues;
-
-        // Text search
         if (query.trim()) {
-          const searchTerm = query.toLowerCase();
-          filteredVenues = filteredVenues.filter((venue: Venue) =>
-            venue.name.toLowerCase().includes(searchTerm) ||
-            venue.address.city.toLowerCase().includes(searchTerm) ||
-            venue.sports.some((sport: Sport) => 
-              sport.name.toLowerCase().includes(searchTerm)
-            )
-          );
+          const q = query.toLowerCase()
+          results = results.filter(
+            (e) =>
+              e.name.toLowerCase().includes(q) ||
+              e.sport.name.toLowerCase().includes(q) ||
+              e.description?.toLowerCase().includes(q)
+          )
         }
 
-        // Apply filters
-        if (filters) {
-          if (filters.sports && filters.sports.length > 0) {
-            filteredVenues = filteredVenues.filter((venue: Venue) =>
-              venue.sports.some((sport: Sport) => 
-                filters.sports!.includes(sport.id)
-              )
-            );
-          }
-
-          if (filters.amenities && filters.amenities.length > 0) {
-            filteredVenues = filteredVenues.filter((venue: Venue) =>
-              filters.amenities!.every((amenityId: string) =>
-                venue.amenities.some((amenity: Amenity) => amenity.id === amenityId)
-              )
-            );
-          }
-
-          if (filters.city) {
-            filteredVenues = filteredVenues.filter((venue: Venue) =>
-              venue.address.city.toLowerCase() === filters.city!.toLowerCase()
-            );
-          }
-
-          if (filters.rating) {
-            filteredVenues = filteredVenues.filter((venue: Venue) =>
-              venue.rating >= filters.rating!
-            );
-          }
-
-          if (filters.priceRange) {
-            filteredVenues = filteredVenues.filter((venue: Venue) =>
-              venue.timeSlots.some((slot: TimeSlot) =>
-                slot.price >= filters.priceRange!.min &&
-                slot.price <= filters.priceRange!.max
-              )
-            );
-          }
+        if (filters?.sports?.length) {
+          results = results.filter((e) =>
+            filters.sports!.includes(e.sport.id)
+          )
         }
 
-        return filteredVenues;
-      },
-
-      searchEvents: (query: string, filters?: EventFilters) => {
-        const events = get().events;
-        let filteredEvents = events;
-
-        // Text search
-        if (query.trim()) {
-          const searchTerm = query.toLowerCase();
-          filteredEvents = filteredEvents.filter((event: Event) =>
-            event.name.toLowerCase().includes(searchTerm) ||
-            event.sport.name.toLowerCase().includes(searchTerm) ||
-            event.description?.toLowerCase().includes(searchTerm)
-          );
+        if (filters?.eventType?.length) {
+          results = results.filter((e) =>
+            filters.eventType!.includes(e.eventType)
+          )
         }
 
-        // Apply filters
-        if (filters) {
-          if (filters.sports && filters.sports.length > 0) {
-            filteredEvents = filteredEvents.filter((event: Event) =>
-              filters.sports!.includes(event.sport.id)
-            );
-          }
-
-          if (filters.eventType && filters.eventType.length > 0) {
-            filteredEvents = filteredEvents.filter((event: Event) =>
-              filters.eventType!.includes(event.eventType)
-            );
-          }
-
-          if (filters.participationType) {
-            filteredEvents = filteredEvents.filter((event: Event) =>
-              event.participationType === filters.participationType
-            );
-          }
-
-          if (filters.dateRange) {
-            const startDate = new Date(filters.dateRange.start);
-            const endDate = new Date(filters.dateRange.end);
-            filteredEvents = filteredEvents.filter((event: Event) => {
-              const eventDate = new Date(event.dateTime);
-              return eventDate >= startDate && eventDate <= endDate;
-            });
-          }
-
-          if (filters.feeRange) {
-            filteredEvents = filteredEvents.filter((event: Event) =>
-              event.fees.amount >= filters.feeRange!.min &&
-              event.fees.amount <= filters.feeRange!.max
-            );
-          }
-
-          if (filters.city) {
-            const venues = get().venues;
-            const venueIds = venues
-              .filter((v: Venue) => v.address.city.toLowerCase() === filters.city!.toLowerCase())
-              .map((v: Venue) => v.id);
-            filteredEvents = filteredEvents.filter((event: Event) =>
-              venueIds.includes(event.venueId)
-            );
-          }
+        if (filters?.participationType) {
+          results = results.filter(
+            (e) => e.participationType === filters.participationType
+          )
         }
 
-        return filteredEvents;
+        if (filters?.feeRange) {
+          const { min, max } = filters.feeRange
+
+          results = results.filter(
+            (e) => e.fees.amount >= min && e.fees.amount <= max
+          )
+        }
+
+        return results
       },
     })),
-    {
-      name: 'booking-store', // Name for devtools
-    }
+    { name: 'booking-store' }
   )
-);
+)

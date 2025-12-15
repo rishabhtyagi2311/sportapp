@@ -1,5 +1,5 @@
-// app/(venue)/eventManager/createEvent.tsx
-import React, { useState } from 'react';
+// app/(venue)/eventManager/editEvent/[id].tsx
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,247 +10,248 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Event, Sport } from '@/types/booking';
+import { useEventManagerStore } from '@/store/eventManagerStore';
 import { useBookingStore } from '@/store/venueStore';
-import uuid from 'react-native-uuid';
-import { CURRENT_USER } from './usercontext';
 
-// Define event type options
+/* -------------------------------------------------------------------------- */
+/*                                   TYPES                                    */
+/* -------------------------------------------------------------------------- */
 type EventType = 'tournament' | 'practice' | 'friendly' | 'training' | 'league';
 type ParticipationType = 'individual' | 'team';
 type FeeType = 'per_person' | 'per_team' | 'total';
+type EventStatus = 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
 
-export default function CreateEventScreen() {
-  const { addEvent, venues, sports } = useBookingStore();
-  
-  // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    venueId: '',
-    sportId: '',
-    eventType: '',
-    participationType: '',
-    teamSize: '',
-    maxParticipants: '',
-    date: '',
-    time: '',
-    duration: '',
-    feeAmount: '',
-    feeType: '',
-  });
-  
-  // Event type options
-  const eventTypes: EventType[] = [
-    'tournament',
-    'practice',
-    'friendly',
-    'training',
-    'league'
-  ];
-  
-  // Participation types
-  const participationTypes: ParticipationType[] = ['individual', 'team'];
-  
-  // Fee types
-  const feeTypes: FeeType[] = ['per_person', 'per_team', 'total'];
-  
-  // Update form data
-  const updateForm = (key: string, value: string) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
-  };
-  
-  // Handle event type selection
-  const selectEventType = (type: EventType) => {
-    updateForm('eventType', type);
-  };
-  
-  // Handle participation type selection
-  const selectParticipationType = (type: ParticipationType) => {
-    updateForm('participationType', type);
-  };
-  
-  // Handle fee type selection
-  const selectFeeType = (type: FeeType) => {
-    updateForm('feeType', type);
-  };
-  
+interface FormState {
+  name: string;
+  description: string;
+  venueId: string;
+  sportId: string;
+  eventType: EventType;
+  participationType: ParticipationType;
+  teamSize: string;
+  maxParticipants: string;
+  date: string;
+  time: string;
+  duration: string;
+  feeAmount: string;
+  feeType: FeeType;
+  status: EventStatus;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              MAIN COMPONENT                                 */
+/* -------------------------------------------------------------------------- */
+export default function EditEventScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { managedEvents, updateEvent, deleteEvent } = useEventManagerStore();
+  const { sports } = useBookingStore();
+  const event = managedEvents.find((e) => e.id === id);
+
+  const [form, setForm] = useState<FormState | null>(null);
+
+  /* ---------------------------- INITIAL LOAD ------------------------------ */
+  useEffect(() => {
+    if (!event) {
+      Alert.alert('Error', 'Event not found');
+      router.back();
+      return;
+    }
+    const dt = new Date(event.dateTime);
+    setForm({
+      name: event.name,
+      description: event.description ?? '',
+      venueId: event.venueId,
+      sportId: event.sport.id,
+      eventType: event.eventType,
+      participationType: event.participationType,
+      teamSize: event.teamSize?.toString() ?? '',
+      maxParticipants: event.maxParticipants.toString(),
+      date: dt.toISOString().slice(0, 10),
+      time: dt.toISOString().slice(11, 16),
+      duration: event.duration.toString(),
+      feeAmount: event.fees.amount.toString(),
+      feeType: event.fees.type,
+      status: event.status,
+    });
+  }, [event]);
+
+  if (!form) return null;
+
+  /* ----------------------------- HELPERS -------------------------------- */
+  const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+    setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+
   // Handle date input with format control
   const handleDateChange = (text: string) => {
-    // Allow only digits and hyphens
     const sanitized = text.replace(/[^\d-]/g, '');
-    
-    // Format as YYYY-MM-DD
     let formatted = sanitized;
     if (sanitized.length > 4 && !sanitized.includes('-')) {
       formatted = sanitized.slice(0, 4) + '-' + sanitized.slice(4);
     }
     if (sanitized.length > 7 && sanitized.split('-').length === 2) {
       const parts = formatted.split('-');
-      formatted = parts[0] + '-' + parts[1].slice(0, 2) + '-' + parts[1].slice(2);
+      formatted =
+        parts[0] + '-' + parts[1].slice(0, 2) + '-' + parts[1].slice(2);
     }
-    
-    // Ensure we don't exceed the expected format length
     if (formatted.length <= 10) {
-      updateForm('date', formatted);
+      update('date', formatted);
     }
   };
-  
+
   // Handle time input with format control
   const handleTimeChange = (text: string) => {
-    // Allow only digits and colons
     const sanitized = text.replace(/[^\d:]/g, '');
-    
-    // Format as HH:MM
     let formatted = sanitized;
     if (sanitized.length > 2 && !sanitized.includes(':')) {
       formatted = sanitized.slice(0, 2) + ':' + sanitized.slice(2);
     }
-    
-    // Ensure we don't exceed the expected format length
     if (formatted.length <= 5) {
-      updateForm('time', formatted);
+      update('time', formatted);
     }
   };
-  
-  // Validate form data
+
+  /* ----------------------------- VALIDATION -------------------------------- */
   const validateForm = (): boolean => {
-    if (!formData.name.trim()) {
+    if (!form.name.trim()) {
       Alert.alert('Error', 'Please enter event name');
       return false;
     }
-    if (!formData.venueId) {
+    if (!form.venueId.trim()) {
       Alert.alert('Error', 'Please enter venue');
       return false;
     }
-    if (!formData.sportId) {
+    if (!form.sportId.trim()) {
       Alert.alert('Error', 'Please enter sport');
       return false;
     }
-    if (!formData.eventType) {
+    if (!form.eventType) {
       Alert.alert('Error', 'Please select event type');
       return false;
     }
-    if (!formData.participationType) {
+    if (!form.participationType) {
       Alert.alert('Error', 'Please select participation type');
       return false;
     }
-    if (formData.participationType === 'team' && !formData.teamSize) {
+    if (form.participationType === 'team' && !form.teamSize) {
       Alert.alert('Error', 'Please enter team size');
       return false;
     }
-    if (!formData.maxParticipants) {
+    if (!form.maxParticipants) {
       Alert.alert('Error', 'Please enter maximum participants');
       return false;
     }
-    
-    // Date validation
-    if (!formData.date) {
+    if (!form.date) {
       Alert.alert('Error', 'Please enter event date');
       return false;
     }
-    if (formData.date.length !== 10 || !formData.date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    if (
+      form.date.length !== 10 ||
+      !form.date.match(/^\d{4}-\d{2}-\d{2}$/)
+    ) {
       Alert.alert('Error', 'Please enter date in YYYY-MM-DD format');
       return false;
     }
-    
-    // Time validation
-    if (!formData.time) {
+    if (!form.time) {
       Alert.alert('Error', 'Please enter event time');
       return false;
     }
-    if (formData.time.length !== 5 || !formData.time.match(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)) {
+    if (
+      form.time.length !== 5 ||
+      !form.time.match(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    ) {
       Alert.alert('Error', 'Please enter time in HH:MM format');
       return false;
     }
-    
-    if (!formData.duration) {
+    if (!form.duration) {
       Alert.alert('Error', 'Please enter event duration');
       return false;
     }
-    if (!formData.feeAmount) {
+    if (!form.feeAmount) {
       Alert.alert('Error', 'Please enter fee amount');
       return false;
     }
-    if (!formData.feeType) {
+    if (!form.feeType) {
       Alert.alert('Error', 'Please select fee type');
       return false;
     }
     return true;
   };
-  
-  // Handle form submission
-  const handleSubmit = () => {
+
+  /* ------------------------------ SAVE ------------------------------------ */
+  const handleSave = () => {
+    if (!id) return;
     if (!validateForm()) return;
-    
+
     try {
-      // Parse date and time
-      const [year, month, day] = formData.date.split('-').map(Number);
-      const [hours, minutes] = formData.time.split(':').map(Number);
-      const eventDateTime = new Date(year, month - 1, day, hours, minutes);
-      
-      // Calculate registration deadline (7 days before)
-      const deadlineDate = new Date(eventDateTime);
-      deadlineDate.setDate(deadlineDate.getDate() - 7);
-      
-      // Create a sport object if it doesn't exist in the current sports list
-      let sportForEvent;
-      const existingSport = sports.find(sport => sport.id === formData.sportId);
-      
-      if (existingSport) {
-        sportForEvent = existingSport;
-      } else {
-        // Create a new sport object with the given ID
-        sportForEvent = {
-          id: formData.sportId,
-          name: formData.sportId, // Use ID as name if not found
-          category: 'outdoor' as const,
-          varieties: [], // Empty varieties
+      const [y, m, d] = form.date.split('-').map(Number);
+      const [hh, mm] = form.time.split(':').map(Number);
+      const dateTime = new Date(y, m - 1, d, hh, mm);
+
+      const deadline = new Date(dateTime);
+      deadline.setDate(deadline.getDate() - 7);
+
+      const sport: Sport =
+        sports.find((s) => s.id === form.sportId) ?? {
+          id: form.sportId,
+          name: form.sportId,
+          category: 'outdoor',
+          varieties: [],
         };
-      }
-      
-      // Create new event
-      const newEvent = {
-        id: uuid.v4().toString(),
-        creatorId: CURRENT_USER.id,
-        venueId: formData.venueId,
-        name: formData.name.trim(),
-        description: formData.description.trim(),
-        eventType: formData.eventType as EventType,
-        sport: sportForEvent,
-        participationType: formData.participationType as ParticipationType,
-        teamSize: formData.participationType === 'team' ? parseInt(formData.teamSize) : undefined,
-        maxParticipants: parseInt(formData.maxParticipants),
-        currentParticipants: 0,
-        dateTime: eventDateTime.toISOString(),
-        duration: parseFloat(formData.duration || '2'),
+
+      updateEvent(id, {
+        name: form.name.trim(),
+        description: form.description.trim() || undefined,
+        venueId: form.venueId,
+        sport,
+        eventType: form.eventType,
+        participationType: form.participationType,
+        teamSize:
+          form.participationType === 'team'
+            ? Number(form.teamSize)
+            : undefined,
+        maxParticipants: Number(form.maxParticipants),
+        dateTime: dateTime.toISOString(),
+        duration: Number(form.duration),
         fees: {
-          amount: parseFloat(formData.feeAmount),
-          currency: 'INR' as const,
-          type: formData.feeType as FeeType,
+          amount: Number(form.feeAmount),
+          currency: 'INR',
+          type: form.feeType,
         },
-        organizer: {
-          name: CURRENT_USER.name,
-          contact: CURRENT_USER.phone,
-        },
-        status: 'upcoming' as const,
-        isPublic: true,
-        registrationDeadline: deadlineDate.toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      
-      // Add to store
-      addEvent(newEvent);
-      
-      // Navigate back
-      router.push('/eventManaging/profile');
+        status: form.status,
+        registrationDeadline: deadline.toISOString(),
+      });
+
+      Alert.alert('Success', 'Event updated successfully');
+      router.back();
     } catch (error) {
-      console.error('Error creating event:', error);
-      Alert.alert('Error', 'Failed to create event. Please check your inputs.');
+      console.error('Error updating event:', error);
+      Alert.alert('Error', 'Failed to update event. Please check your inputs.');
     }
   };
-  
+
+  /* ------------------------------ DELETE ---------------------------------- */
+  const handleDelete = () => {
+    Alert.alert('Delete Event', 'Are you sure you want to delete this event?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          try {
+            deleteEvent(id!);
+            router.back();
+          } catch (error) {
+            console.error('Error deleting event:', error);
+            Alert.alert('Error', 'Failed to delete event');
+          }
+        },
+      },
+    ]);
+  };
+
+  /* ------------------------------ UI -------------------------------------- */
   return (
     <SafeAreaView className="flex-1 bg-white">
       <View className="w-full h-full bg-slate-900">
@@ -263,11 +264,9 @@ export default function CreateEventScreen() {
           >
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
-          <Text className="text-white text-xl font-bold">
-            Create Event
-          </Text>
+          <Text className="text-white text-xl font-bold">Edit Event</Text>
         </View>
-        
+
         {/* Form */}
         <ScrollView
           className="flex-1"
@@ -285,12 +284,12 @@ export default function CreateEventScreen() {
                 className="flex-1 text-black py-4 px-3 text-base"
                 placeholder="Enter event name"
                 placeholderTextColor="#6b7280"
-                value={formData.name}
-                onChangeText={(text) => updateForm('name', text)}
+                value={form.name}
+                onChangeText={(text) => update('name', text)}
               />
             </View>
           </View>
-          
+
           {/* Venue Selection */}
           <View className="mb-6">
             <Text className="text-white font-semibold mb-2 text-base">
@@ -302,12 +301,12 @@ export default function CreateEventScreen() {
                 className="flex-1 text-black py-4 px-3 text-base"
                 placeholder="Enter venue"
                 placeholderTextColor="#6b7280"
-                value={formData.venueId}
-                onChangeText={(text) => updateForm('venueId', text)}
+                value={form.venueId}
+                onChangeText={(text) => update('venueId', text)}
               />
             </View>
           </View>
-          
+
           {/* Sport Selection */}
           <View className="mb-6">
             <Text className="text-white font-semibold mb-2 text-base">
@@ -319,12 +318,12 @@ export default function CreateEventScreen() {
                 className="flex-1 text-black py-4 px-3 text-base"
                 placeholder="Enter sport"
                 placeholderTextColor="#6b7280"
-                value={formData.sportId}
-                onChangeText={(text) => updateForm('sportId', text)}
+                value={form.sportId}
+                onChangeText={(text) => update('sportId', text)}
               />
             </View>
           </View>
-          
+
           {/* Event Type Selection */}
           <View className="mb-6">
             <Text className="text-white font-semibold mb-2 text-base">
@@ -333,33 +332,34 @@ export default function CreateEventScreen() {
             <Text className="text-gray-400 text-sm mb-3">
               Select the type of event
             </Text>
-            
             <View className="flex-row flex-wrap mb-3">
-              {eventTypes.map((type) => (
-                <TouchableOpacity
-                  key={type}
-                  onPress={() => selectEventType(type)}
-                  className={`rounded-lg px-3 py-2 mr-2 mb-2 border ${
-                    formData.eventType === type
-                      ? "bg-green-600 border-green-500"
-                      : "bg-sky-100 border-gray-300"
-                  }`}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    className={`text-sm ${
-                      formData.eventType === type
-                        ? "text-white font-semibold"
-                        : "text-gray-700"
+              {['tournament', 'practice', 'friendly', 'training', 'league'].map(
+                (type) => (
+                  <TouchableOpacity
+                    key={type}
+                    onPress={() => update('eventType', type as EventType)}
+                    className={`rounded-lg px-3 py-2 mr-2 mb-2 border ${
+                      form.eventType === type
+                        ? 'bg-green-600 border-green-500'
+                        : 'bg-sky-100 border-gray-300'
                     }`}
+                    activeOpacity={0.7}
                   >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      className={`text-sm ${
+                        form.eventType === type
+                          ? 'text-white font-semibold'
+                          : 'text-gray-700'
+                      }`}
+                    >
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              )}
             </View>
           </View>
-          
+
           {/* Description */}
           <View className="mb-6">
             <Text className="text-white font-semibold mb-2 text-base">
@@ -370,37 +370,39 @@ export default function CreateEventScreen() {
                 className="w-full text-black py-4 text-base"
                 placeholder="Enter event description"
                 placeholderTextColor="#6b7280"
-                value={formData.description}
-                onChangeText={(text) => updateForm('description', text)}
+                value={form.description}
+                onChangeText={(text) => update('description', text)}
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
               />
             </View>
           </View>
-          
+
           {/* Participation Type */}
           <View className="mb-6">
             <Text className="text-white font-semibold mb-2 text-base">
               Participation Type *
             </Text>
             <View className="flex-row">
-              {participationTypes.map((type) => (
+              {['individual', 'team'].map((type) => (
                 <TouchableOpacity
                   key={type}
-                  onPress={() => selectParticipationType(type)}
+                  onPress={() =>
+                    update('participationType', type as ParticipationType)
+                  }
                   className={`flex-1 rounded-lg py-3 px-2 mr-2 border ${
-                    formData.participationType === type
-                      ? "bg-green-600 border-green-500"
-                      : "bg-sky-100 border-gray-300"
+                    form.participationType === type
+                      ? 'bg-green-600 border-green-500'
+                      : 'bg-sky-100 border-gray-300'
                   }`}
                   activeOpacity={0.7}
                 >
                   <Text
                     className={`text-center text-sm ${
-                      formData.participationType === type
-                        ? "text-white font-semibold"
-                        : "text-gray-700"
+                      form.participationType === type
+                        ? 'text-white font-semibold'
+                        : 'text-gray-700'
                     }`}
                   >
                     {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -409,9 +411,9 @@ export default function CreateEventScreen() {
               ))}
             </View>
           </View>
-          
+
           {/* Team Size (if applicable) */}
-          {formData.participationType === 'team' && (
+          {form.participationType === 'team' && (
             <View className="mb-6">
               <Text className="text-white font-semibold mb-2 text-base">
                 Team Size *
@@ -422,32 +424,39 @@ export default function CreateEventScreen() {
                   className="flex-1 text-black py-4 px-3 text-base"
                   placeholder="Enter team size"
                   placeholderTextColor="#6b7280"
-                  value={formData.teamSize}
-                  onChangeText={(text) => updateForm('teamSize', text)}
+                  value={form.teamSize}
+                  onChangeText={(text) => update('teamSize', text)}
                   keyboardType="numeric"
                 />
               </View>
             </View>
           )}
-          
+
           {/* Maximum Participants */}
           <View className="mb-6">
             <Text className="text-white font-semibold mb-2 text-base">
-              Maximum {formData.participationType === 'team' ? 'Teams' : 'Participants'} *
+              Maximum{' '}
+              {form.participationType === 'team' ? 'Teams' : 'Participants'} *
             </Text>
             <View className="bg-sky-100 rounded-xl border border-gray-200 flex-row items-center px-4">
-              <Ionicons name="people-circle-outline" size={20} color="#374151" />
+              <Ionicons
+                name="people-circle-outline"
+                size={20}
+                color="#374151"
+              />
               <TextInput
                 className="flex-1 text-black py-4 px-3 text-base"
-                placeholder={`Enter maximum ${formData.participationType === 'team' ? 'teams' : 'participants'}`}
+                placeholder={`Enter maximum ${
+                  form.participationType === 'team' ? 'teams' : 'participants'
+                }`}
                 placeholderTextColor="#6b7280"
-                value={formData.maxParticipants}
-                onChangeText={(text) => updateForm('maxParticipants', text)}
+                value={form.maxParticipants}
+                onChangeText={(text) => update('maxParticipants', text)}
                 keyboardType="numeric"
               />
             </View>
           </View>
-          
+
           {/* Date & Time */}
           <View className="mb-6">
             <Text className="text-white font-semibold mb-2 text-base">
@@ -460,7 +469,7 @@ export default function CreateEventScreen() {
                   className="flex-1 text-black py-4 px-3 text-base"
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor="#6b7280"
-                  value={formData.date}
+                  value={form.date}
                   onChangeText={handleDateChange}
                   keyboardType="numeric"
                   maxLength={10}
@@ -472,7 +481,7 @@ export default function CreateEventScreen() {
                   className="flex-1 text-black py-4 px-3 text-base"
                   placeholder="HH:MM"
                   placeholderTextColor="#6b7280"
-                  value={formData.time}
+                  value={form.time}
                   onChangeText={handleTimeChange}
                   keyboardType="numeric"
                   maxLength={5}
@@ -480,7 +489,7 @@ export default function CreateEventScreen() {
               </View>
             </View>
           </View>
-          
+
           {/* Duration */}
           <View className="mb-6">
             <Text className="text-white font-semibold mb-2 text-base">
@@ -492,13 +501,13 @@ export default function CreateEventScreen() {
                 className="flex-1 text-black py-4 px-3 text-base"
                 placeholder="Enter duration in hours"
                 placeholderTextColor="#6b7280"
-                value={formData.duration}
-                onChangeText={(text) => updateForm('duration', text)}
+                value={form.duration}
+                onChangeText={(text) => update('duration', text)}
                 keyboardType="numeric"
               />
             </View>
           </View>
-          
+
           {/* Fee Amount & Type */}
           <View className="mb-6">
             <Text className="text-white font-semibold mb-2 text-base">
@@ -510,51 +519,103 @@ export default function CreateEventScreen() {
                 className="flex-1 text-black py-4 px-3 text-base"
                 placeholder="Enter fee amount"
                 placeholderTextColor="#6b7280"
-                value={formData.feeAmount}
-                onChangeText={(text) => updateForm('feeAmount', text)}
+                value={form.feeAmount}
+                onChangeText={(text) => update('feeAmount', text)}
                 keyboardType="numeric"
               />
             </View>
-            
             <Text className="text-white font-semibold mb-2">Fee Type</Text>
             <View className="flex-row flex-wrap">
-              {feeTypes.map((type) => (
+              {['per_person', 'per_team', 'total'].map((type) => (
                 <TouchableOpacity
                   key={type}
-                  onPress={() => selectFeeType(type)}
+                  onPress={() => update('feeType', type as FeeType)}
                   className={`rounded-lg py-2 px-3 mr-2 mb-2 border ${
-                    formData.feeType === type
-                      ? "bg-green-600 border-green-500"
-                      : "bg-sky-100 border-gray-300"
+                    form.feeType === type
+                      ? 'bg-green-600 border-green-500'
+                      : 'bg-sky-100 border-gray-300'
                   }`}
                   activeOpacity={0.7}
                 >
                   <Text
                     className={`text-sm ${
-                      formData.feeType === type
-                        ? "text-white font-semibold"
-                        : "text-gray-700"
+                      form.feeType === type
+                        ? 'text-white font-semibold'
+                        : 'text-gray-700'
                     }`}
                   >
-                    {type === 'per_person' ? 'Per Person' : 
-                     type === 'per_team' ? 'Per Team' : 'Total (Fixed)'}
+                    {type === 'per_person'
+                      ? 'Per Person'
+                      : type === 'per_team'
+                        ? 'Per Team'
+                        : 'Total (Fixed)'}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
-          
-          {/* Submit Button */}
+
+          {/* Status */}
+          <View className="mb-6">
+            <Text className="text-white font-semibold mb-2 text-base">
+              Event Status *
+            </Text>
+            <Text className="text-gray-400 text-sm mb-3">
+              Select event status
+            </Text>
+            <View className="flex-row flex-wrap">
+              {['upcoming', 'ongoing', 'completed', 'cancelled'].map(
+                (status) => (
+                  <TouchableOpacity
+                    key={status}
+                    onPress={() => update('status', status as EventStatus)}
+                    className={`rounded-lg px-3 py-2 mr-2 mb-2 border ${
+                      form.status === status
+                        ? 'bg-green-600 border-green-500'
+                        : 'bg-sky-100 border-gray-300'
+                    }`}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      className={`text-sm ${
+                        form.status === status
+                          ? 'text-white font-semibold'
+                          : 'text-gray-700'
+                      }`}
+                    >
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              )}
+            </View>
+          </View>
+
+          {/* Save Button */}
           <TouchableOpacity
-            onPress={handleSubmit}
-            className="bg-blue-300 rounded-xl py-4 mb-6 shadow-lg"
+            onPress={handleSave}
+            className="bg-blue-300 rounded-xl py-4 mb-4 shadow-lg"
             activeOpacity={0.8}
           >
             <View className="flex-row items-center justify-center">
               <Text className="text-black font-bold text-lg mr-2">
-                Create Event
+                Save Changes
               </Text>
               <Ionicons name="checkmark-circle-outline" size={24} color="black" />
+            </View>
+          </TouchableOpacity>
+
+          {/* Delete Button */}
+          <TouchableOpacity
+            onPress={handleDelete}
+            className="bg-red-600 rounded-xl py-4 mb-6 shadow-lg"
+            activeOpacity={0.8}
+          >
+            <View className="flex-row items-center justify-center">
+              <Text className="text-white font-bold text-lg mr-2">
+                Delete Event
+              </Text>
+              <Ionicons name="trash-outline" size={24} color="white" />
             </View>
           </TouchableOpacity>
         </ScrollView>
