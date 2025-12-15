@@ -1,18 +1,31 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { View, Text, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialIcons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
+
+// 1. Import your store (Adjust the path based on where you saved it)
+import signUpStore from './../../store/signUpStore' 
 
 export default function VenueOwnerDashboard() {
   const router = useRouter()
   const { width } = useWindowDimensions()
 
-  // Responsive sizing
-  const isSmallScreen = width < 380
-  const isMediumScreen = width >= 380 && width < 450
+  // 2. Get real user data from the store
+  const { firstName, lastName } = signUpStore()
 
-  // Dummy data
+  // 3. Logic: Use store data if available, otherwise use Dummy Default
+  const hasName = firstName || lastName
+  const displayName = hasName ? `${firstName} ${lastName}`.trim() : "Venue Manager"
+  
+  // Calculate Initials for the Avatar
+  const getInitials = () => {
+    if (hasName) {
+      return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+    }
+    return "VM" // Default for "Venue Manager"
+  }
+
+  // Dummy data for metrics (keep this static/dummy for now as requested)
   const dashboardData = {
     totalVenues: 3,
     activeBookings: 12,
@@ -20,278 +33,198 @@ export default function VenueOwnerDashboard() {
     monthlyRevenue: '$4,250',
   }
 
+  /* -------------------------------------------------------------------------- */
+  /* COMPONENTS                                 */
+  /* -------------------------------------------------------------------------- */
+
   const MetricCard = ({
     icon,
     label,
     value,
-    bgColor,
+    trend
   }: {
     icon: React.ReactNode
     label: string
     value: string
-    bgColor: string
+    trend?: string
   }) => (
-    <View className={`flex-1 ${bgColor} rounded-xl p-4 border border-slate-200 items-center shadow-sm`}>
-      <View className="w-12 h-12 rounded-full bg-white items-center justify-center mb-2">
-        {icon}
+    <View className="flex-1 bg-white rounded-2xl p-4 border border-slate-100 shadow-sm items-start justify-between min-h-[110px]">
+      <View className="flex-row justify-between w-full mb-2">
+        <View className="w-10 h-10 rounded-full bg-slate-50 items-center justify-center border border-slate-100">
+          {icon}
+        </View>
+        {trend && (
+           <View className="bg-green-100 px-2 py-1 rounded-full">
+             <Text className="text-[10px] font-bold text-green-700">{trend}</Text>
+           </View>
+        )}
       </View>
-      <Text className="text-slate-600 text-xs font-semibold uppercase tracking-wide text-center mb-1">
-        {label}
-      </Text>
-      <Text className="text-slate-900 font-bold text-lg text-center">{value}</Text>
+      <View>
+        <Text className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">
+          {label}
+        </Text>
+        <Text className="text-slate-900 font-bold text-2xl">{value}</Text>
+      </View>
     </View>
   )
 
-  const QuickStat = ({
+  const ActionCard = ({
     title,
-    value,
-    change,
+    subtitle,
     icon,
-    bgColor,
+    gradientColors,
+    borderColor,
+    onPress,
+    badgeCount
   }: {
     title: string
-    value: string
-    change: string
+    subtitle: string
     icon: React.ReactNode
-    bgColor: string
-  }) => (
-    <View className={`${bgColor} rounded-xl p-4 border border-slate-200 flex-1 shadow-sm`}>
-      <View className="flex-row items-center justify-between mb-2">
-        <Text className="text-slate-600 text-xs font-semibold">{title}</Text>
-        {icon}
-      </View>
-      <Text className="text-slate-900 font-bold text-xl">{value}</Text>
-      <Text className="text-green-600 text-xs font-semibold mt-1">{change}</Text>
-    </View>
-  )
-
-  const QuickLink = ({
-    icon,
-    label,
-    onPress,
-    bgColor,
-    borderColor,
-  }: {
-    icon: React.ReactNode
-    label: string
-    onPress: () => void
-    bgColor: string
+    gradientColors: string 
     borderColor: string
+    onPress: () => void
+    badgeCount?: number
   }) => (
     <TouchableOpacity
       onPress={onPress}
-      activeOpacity={0.7}
-      className={`flex-1 ${bgColor} border-2 ${borderColor} rounded-xl p-3 items-center`}
+      activeOpacity={0.9}
+      className={`rounded-2xl overflow-hidden mb-4 border ${borderColor} bg-white shadow-sm`}
     >
-      {icon}
-      <Text className="text-slate-700 text-xs font-semibold mt-2 text-center">{label}</Text>
+      <View className={`p-5 flex-row items-center justify-between ${gradientColors} bg-opacity-30`}>
+        <View className="flex-1 mr-4">
+          <Text className="font-bold text-slate-800 text-lg mb-1">{title}</Text>
+          <Text className="text-slate-500 text-sm leading-5">{subtitle}</Text>
+        </View>
+        
+        <View className="relative">
+          <View className="w-14 h-14 rounded-2xl bg-white items-center justify-center shadow-sm">
+            {icon}
+          </View>
+          {badgeCount ? (
+             <View className="absolute -top-2 -right-2 bg-rose-500 rounded-full w-6 h-6 items-center justify-center border-2 border-white shadow-sm">
+               <Text className="text-white text-[10px] font-bold">{badgeCount}</Text>
+             </View>
+          ) : null}
+        </View>
+      </View>
     </TouchableOpacity>
   )
 
-  return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top', 'left', 'right']}>
-      <ScrollView
-        className="flex-1"
-        showsVerticalScrollIndicator={false}
-        bounces={true}
-        scrollEventThrottle={16}
-        contentContainerStyle={{ paddingBottom: 40 }}
-      >
-        {/* Top Spacing */}
-        <View className="h-6" />
+  /* -------------------------------------------------------------------------- */
+  /* MAIN                                    */
+  /* -------------------------------------------------------------------------- */
 
-        {/* Header */}
-        <View className={`${isSmallScreen ? 'px-4' : isMediumScreen ? 'px-5' : 'px-6'} mb-8`}>
-          <Text className="text-slate-500 text-sm font-semibold uppercase tracking-wide mb-1">
-            Welcome Back
-          </Text>
-          <Text
-            className={`text-slate-900 font-bold ${
-              isSmallScreen ? 'text-2xl' : isMediumScreen ? 'text-3xl' : 'text-4xl'
-            } mb-1`}
-          >
-            Venue Manager
-          </Text>
-          <Text className="text-slate-500 text-sm">Manage your venues and bookings</Text>
+  return (
+    <View className="flex-1 bg-slate-50">
+      {/* INTENSIVE HEADER */}
+      <View className="bg-slate-900 pt-12 pb-8 px-6 rounded-b-[32px] shadow-lg z-10 ">
+        
+        {/* Top Row: User & Notifications */}
+        <View className="flex-row justify-between items-center mb-6 mt-12">
+          <View className="flex-row items-center gap-3">
+            {/* Dynamic Initials Avatar */}
+            <View className="w-10 h-10 rounded-full bg-slate-700 border border-slate-600 items-center justify-center overflow-hidden">
+               <Text className="text-white font-bold text-sm">{getInitials()}</Text>
+            </View>
+            <View>
+              <Text className="text-slate-400 text-xs uppercase font-semibold tracking-wider">Welcome Back</Text>
+              {/* Dynamic Name Display */}
+              <Text className="text-white font-bold text-lg">{displayName}</Text>
+            </View>
+          </View>
+          
+          <TouchableOpacity className="w-10 h-10 rounded-full bg-slate-800 items-center justify-center border border-slate-700">
+             <MaterialIcons name="notifications-none" size={22} color="white" />
+             <View className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full" />
+          </TouchableOpacity>
         </View>
 
-        {/* Quick Metrics */}
-        <View className={`${isSmallScreen ? 'px-4' : isMediumScreen ? 'px-5' : 'px-6'} mb-8`}>
-          <View className="flex-row gap-2.5 mb-2.5">
+        {/* Dashboard Title */}
+        <View>
+         
+          <Text className="text-slate-400 text-sm">Here is what's happening at your venues today.</Text>
+        </View>
+      </View>
+
+      <ScrollView
+        className="flex-1 -mt-4"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100, paddingTop: 24 }}
+      >
+        {/* Quick Metrics Grid */}
+        <View className="px-5 mb-8">
+          <View className="flex-row gap-3 mb-3">
             <MetricCard
-              icon={<MaterialIcons name="location-on" size={20} color="#3b82f6" />}
-              label="Venues"
+              icon={<MaterialIcons name="store" size={22} color="#3b82f6" />}
+              label="Active Venues"
               value={dashboardData.totalVenues.toString()}
-              bgColor="bg-blue-50"
             />
             <MetricCard
-              icon={<MaterialIcons name="event-available" size={20} color="#10b981" />}
-              label="Bookings"
-              value={dashboardData.activeBookings.toString()}
-              bgColor="bg-green-50"
-            />
-          </View>
-          <View className="flex-row gap-2.5">
-            <MetricCard
-              icon={<MaterialIcons name="schedule" size={20} color="#06b6d4" />}
-              label="Slots"
-              value={dashboardData.totalSlots.toString()}
-              bgColor="bg-cyan-50"
-            />
-            <MetricCard
-              icon={<MaterialIcons name="trending-up" size={20} color="#22c55e" />}
+              icon={<MaterialIcons name="payments" size={22} color="#10b981" />}
               label="Revenue"
               value={dashboardData.monthlyRevenue}
-              bgColor="bg-green-50"
+              trend="+12%"
             />
           </View>
-        </View>
-
-        {/* Revenue Overview */}
-        <View className={`${isSmallScreen ? 'px-4' : isMediumScreen ? 'px-5' : 'px-6'} mb-8`}>
-          <Text className="text-xs font-bold text-slate-600 uppercase tracking-widest mb-3">
-            Performance
-          </Text>
-          <View className="flex-row gap-2.5">
-            <QuickStat
-              title="This Month"
-              value="$4,250"
-              change="↑ 12% from last month"
-              bgColor="bg-green-50"
-              icon={<MaterialIcons name="trending-up" size={16} color="#22c55e" />}
+          <View className="flex-row gap-3">
+             <MetricCard
+              icon={<MaterialIcons name="confirmation-number" size={22} color="#f59e0b" />}
+              label="Bookings"
+              value={dashboardData.activeBookings.toString()}
             />
-            <QuickStat
-              title="Active"
-              value="12"
-              change="3 pending bookings"
-              bgColor="bg-blue-50"
-              icon={<MaterialIcons name="check-circle" size={16} color="#3b82f6" />}
+            <MetricCard
+              icon={<MaterialIcons name="schedule" size={22} color="#6366f1" />}
+              label="Total Slots"
+              value={dashboardData.totalSlots.toString()}
             />
           </View>
         </View>
 
         {/* Action Cards Section */}
-        <View className={`${isSmallScreen ? 'px-4' : isMediumScreen ? 'px-5' : 'px-6'} mb-8`}>
-          <Text className="text-xs font-bold text-slate-600 uppercase tracking-widest mb-4">
-            Core Actions
+        <View className="px-5">
+          <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 ml-1">
+            Management Console
           </Text>
 
-          <TouchableOpacity
-            onPress={() => router.push('/(homeScreenTabs)/profile')}
-            activeOpacity={0.8}
-            className="rounded-2xl overflow-hidden mb-4 border-2 border-blue-200"
-          >
-            <View className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 flex-row items-center justify-between">
-              <View className="flex-1">
-                <Text className="font-bold text-blue-900 text-lg mb-1">Add New Venue</Text>
-                <Text className="text-blue-700 text-sm leading-5">Create and list a new venue</Text>
-              </View>
-              <View className="ml-4 w-16 h-16 rounded-full bg-blue-100 items-center justify-center">
-                <MaterialIcons name="add-location-alt" size={32} color="#1e40af" />
-              </View>
-            </View>
-          </TouchableOpacity>
+          <ActionCard 
+            title="Manage Venues"
+            subtitle={`${dashboardData.totalVenues} properties active • Update details`}
+            icon={<MaterialIcons name="business" size={28} color="#0f172a" />}
+            gradientColors="bg-slate-50"
+            borderColor="border-slate-200"
+            onPress={() => router.push('/(venueManagement)/venueHandling/landingDashboard')}
+          />
 
-          <TouchableOpacity
-            onPress={() => router.push('/(homeScreenTabs)/profile')}
-            activeOpacity={0.8}
-            className="rounded-2xl overflow-hidden mb-4 border-2 border-green-200"
-          >
-            <View className="bg-gradient-to-br from-green-50 to-green-100 p-5 flex-row items-center justify-between">
-              <View className="flex-1">
-                <Text className="font-bold text-green-900 text-lg mb-1">Manage Venues</Text>
-                <Text className="text-green-700 text-sm">{dashboardData.totalVenues} venues active</Text>
-              </View>
-              <View className="ml-4 w-16 h-16 rounded-full bg-green-100 items-center justify-center">
-                <MaterialIcons name="store" size={32} color="#166534" />
-              </View>
-            </View>
-          </TouchableOpacity>
+          <ActionCard 
+            title="Slot Configuration"
+            subtitle={`${dashboardData.totalSlots} slots • Adjust timing & pricing`}
+            icon={<MaterialIcons name="tune" size={28} color="#0e7490" />}
+            gradientColors="bg-cyan-50"
+            borderColor="border-cyan-100"
+            onPress={() => router.push('/(venueManagement)/slotHandling/venuePicker')}
+          />
 
-          <TouchableOpacity
-            onPress={() => router.push('/(homeScreenTabs)/profile')}
-            activeOpacity={0.8}
-            className="rounded-2xl overflow-hidden mb-4 border-2 border-cyan-200"
-          >
-            <View className="bg-gradient-to-br from-cyan-50 to-cyan-100 p-5 flex-row items-center justify-between">
-              <View className="flex-1">
-                <Text className="font-bold text-cyan-900 text-lg mb-1">Manage Slots</Text>
-                <Text className="text-cyan-700 text-sm">{dashboardData.totalSlots} slots available</Text>
-              </View>
-              <View className="ml-4 w-16 h-16 rounded-full bg-cyan-100 items-center justify-center">
-                <MaterialIcons name="calendar-today" size={32} color="#0c4a6e" />
-              </View>
-            </View>
-          </TouchableOpacity>
+          <ActionCard 
+            title="Booking Requests"
+            subtitle="Approve or manage incoming reservations"
+            icon={<MaterialIcons name="bookmark-border" size={28} color="#b45309" />}
+            gradientColors="bg-amber-50"
+            borderColor="border-amber-100"
+            badgeCount={3}
+            onPress={() => router.push('/(venueManagement)/bookingHandling/venuePicker')}
+          />
 
-          <TouchableOpacity
+          <ActionCard 
+            title="Financials"
+            subtitle="Transaction history & payouts"
+            icon={<MaterialIcons name="account-balance-wallet" size={28} color="#047857" />}
+            gradientColors="bg-emerald-50"
+            borderColor="border-emerald-100"
             onPress={() => router.push('/(homeScreenTabs)/profile')}
-            activeOpacity={0.8}
-            className="rounded-2xl overflow-hidden mb-4 border-2 border-amber-200"
-          >
-            <View className="bg-gradient-to-br from-amber-50 to-amber-100 p-5 flex-row items-center justify-between">
-              <View className="flex-1">
-                <Text className="font-bold text-amber-900 text-lg mb-1">Manage Bookings</Text>
-                <Text className="text-amber-700 text-sm">{dashboardData.activeBookings} active bookings</Text>
-              </View>
-              <View className="ml-4 items-center justify-center relative">
-                <View className="w-16 h-16 rounded-full bg-amber-100 items-center justify-center">
-                  <MaterialIcons name="event-note" size={32} color="#92400e" />
-                </View>
-                <View className="absolute top-0 right-0 bg-red-500 rounded-full w-6 h-6 items-center justify-center border-2 border-white">
-                  <Text className="text-white text-xs font-bold">3</Text>
-                </View>
-              </View>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => router.push('/(homeScreenTabs)/profile')}
-            activeOpacity={0.8}
-            className="rounded-2xl overflow-hidden mb-4 border-2 border-green-300"
-          >
-            <View className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-5 flex-row items-center justify-between">
-              <View className="flex-1">
-                <Text className="font-bold text-emerald-900 text-lg mb-1">Payment History</Text>
-                <Text className="text-emerald-700 text-sm">View earnings and transactions</Text>
-              </View>
-              <View className="ml-4 w-16 h-16 rounded-full bg-emerald-100 items-center justify-center">
-                <MaterialIcons name="receipt-long" size={32} color="#065f46" />
-              </View>
-            </View>
-          </TouchableOpacity>
+          />
         </View>
 
-        {/* Quick Links Section */}
-        <View className={`${isSmallScreen ? 'px-4' : isMediumScreen ? 'px-5' : 'px-6'} mb-4`}>
-          <Text className="text-xs font-bold text-slate-600 uppercase tracking-widest mb-3">
-            Quick Access
-          </Text>
-          <View className="flex-row gap-3 mb-12">
-            <QuickLink
-              icon={<MaterialIcons name="help" size={24} color="#3b82f6" />}
-              label="Support"
-              bgColor="bg-blue-50"
-              borderColor="border-blue-300"
-              onPress={() => router.push('/(homeScreenTabs)/profile')}
-            />
-            <QuickLink
-              icon={<MaterialIcons name="analytics" size={24} color="#10b981" />}
-              label="Analytics"
-              bgColor="bg-green-50"
-              borderColor="border-green-300"
-              onPress={() => router.push('/(homeScreenTabs)/profile')}
-            />
-            <QuickLink
-              icon={<MaterialIcons name="settings" size={24} color="#06b6d4" />}
-              label="Settings"
-              bgColor="bg-cyan-50"
-              borderColor="border-cyan-300"
-              onPress={() => router.push('/(homeScreenTabs)/profile')}
-            />
-          </View>
-        </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   )
 }
