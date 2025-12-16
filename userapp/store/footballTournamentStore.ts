@@ -1,4 +1,3 @@
-// /store/footballTournamentStore.ts
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
@@ -8,7 +7,7 @@ import { useFootballStore } from './footballTeamStore';
 export type TournamentFormat = 'league';
 export type TournamentStage = 'group';
 
-// Tournament Match Event (separate from regular match events)
+// Tournament Match Event (Legacy/Display purposes)
 export interface TournamentMatchEvent {
   id: string;
   teamId: string;
@@ -25,7 +24,7 @@ export interface TournamentMatchEvent {
   timestamp: Date;
 }
 
-// Active Tournament Match State
+// Active Tournament Match State (Staging for Setup)
 export interface ActiveTournamentMatch {
   fixtureId: string;
   tournamentId: string;
@@ -33,11 +32,18 @@ export interface ActiveTournamentMatch {
   awayTeamId: string;
   homeTeamName: string;
   awayTeamName: string;
-  homeTeamPlayers: string[]; // Player IDs
-  awayTeamPlayers: string[]; // Player IDs
+  
+  // Players
+  homeTeamPlayers: string[]; // Starter IDs
+  awayTeamPlayers: string[]; // Starter IDs
+  
+  // NEW: Substitutes
+  homeTeamSubstitutes: string[]; // Bench IDs
+  awayTeamSubstitutes: string[]; // Bench IDs
+  
   homeCaptain?: string;
   awayCaptain?: string;
-  referees: string[]; // Referee names
+  referees: string[];
   events: TournamentMatchEvent[];
   homeScore: number;
   awayScore: number;
@@ -49,8 +55,8 @@ export interface ActiveTournamentMatch {
 export interface TournamentTeam {
   id: string;
   teamName: string;
-  teamId: string; // Reference to original team in football store
-  tableId?: string; // Reference to which table/group the team belongs to
+  teamId: string;
+  tableId?: string;
   logoUrl?: string;
   played: number;
   won: number;
@@ -60,13 +66,13 @@ export interface TournamentTeam {
   goalsAgainst: number;
   goalDifference: number;
   points: number;
-  position?: number; // Position in table
+  position?: number;
 }
 
 export interface TournamentTable {
   id: string;
   name: string;
-  teamIds: string[]; // Teams in this table/group
+  teamIds: string[];
 }
 
 export interface TournamentFixture {
@@ -79,12 +85,12 @@ export interface TournamentFixture {
   awayTeamId: string;
   homeTeamName: string;
   awayTeamName: string;
-  tableId?: string; // Which table/group this fixture belongs to
+  tableId?: string;
   scheduledDate?: Date;
   status: 'upcoming' | 'in_progress' | 'completed';
   homeScore?: number;
   awayScore?: number;
-  matchData?: any; // Stored match data after completion
+  matchData?: any;
   venue?: string;
 }
 
@@ -95,11 +101,9 @@ export interface TournamentSettings {
   numberOfReferees: number;
   matchDuration: number;
   format: TournamentFormat;
-  // League specific scoring settings
-  winPoints?: number; // default 3
-  drawPoints?: number; // default 1
-  lossPoints?: number; // default 0
-  // matchesPerPair: 1 => single round-robin, 2 => double (home & away)
+  winPoints?: number; 
+  drawPoints?: number; 
+  lossPoints?: number; 
   matchesPerPair?: 1 | 2;
 }
 
@@ -110,7 +114,7 @@ export interface Tournament {
   format: TournamentFormat;
   settings: TournamentSettings;
   teams: TournamentTeam[];
-  tables: TournamentTable[]; // Groups for league format
+  tables: TournamentTable[]; 
   fixtures: TournamentFixture[];
   currentStage: TournamentStage;
   status: 'draft' | 'active' | 'completed' | 'cancelled';
@@ -127,12 +131,12 @@ export interface TournamentCreationDraft {
   name: string;
   description?: string;
   format: TournamentFormat;
-  teamCount: number; // Number of teams in tournament
+  teamCount: number; 
   tableCount?: number;
-  enforceEvenTeams?: boolean; // if true, require even team count
+  enforceEvenTeams?: boolean; 
   settings: Partial<TournamentSettings>;
   selectedTeamIds: string[];
-  teamTableAssignments?: Record<string, string>; // teamId -> tableId (kept for compatibility)
+  teamTableAssignments?: Record<string, string>; 
 }
 
 interface TournamentState {
@@ -140,6 +144,7 @@ interface TournamentState {
   activeTournament: Tournament | null;
   creationDraft: TournamentCreationDraft | null;
   activeTournamentMatch: ActiveTournamentMatch | null;
+  
   // Creation Flow
   startTournamentCreation: (name: string) => void;
   updateCreationDraft: (updates: Partial<TournamentCreationDraft>) => void;
@@ -149,11 +154,13 @@ interface TournamentState {
   setTournamentSettings: (settings: TournamentSettings) => void;
   createTournament: () => string | null;
   cancelTournamentCreation: () => void;
+  
   // Tournament Management
   generateFixtures: (tournamentId: string) => void;
   generateGroupStageFixtures: (tournamentId: string) => void;
   startTournament: (tournamentId: string) => void;
-  // Tournament Match Flow
+  
+  // Match Setup (Staging)
   initializeTournamentMatch: (tournamentId: string, fixtureId: string) => {
     homeTeamId: string;
     awayTeamId: string;
@@ -161,12 +168,21 @@ interface TournamentState {
     awayTeamName: string;
   } | null;
   setTournamentMatchPlayers: (homePlayerIds: string[], awayPlayerIds: string[]) => void;
+  
+  // NEW: Set Substitutes
+  setTournamentMatchSubstitutes: (homeSubIds: string[], awaySubIds: string[]) => void;
+  
   setTournamentMatchCaptains: (homeCaptain: string, awayCaptain: string) => void;
   setTournamentMatchReferees: (referees: string[]) => void;
+  
+  // Handover & Result Logic
   startTournamentMatchScoring: () => void;
   addTournamentMatchEvent: (event: Omit<TournamentMatchEvent, 'id' | 'timestamp'>) => void;
+  submitMatchResult: (fixtureId: string, homeScore: number, awayScore: number, matchEvents: any[]) => void;
+  
   endTournamentMatch: () => void;
   cancelTournamentMatch: () => void;
+  
   // Queries
   getTournament: (tournamentId: string) => Tournament | null;
   getTournamentFixtures: (tournamentId: string) => TournamentFixture[];
@@ -175,14 +191,13 @@ interface TournamentState {
   getUpcomingFixtures: (tournamentId: string) => TournamentFixture[];
   getCompletedFixtures: (tournamentId: string) => TournamentFixture[];
   getFixturesByRound: (tournamentId: string, round: number) => TournamentFixture[];
+  
   // Management
   deleteTournament: (tournamentId: string) => void;
   clearAllTournaments: () => void;
 }
 
-// --- Single-round league fixture generator ---
-// Create exactly one fixture per unordered pair (i < j) for every table.
-// All fixtures are round = 1.
+// Helpers
 const generateLeagueFixtures = (tournament: Tournament): TournamentFixture[] => {
   const fixtures: TournamentFixture[] = [];
   if (!tournament.tables || tournament.tables.length === 0) return fixtures;
@@ -201,10 +216,8 @@ const generateLeagueFixtures = (tournament: Tournament): TournamentFixture[] => 
         const awayTeam = tournament.teams.find(t => t.id === teamIds[j]);
         if (!homeTeam || !awayTeam) continue;
         
-        // Generate matchesPerPair fixtures
         for (let match = 0; match < matchesPerPair; match++) {
           const isReturnFixture = match === 1;
-          
           fixtures.push({
             id: `fixture_${Date.now()}_${table.id}_${matchNumber}`,
             stage: 'group',
@@ -281,6 +294,7 @@ export const useTournamentStore = create<TournamentState>()(
         activeTournament: null,
         creationDraft: null,
         activeTournamentMatch: null,
+
         startTournamentCreation: (name) => set((state) => {
           state.creationDraft = {
             name,
@@ -293,35 +307,34 @@ export const useTournamentStore = create<TournamentState>()(
               numberOfSubstitutes: 5,
               numberOfReferees: 1,
               matchDuration: 90,
-              // league scoring defaults
               winPoints: 3,
               drawPoints: 1,
               lossPoints: 0,
-              // default single round-robin (kept for compatibility)
               matchesPerPair: 1,
               format: 'league',
             },
             selectedTeamIds: [],
           };
         }),
+
         updateCreationDraft: (updates) => set((state) => {
           if (state.creationDraft) {
             Object.assign(state.creationDraft, updates);
           }
         }),
+
         addTeamToDraft: (teamId) => set((state) => {
           if (state.creationDraft && !state.creationDraft.selectedTeamIds.includes(teamId)) {
             state.creationDraft.selectedTeamIds.push(teamId);
           }
         }),
+
         removeTeamFromDraft: (teamId) => set((state) => {
           if (state.creationDraft) {
             state.creationDraft.selectedTeamIds = state.creationDraft.selectedTeamIds.filter(id => id !== teamId);
-            if (state.creationDraft.teamTableAssignments) {
-              delete state.creationDraft.teamTableAssignments[teamId];
-            }
           }
         }),
+
         assignTeamToTable: (teamId, tableId) => set((state) => {
           if (state.creationDraft) {
             if (!state.creationDraft.teamTableAssignments) {
@@ -330,27 +343,23 @@ export const useTournamentStore = create<TournamentState>()(
             state.creationDraft.teamTableAssignments[teamId] = tableId;
           }
         }),
+
         setTournamentSettings: (settings) => set((state) => {
           if (state.creationDraft) {
             state.creationDraft.settings = settings;
           }
         }),
+
         createTournament: () => {
           const state = get();
           const draft = state.creationDraft;
           if (!draft || draft.selectedTeamIds.length < draft.teamCount) return null;
-          if (draft.enforceEvenTeams && (draft.teamCount % 2 !== 0)) {
-            console.error('Even number of teams required');
-            return null;
-          }
+          
           const footballStore = useFootballStore.getState();
           const actualTeams = draft.selectedTeamIds
             .map(teamId => footballStore.getTeamById(teamId))
             .filter(team => team !== undefined) as any[];
-          if (actualTeams.length < 2) {
-            console.error('Could not find all selected teams in football store');
-            return null;
-          }
+
           const tournamentId = `tournament_${Date.now()}`;
           const tables: TournamentTable[] = [];
           tables.push({
@@ -358,6 +367,7 @@ export const useTournamentStore = create<TournamentState>()(
             name: 'League Table',
             teamIds: [],
           });
+
           const teams: TournamentTeam[] = actualTeams.slice(0, draft.teamCount).map((team: any, index: number) => {
             const teamObj: TournamentTeam = {
               id: `tourney_team_${team.id}_${Date.now()}_${index}`,
@@ -377,6 +387,7 @@ export const useTournamentStore = create<TournamentState>()(
             tables[0].teamIds.push(teamObj.id);
             return teamObj;
           });
+
           const tournament: Tournament = {
             id: tournamentId,
             name: draft.name,
@@ -400,16 +411,20 @@ export const useTournamentStore = create<TournamentState>()(
             createdAt: new Date(),
             updatedAt: new Date(),
           };
+
           set((state) => {
             state.tournaments.push(tournament);
             state.creationDraft = null;
           });
+
           get().generateFixtures(tournamentId);
           return tournamentId;
         },
+
         cancelTournamentCreation: () => set((state) => {
           state.creationDraft = null;
         }),
+
         generateFixtures: (tournamentId) => set((state) => {
           const tournament = state.tournaments.find(t => t.id === tournamentId);
           if (!tournament) return;
@@ -420,16 +435,15 @@ export const useTournamentStore = create<TournamentState>()(
           tournament.currentStage = 'group';
           tournament.updatedAt = new Date();
         }),
+
         generateGroupStageFixtures: (tournamentId) => set((state) => {
-          const tournament = state.tournaments.find(t => t.id === tournamentId);
-          if (!tournament) return;
-          const groupFixtures = generateLeagueFixtures(tournament);
-          tournament.fixtures = groupFixtures;
-          tournament.currentStage = 'group';
-          tournament.currentRound = 1;
-          tournament.totalRounds = 1;
-          tournament.updatedAt = new Date();
+           const tournament = state.tournaments.find(t => t.id === tournamentId);
+           if (!tournament) return;
+           const groupFixtures = generateLeagueFixtures(tournament);
+           tournament.fixtures = groupFixtures;
+           tournament.updatedAt = new Date();
         }),
+
         startTournament: (tournamentId) => set((state) => {
           const tournament = state.tournaments.find(t => t.id === tournamentId);
           if (tournament) {
@@ -438,12 +452,14 @@ export const useTournamentStore = create<TournamentState>()(
             tournament.updatedAt = new Date();
           }
         }),
+
         initializeTournamentMatch: (tournamentId, fixtureId) => {
           const state = get();
           const tournament = state.tournaments.find(t => t.id === tournamentId);
           if (!tournament) return null;
           const fixture = tournament.fixtures.find(f => f.id === fixtureId);
           if (!fixture || !fixture.homeTeamId || !fixture.awayTeamId) return null;
+          
           set((state) => {
             state.activeTournamentMatch = {
               fixtureId,
@@ -454,6 +470,8 @@ export const useTournamentStore = create<TournamentState>()(
               awayTeamName: fixture.awayTeamName,
               homeTeamPlayers: [],
               awayTeamPlayers: [],
+              homeTeamSubstitutes: [], // Initialize empty
+              awayTeamSubstitutes: [], // Initialize empty
               referees: [],
               events: [],
               homeScore: 0,
@@ -463,6 +481,7 @@ export const useTournamentStore = create<TournamentState>()(
               status: 'setup',
             };
           });
+          
           return {
             homeTeamId: fixture.homeTeamId,
             awayTeamId: fixture.awayTeamId,
@@ -470,96 +489,111 @@ export const useTournamentStore = create<TournamentState>()(
             awayTeamName: fixture.awayTeamName,
           };
         },
+
         setTournamentMatchPlayers: (homePlayerIds, awayPlayerIds) => set((state) => {
           if (state.activeTournamentMatch) {
             state.activeTournamentMatch.homeTeamPlayers = homePlayerIds;
             state.activeTournamentMatch.awayTeamPlayers = awayPlayerIds;
           }
         }),
+
+        // NEW: Action to save substitutes
+        setTournamentMatchSubstitutes: (homeSubIds, awaySubIds) => set((state) => {
+          if (state.activeTournamentMatch) {
+            state.activeTournamentMatch.homeTeamSubstitutes = homeSubIds;
+            state.activeTournamentMatch.awayTeamSubstitutes = awaySubIds;
+          }
+        }),
+
         setTournamentMatchCaptains: (homeCaptain, awayCaptain) => set((state) => {
           if (state.activeTournamentMatch) {
             state.activeTournamentMatch.homeCaptain = homeCaptain;
             state.activeTournamentMatch.awayCaptain = awayCaptain;
           }
         }),
+
         setTournamentMatchReferees: (referees) => set((state) => {
           if (state.activeTournamentMatch) {
             state.activeTournamentMatch.referees = referees;
           }
         }),
+
         startTournamentMatchScoring: () => set((state) => {
           if (state.activeTournamentMatch) {
             state.activeTournamentMatch.status = 'playing';
-            state.activeTournamentMatch.startTime = new Date();
           }
         }),
+
         addTournamentMatchEvent: (eventData) => set((state) => {
           if (!state.activeTournamentMatch) return;
           const newEvent: TournamentMatchEvent = {
             ...eventData,
             id: `event_${Date.now()}`,
             timestamp: new Date(),
+            seconds: 0,
           };
           state.activeTournamentMatch.events.push(newEvent);
-          state.activeTournamentMatch.events.sort((a, b) => a.minute - b.minute);
+          
           if (newEvent.eventType === 'goal') {
-            const isHomeTeam = newEvent.teamId === state.activeTournamentMatch.homeTeamId;
-            const isOwnGoal = newEvent.eventSubType === 'own_goal';
-            if (isOwnGoal) {
-              if (isHomeTeam) {
-                state.activeTournamentMatch.awayScore += 1;
-              } else {
-                state.activeTournamentMatch.homeScore += 1;
-              }
-            } else {
-              if (isHomeTeam) {
-                state.activeTournamentMatch.homeScore += 1;
-              } else {
-                state.activeTournamentMatch.awayScore += 1;
-              }
+             const isHome = newEvent.teamId === state.activeTournamentMatch.homeTeamId;
+             const isOwn = newEvent.eventSubType === 'own_goal';
+             if (isOwn) {
+                if (isHome) state.activeTournamentMatch.awayScore++;
+                else state.activeTournamentMatch.homeScore++;
+             } else {
+                if (isHome) state.activeTournamentMatch.homeScore++;
+                else state.activeTournamentMatch.awayScore++;
+             }
+          }
+        }),
+
+        submitMatchResult: (fixtureId, homeScore, awayScore, matchEvents) => set((state) => {
+            const tournament = state.tournaments.find(t => t.fixtures.some(f => f.id === fixtureId));
+            if (!tournament) return;
+
+            const fixture = tournament.fixtures.find(f => f.id === fixtureId);
+            if (!fixture) return;
+
+            fixture.status = 'completed';
+            fixture.homeScore = homeScore;
+            fixture.awayScore = awayScore;
+            fixture.matchData = { events: matchEvents };
+
+            tournament.teams = updateStandings(
+              tournament.teams,
+              fixture.homeTeamId,
+              fixture.awayTeamId,
+              homeScore,
+              awayScore,
+              tournament.settings
+            );
+
+            const groupFixtures = tournament.fixtures.filter(f => f.stage === 'group');
+            const allCompleted = groupFixtures.every(f => f.status === 'completed');
+            if (allCompleted) {
+                tournament.status = 'completed';
+                tournament.endDate = new Date();
+                const winner = [...tournament.teams].sort((a, b) => b.points - a.points)[0];
+                tournament.winner = winner?.teamName;
             }
-          }
+
+            tournament.updatedAt = new Date();
+            state.activeTournamentMatch = null;
         }),
+
         endTournamentMatch: () => set((state) => {
-          if (!state.activeTournamentMatch) return;
-          const match = state.activeTournamentMatch;
-          const tournament = state.tournaments.find(t => t.id === match.tournamentId);
-          if (!tournament) return;
-          const fixture = tournament.fixtures.find(f => f.id === match.fixtureId);
-          if (!fixture) return;
-          fixture.status = 'completed';
-          fixture.homeScore = match.homeScore;
-          fixture.awayScore = match.awayScore;
-          fixture.matchData = { ...match };
-          tournament.teams = updateStandings(
-            tournament.teams,
-            match.homeTeamId,
-            match.awayTeamId,
-            match.homeScore,
-            match.awayScore,
-            tournament.settings
-          );
-          tournament.updatedAt = new Date();
-          const groupFixtures = tournament.fixtures.filter(f => f.stage === 'group');
-          const allGroupCompleted = groupFixtures.every(f => f.status === 'completed');
-          if (allGroupCompleted) {
-            tournament.status = 'completed';
-            tournament.endDate = new Date();
-            const winner = [...tournament.teams].sort((a, b) => b.points - a.points)[0];
-            tournament.winner = winner?.teamName;
-          }
-          state.activeTournamentMatch = null;
+           state.activeTournamentMatch = null;
         }),
+
         cancelTournamentMatch: () => set((state) => {
           state.activeTournamentMatch = null;
         }),
+
         // Queries
-        getTournament: (tournamentId) => {
-          return get().tournaments.find(t => t.id === tournamentId) || null;
-        },
+        getTournament: (tournamentId) => get().tournaments.find(t => t.id === tournamentId) || null,
         getTournamentFixtures: (tournamentId) => {
-          const tournament = get().tournaments.find(t => t.id === tournamentId);
-          return tournament?.fixtures || [];
+            const tournament = get().tournaments.find(t => t.id === tournamentId);
+            return tournament?.fixtures || [];
         },
         getTournamentTable: (tournamentId, tableId) => {
           const tournament = get().tournaments.find(t => t.id === tournamentId);
@@ -569,35 +603,27 @@ export const useTournamentStore = create<TournamentState>()(
             if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
             if ((b.goalDifference || 0) !== (a.goalDifference || 0)) return (b.goalDifference || 0) - (a.goalDifference || 0);
             if ((b.goalsFor || 0) !== (a.goalsFor || 0)) return (b.goalsFor || 0) - (a.goalsFor || 0);
-            const aAvg = a.goalsAgainst > 0 ? a.goalsFor / a.goalsAgainst : a.goalsFor;
-            const bAvg = b.goalsAgainst > 0 ? b.goalsFor / b.goalsAgainst : b.goalsFor;
-            return bAvg - aAvg;
+            return 0;
           });
         },
         getTournamentStandings: (tournamentId) => {
-          const tournament = get().tournaments.find(t => t.id === tournamentId);
-          if (!tournament) return [];
-          return [...tournament.teams].sort((a, b) => {
-            if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
-            if ((b.goalDifference || 0) !== (a.goalDifference || 0)) return (b.goalDifference || 0) - (a.goalDifference || 0);
-            if ((b.goalsFor || 0) !== (a.goalsFor || 0)) return (b.goalsFor || 0) - (a.goalsFor || 0);
-            const aAvg = a.goalsAgainst > 0 ? a.goalsFor / a.goalsAgainst : a.goalsFor;
-            const bAvg = b.goalsAgainst > 0 ? b.goalsFor / b.goalsAgainst : b.goalsFor;
-            return bAvg - aAvg;
-          });
+             const tournament = get().tournaments.find(t => t.id === tournamentId);
+             if (!tournament) return [];
+             return [...tournament.teams].sort((a, b) => (b.points || 0) - (a.points || 0));
         },
         getUpcomingFixtures: (tournamentId) => {
-          const tournament = get().tournaments.find(t => t.id === tournamentId);
-          return tournament?.fixtures.filter(f => f.status === 'upcoming') || [];
+            const tournament = get().tournaments.find(t => t.id === tournamentId);
+            return tournament?.fixtures.filter(f => f.status === 'upcoming') || [];
         },
         getCompletedFixtures: (tournamentId) => {
-          const tournament = get().tournaments.find(t => t.id === tournamentId);
-          return tournament?.fixtures.filter(f => f.status === 'completed') || [];
+            const tournament = get().tournaments.find(t => t.id === tournamentId);
+            return tournament?.fixtures.filter(f => f.status === 'completed') || [];
         },
         getFixturesByRound: (tournamentId, round) => {
-          const tournament = get().tournaments.find(t => t.id === tournamentId);
-          return tournament?.fixtures.filter(f => f.round === round) || [];
+            const tournament = get().tournaments.find(t => t.id === tournamentId);
+            return tournament?.fixtures.filter(f => f.round === round) || [];
         },
+
         deleteTournament: (tournamentId) => set((state) => {
           if (state.activeTournamentMatch?.tournamentId === tournamentId) {
             state.activeTournamentMatch = null;
@@ -607,6 +633,7 @@ export const useTournamentStore = create<TournamentState>()(
           }
           state.tournaments = state.tournaments.filter(t => t.id !== tournamentId);
         }),
+        
         clearAllTournaments: () => set((state) => {
           state.tournaments = [];
           state.activeTournament = null;

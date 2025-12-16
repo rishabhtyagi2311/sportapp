@@ -1,3 +1,5 @@
+// app/(user)/eventDetails/[eventId].tsx (or wherever you place this file)
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -13,7 +15,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import uuid from 'react-native-uuid'; // IMPORTED THIS
+import uuid from 'react-native-uuid'; // Logic Fix: Import UUID
 
 // STORES & TYPES
 import { Event } from '@/types/booking';
@@ -21,7 +23,7 @@ import { useBookingStore } from '@/store/venueStore';
 import { 
   useRegistrationRequestStore, 
   RegistrationRequest 
-} from '@/store/eventRegistrationRequestStore'; // IMPORTED THIS
+} from '@/store/eventRegistrationRequestStore'; // Logic Fix: Import Request Store
 
 // Mock User (In real app, get this from your Auth Context)
 const CURRENT_USER_ID = 'user-123';
@@ -45,7 +47,7 @@ const EventDetailsScreen: React.FC = () => {
 
   // 1. GET STORE ACTIONS
   const { getEventById, getVenueById } = useBookingStore();
-  const { addRequest } = useRegistrationRequestStore(); // CONNECTED STORE
+  const { addRequest } = useRegistrationRequestStore(); // Logic Fix: Get addRequest action
   
   const [event, setEvent] = useState<Event | null>(null);
   const [activeTab, setActiveTab] = useState<'details' | 'registration'>('details');
@@ -69,6 +71,7 @@ const EventDetailsScreen: React.FC = () => {
     if (foundEvent) {
       setEvent(foundEvent);
       
+      // Initialize team members array if it's a team event
       if (foundEvent.participationType === 'team' && foundEvent.teamSize) {
         const initialMembers: TeamMemberForm[] = Array.from(
           { length: foundEvent.teamSize },
@@ -102,7 +105,6 @@ const EventDetailsScreen: React.FC = () => {
     spotsLeft > 0 && 
     new Date() < registrationDeadline;
 
-  // ... (Keep your getStatusColor and getEventTypeColor helpers here) ...
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'upcoming': return { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' };
@@ -124,35 +126,58 @@ const EventDetailsScreen: React.FC = () => {
     }
   };
 
-  // ... (Keep your validation functions: validateIndividualForm, validateTeamForm) ...
   const validateIndividualForm = (): boolean => {
-    if (!participantForm.name.trim()) { Alert.alert('Error', 'Enter name'); return false; }
-    if (!participantForm.contact.trim() || participantForm.contact.length !== 10) { Alert.alert('Error', 'Enter valid contact'); return false; }
-    if (!participantForm.email.includes('@')) { Alert.alert('Error', 'Enter valid email'); return false; }
-    return true;
-  };
-
-  const validateTeamForm = (): boolean => {
-    if (!teamName.trim()) { Alert.alert('Error', 'Enter team name'); return false; }
-    if (!captainContact.trim()) { Alert.alert('Error', 'Enter captain contact'); return false; }
-    if (!captainEmail.includes('@')) { Alert.alert('Error', 'Enter captain email'); return false; }
-    for (let i = 0; i < teamMembers.length; i++) {
-        if (!teamMembers[i].name || !teamMembers[i].contact) {
-            Alert.alert('Error', `Complete details for Player ${i+1}`);
-            return false;
-        }
+    if (!participantForm.name.trim()) {
+      Alert.alert('Validation Error', 'Please enter your name');
+      return false;
+    }
+    if (!participantForm.contact.trim() || participantForm.contact.length !== 10) {
+      Alert.alert('Validation Error', 'Please enter a valid 10-digit contact number');
+      return false;
+    }
+    if (!participantForm.email.trim() || !participantForm.email.includes('@')) {
+      Alert.alert('Validation Error', 'Please enter a valid email address');
+      return false;
     }
     return true;
   };
 
-  /* -------------------- THE CRITICAL FIX -------------------- */
+  const validateTeamForm = (): boolean => {
+    if (!teamName.trim()) {
+      Alert.alert('Validation Error', 'Please enter your team name');
+      return false;
+    }
+    if (!captainContact.trim() || captainContact.length !== 10) {
+      Alert.alert('Validation Error', 'Please enter a valid 10-digit captain contact number');
+      return false;
+    }
+    if (!captainEmail.trim() || !captainEmail.includes('@')) {
+      Alert.alert('Validation Error', 'Please enter a valid captain email address');
+      return false;
+    }
+    
+    for (let i = 0; i < teamMembers.length; i++) {
+      const member = teamMembers[i];
+      if (!member.name.trim()) {
+        Alert.alert('Validation Error', `Please enter name for Team Member ${i + 1}`);
+        return false;
+      }
+      if (!member.contact.trim() || member.contact.length !== 10) {
+        Alert.alert('Validation Error', `Please enter valid contact for Team Member ${i + 1}`);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  /* -------------------- LOGIC FIX: Handle Registration -------------------- */
   const handleRegistration = () => {
     if (event.participationType === 'individual') {
       if (!validateIndividualForm()) return;
       
       Alert.alert(
         'Confirm Registration',
-        `Register for ${event.name}?\nFee: ₹${event.fees.amount}`,
+        `Register for ${event.name}?\n\nName: ${participantForm.name}\nContact: ${participantForm.contact}\nFee: ₹${event.fees.amount}`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -160,7 +185,7 @@ const EventDetailsScreen: React.FC = () => {
             onPress: () => {
               setIsRegistering(true);
 
-              // 1. Construct the Request Object
+              // 1. Create Request Object
               const newRequest: RegistrationRequest = {
                 id: uuid.v4().toString(),
                 eventId: event.id,
@@ -173,29 +198,28 @@ const EventDetailsScreen: React.FC = () => {
                 submittedAt: new Date().toISOString(),
               };
 
-              // 2. Simulate Network Delay then Save to Store
+              // 2. Simulate API Call
               setTimeout(() => {
-                // 3. CALL STORE ACTION
+                // 3. Save to Store
                 addRequest(newRequest);
                 
                 setIsRegistering(false);
                 Alert.alert(
-                  'Success!',
-                  'Registration submitted. Waiting for approval.',
+                  'Registration Successful!',
+                  'You have been registered for the event. Check your email for confirmation.',
                   [{ text: 'OK', onPress: () => router.back() }]
                 );
-              }, 1000);
+              }, 1500);
             },
           },
         ]
       );
     } else {
-      // TEAM LOGIC
       if (!validateTeamForm()) return;
       
       Alert.alert(
         'Confirm Team Registration',
-        `Register team "${teamName}"?\nFee: ₹${event.fees.amount}`,
+        `Register team "${teamName}" for ${event.name}?\n\nTeam Size: ${teamMembers.length}\nCaptain: ${captainContact}\nFee: ₹${event.fees.amount}`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -203,7 +227,7 @@ const EventDetailsScreen: React.FC = () => {
             onPress: () => {
               setIsRegistering(true);
 
-              // 1. Construct the Request Object
+              // 1. Create Request Object
               const newRequest: RegistrationRequest = {
                 id: uuid.v4().toString(),
                 eventId: event.id,
@@ -218,18 +242,18 @@ const EventDetailsScreen: React.FC = () => {
                 submittedAt: new Date().toISOString(),
               };
 
-              // 2. Simulate Network Delay then Save to Store
+              // 2. Simulate API Call
               setTimeout(() => {
-                // 3. CALL STORE ACTION
+                // 3. Save to Store
                 addRequest(newRequest);
 
                 setIsRegistering(false);
                 Alert.alert(
-                  'Success!',
-                  'Team registration submitted. Waiting for approval.',
+                  'Team Registration Successful!',
+                  'Your team has been registered for the event. Check your email for confirmation.',
                   [{ text: 'OK', onPress: () => router.back() }]
                 );
-              }, 1000);
+              }, 1500);
             },
           },
         ]
@@ -243,14 +267,256 @@ const EventDetailsScreen: React.FC = () => {
     setTeamMembers(updatedMembers);
   };
 
-  // ... (The rest of your render code for renderDetailsTab and renderRegistrationTab remains exactly the same) ...
+  /* -------------------- UI COMPONENTS -------------------- */
 
   const renderDetailsTab = () => (
     <ScrollView className="flex-1 bg-gray-50">
-        {/* ... (Your existing UI code) ... */}
-        {/* I am omitting the UI boilerplate to keep the answer concise, 
-            but use your exact UI code from the prompt here. */}
-        <View className="p-6"><Text>Event Details View Loaded</Text></View>
+      {/* Event Header */}
+      <View className="bg-white px-6 py-8">
+        <View className="flex-row items-center justify-between mb-4">
+          <View className={`px-3 py-1.5 rounded-lg border ${getEventTypeColor(event.eventType).bg} ${getEventTypeColor(event.eventType).border}`}>
+            <Text className={`text-sm font-semibold capitalize ${getEventTypeColor(event.eventType).text}`}>
+              {event.eventType}
+            </Text>
+          </View>
+          
+          <View className={`px-3 py-1.5 rounded-lg border ${getStatusColor(event.status).bg} ${getStatusColor(event.status).border}`}>
+            <Text className={`text-sm font-semibold capitalize ${getStatusColor(event.status).text}`}>
+              {event.status}
+            </Text>
+          </View>
+        </View>
+
+        <Text className="text-3xl font-bold text-slate-900 mb-4 leading-tight">
+          {event.name}
+        </Text>
+
+        {event.description && (
+          <Text className="text-slate-600 text-base leading-relaxed mb-6">
+            {event.description}
+          </Text>
+        )}
+
+        {/* Sport Info */}
+        <View className="flex-row items-center mb-4">
+          <View className="bg-green-100 px-3 py-2 rounded-lg mr-3">
+            <Text className="text-green-800 text-sm font-semibold">
+              {event.sport.name}
+            </Text>
+          </View>
+          
+          <View className="flex-row items-center bg-slate-100 px-3 py-2 rounded-lg">
+            <Ionicons name="people-outline" size={16} color="#475569" />
+            <Text className="text-slate-700 text-sm ml-2 font-medium">
+              {event.participationType === 'team' 
+                ? `Team (${event.teamSize} players)` 
+                : 'Individual'
+              }
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Event Details Cards */}
+      <View className="px-6 py-2">
+        {/* Date & Time */}
+        <View className="bg-white rounded-xl p-5 mb-4 shadow-sm border border-gray-100">
+          <Text className="text-lg font-bold text-slate-900 mb-4">Date & Time</Text>
+          
+          <View className="flex-row items-center mb-3">
+            <View className="bg-green-50 p-2 rounded-lg">
+              <Ionicons name="calendar" size={20} color="#16a34a" />
+            </View>
+            <View className="ml-3 flex-1">
+              <Text className="text-slate-500 text-xs mb-1">Event Date</Text>
+              <Text className="text-slate-900 text-base font-semibold">
+                {eventDate.toLocaleDateString('en-IN', { 
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric'
+                })}
+              </Text>
+            </View>
+          </View>
+
+          <View className="flex-row items-center mb-3">
+            <View className="bg-blue-50 p-2 rounded-lg">
+              <Ionicons name="time" size={20} color="#2563eb" />
+            </View>
+            <View className="ml-3 flex-1">
+              <Text className="text-slate-500 text-xs mb-1">Start Time</Text>
+              <Text className="text-slate-900 text-base font-semibold">
+                {eventDate.toLocaleTimeString('en-IN', { 
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </Text>
+            </View>
+          </View>
+
+          <View className="flex-row items-center">
+            <View className="bg-purple-50 p-2 rounded-lg">
+              <Ionicons name="hourglass-outline" size={20} color="#9333ea" />
+            </View>
+            <View className="ml-3 flex-1">
+              <Text className="text-slate-500 text-xs mb-1">Duration</Text>
+              <Text className="text-slate-900 text-base font-semibold">
+                {event.duration} {event.duration === 1 ? 'hour' : 'hours'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Venue */}
+        {venue && (
+          <View className="bg-white rounded-xl p-5 mb-4 shadow-sm border border-gray-100">
+            <Text className="text-lg font-bold text-slate-900 mb-4">Venue</Text>
+            
+            <View className="flex-row items-start mb-3">
+              <View className="bg-orange-50 p-2 rounded-lg">
+                <Ionicons name="location" size={20} color="#ea580c" />
+              </View>
+              <View className="ml-3 flex-1">
+                <Text className="text-slate-900 text-base font-semibold mb-1">
+                  {venue.name}
+                </Text>
+                <Text className="text-slate-600 text-sm leading-relaxed">
+                  {venue.address.street}, {venue.address.city}
+                </Text>
+                <Text className="text-slate-600 text-sm">
+                  {venue.address.state} - {venue.address.pincode}
+                </Text>
+              </View>
+            </View>
+
+            <View className="flex-row items-center">
+              <View className="bg-blue-50 p-2 rounded-lg">
+                <Ionicons name="call" size={20} color="#2563eb" />
+              </View>
+              <View className="ml-3 flex-1">
+                <Text className="text-slate-600 text-sm mb-1">Contact</Text>
+                <Text className="text-slate-900 text-base font-semibold">
+                  {venue.contactInfo.phone}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Participation Info */}
+        <View className="bg-white rounded-xl p-5 mb-4 shadow-sm border border-gray-100">
+          <Text className="text-lg font-bold text-slate-900 mb-4">Participation</Text>
+          
+          <View className="mb-4">
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-slate-600 text-sm">
+                {event.currentParticipants}/{event.maxParticipants} {event.participationType === 'team' ? 'teams' : 'participants'} registered
+              </Text>
+              <Text className="text-slate-900 text-sm font-semibold">
+                {spotsLeft} spot{spotsLeft !== 1 ? 's' : ''} left
+              </Text>
+            </View>
+            
+            <View className="w-full bg-gray-200 rounded-full h-2.5">
+              <View 
+                className={`h-2.5 rounded-full ${
+                  (event.currentParticipants / event.maxParticipants) * 100 >= 80 
+                    ? 'bg-orange-500' 
+                    : 'bg-green-500'
+                }`}
+                style={{ 
+                  width: `${Math.min((event.currentParticipants / event.maxParticipants) * 100, 100)}%` 
+                }}
+              />
+            </View>
+          </View>
+
+          <View className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <View className="flex-row items-center mb-2">
+              <Ionicons name="time-outline" size={18} color="#ca8a04" />
+              <Text className="text-yellow-800 font-semibold ml-2">Registration Deadline</Text>
+            </View>
+            <Text className="text-yellow-700 text-sm">
+              {registrationDeadline.toLocaleDateString('en-IN', { 
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </Text>
+          </View>
+        </View>
+
+        {/* Fees */}
+        <View className="bg-white rounded-xl p-5 mb-4 shadow-sm border border-gray-100">
+          <Text className="text-lg font-bold text-slate-900 mb-4">Entry Fee</Text>
+          
+          <View className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+            <View className="flex-row items-center justify-between">
+              <View>
+                <Text className="text-slate-600 text-sm mb-1">
+                  {event.fees.type.replace('_', ' ').toUpperCase()}
+                </Text>
+                <Text className="text-green-700 text-3xl font-bold">
+                  ₹{event.fees.amount}
+                </Text>
+              </View>
+              <View className="bg-green-200 p-3 rounded-full">
+                <Ionicons name="cash-outline" size={28} color="#15803d" />
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Organizer */}
+        <View className="bg-white rounded-xl p-5 mb-4 shadow-sm border border-gray-100">
+          <Text className="text-lg font-bold text-slate-900 mb-4">Organizer</Text>
+          
+          <View className="flex-row items-center mb-3">
+            <View className="bg-purple-50 p-2 rounded-lg">
+              <Ionicons name="person" size={20} color="#9333ea" />
+            </View>
+            <View className="ml-3 flex-1">
+              <Text className="text-slate-500 text-xs mb-1">Name</Text>
+              <Text className="text-slate-900 text-base font-semibold">
+                {event.organizer.name}
+              </Text>
+            </View>
+          </View>
+
+          <View className="flex-row items-center">
+            <View className="bg-blue-50 p-2 rounded-lg">
+              <Ionicons name="call" size={20} color="#2563eb" />
+            </View>
+            <View className="ml-3 flex-1">
+              <Text className="text-slate-500 text-xs mb-1">Contact</Text>
+              <Text className="text-slate-900 text-base font-semibold">
+                {event.organizer.contact}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Requirements */}
+        {event.requirements && event.requirements.length > 0 && (
+          <View className="bg-white rounded-xl p-5 mb-6 shadow-sm border border-gray-100">
+            <Text className="text-lg font-bold text-slate-900 mb-4">Requirements</Text>
+            
+            {event.requirements.map((requirement, index) => (
+              <View key={index} className="flex-row items-start mb-3 last:mb-0">
+                <View className="bg-blue-100 rounded-full p-1 mt-0.5">
+                  <Ionicons name="checkmark" size={14} color="#1e40af" />
+                </View>
+                <Text className="text-slate-700 text-sm ml-3 flex-1 leading-relaxed">
+                  {requirement}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 
@@ -260,25 +526,230 @@ const EventDetailsScreen: React.FC = () => {
       className="flex-1"
     >
       <ScrollView className="flex-1 bg-gray-50">
-         {/* ... (Your existing UI code for forms) ... */}
-         {/* Use your exact UI code from the prompt here. */}
-         {/* Note: I'm keeping the form inputs, just ensuring the "Register" button 
-             calls the UPDATED handleRegistration function above */}
-         
-         <View className="px-6 py-8">
-            {/* ... Form Logic ... */}
-            {isRegistrationOpen && (
+        <View className="px-6 py-8">
+          {!isRegistrationOpen ? (
+            <View className="bg-red-50 border border-red-200 rounded-xl p-6">
+              <View className="flex-row items-center mb-3">
+                <Ionicons name="close-circle" size={24} color="#dc2626" />
+                <Text className="text-red-900 text-lg font-bold ml-3">
+                  Registration Closed
+                </Text>
+              </View>
+              <Text className="text-red-700 text-base leading-relaxed">
+                {spotsLeft === 0 
+                  ? 'This event is full. No more registrations are being accepted.'
+                  : event.status === 'cancelled'
+                  ? 'This event has been cancelled.'
+                  : new Date() >= registrationDeadline
+                  ? 'The registration deadline has passed.'
+                  : 'Registration is currently not available for this event.'
+                }
+              </Text>
+            </View>
+          ) : event.participationType === 'individual' ? (
+            <>
+              <Text className="text-2xl font-bold text-slate-900 mb-2">
+                Individual Registration
+              </Text>
+              <Text className="text-slate-600 text-base mb-8 leading-relaxed">
+                Fill in your details to register for this event
+              </Text>
+
+              {/* Individual Form */}
+              <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
+                <View className="mb-5">
+                  <Text className="text-slate-700 text-sm font-semibold mb-2">
+                    Full Name <Text className="text-red-500">*</Text>
+                  </Text>
+                  <TextInput
+                    className="bg-gray-50 border border-gray-300 rounded-lg px-4 py-3.5 text-slate-900 text-base"
+                    placeholder="Enter your full name"
+                    value={participantForm.name}
+                    onChangeText={(text) => setParticipantForm({ ...participantForm, name: text })}
+                  />
+                </View>
+
+                <View className="mb-5">
+                  <Text className="text-slate-700 text-sm font-semibold mb-2">
+                    Contact Number <Text className="text-red-500">*</Text>
+                  </Text>
+                  <TextInput
+                    className="bg-gray-50 border border-gray-300 rounded-lg px-4 py-3.5 text-slate-900 text-base"
+                    placeholder="10-digit mobile number"
+                    value={participantForm.contact}
+                    onChangeText={(text) => setParticipantForm({ ...participantForm, contact: text.replace(/[^0-9]/g, '') })}
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                  />
+                </View>
+
+                <View className="mb-0">
+                  <Text className="text-slate-700 text-sm font-semibold mb-2">
+                    Email Address <Text className="text-red-500">*</Text>
+                  </Text>
+                  <TextInput
+                    className="bg-gray-50 border border-gray-300 rounded-lg px-4 py-3.5 text-slate-900 text-base"
+                    placeholder="your.email@example.com"
+                    value={participantForm.email}
+                    onChangeText={(text) => setParticipantForm({ ...participantForm, email: text })}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
+
+              {/* Fee Summary */}
+              <View className="bg-green-50 border border-green-200 rounded-xl p-5 mb-6">
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-slate-700 text-base font-semibold">
+                    Registration Fee
+                  </Text>
+                  <Text className="text-green-700 text-2xl font-bold">
+                    ₹{event.fees.amount}
+                  </Text>
+                </View>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text className="text-2xl font-bold text-slate-900 mb-2">
+                Team Registration
+              </Text>
+              <Text className="text-slate-600 text-base mb-8 leading-relaxed">
+                Register your team of {event.teamSize} players
+              </Text>
+
+              {/* Team Details */}
+              <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
+                <Text className="text-lg font-bold text-slate-900 mb-5">Team Details</Text>
+                
+                <View className="mb-5">
+                  <Text className="text-slate-700 text-sm font-semibold mb-2">
+                    Team Name <Text className="text-red-500">*</Text>
+                  </Text>
+                  <TextInput
+                    className="bg-gray-50 border border-gray-300 rounded-lg px-4 py-3.5 text-slate-900 text-base"
+                    placeholder="Enter your team name"
+                    value={teamName}
+                    onChangeText={setTeamName}
+                  />
+                </View>
+
+                <View className="mb-5">
+                  <Text className="text-slate-700 text-sm font-semibold mb-2">
+                    Captain Contact <Text className="text-red-500">*</Text>
+                  </Text>
+                  <TextInput
+                    className="bg-gray-50 border border-gray-300 rounded-lg px-4 py-3.5 text-slate-900 text-base"
+                    placeholder="10-digit mobile number"
+                    value={captainContact}
+                    onChangeText={(text) => setCaptainContact(text.replace(/[^0-9]/g, ''))}
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                  />
+                </View>
+
+                <View className="mb-0">
+                  <Text className="text-slate-700 text-sm font-semibold mb-2">
+                    Captain Email <Text className="text-red-500">*</Text>
+                  </Text>
+                  <TextInput
+                    className="bg-gray-50 border border-gray-300 rounded-lg px-4 py-3.5 text-slate-900 text-base"
+                    placeholder="captain.email@example.com"
+                    value={captainEmail}
+                    onChangeText={setCaptainEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
+
+              {/* Team Members */}
+              <View className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
+                <Text className="text-lg font-bold text-slate-900 mb-5">
+                  Team Members ({event.teamSize} Players)
+                </Text>
+                
+                {teamMembers.map((member, index) => (
+                  <View key={member.id} className="mb-6 last:mb-0">
+                    <Text className="text-slate-900 text-base font-semibold mb-3">
+                      Player {index + 1}
+                    </Text>
+                    
+                    <View className="mb-3">
+                      <Text className="text-slate-700 text-sm font-medium mb-2">
+                        Name <Text className="text-red-500">*</Text>
+                      </Text>
+                      <TextInput
+                        className="bg-gray-50 border border-gray-300 rounded-lg px-4 py-3 text-slate-900"
+                        placeholder="Player name"
+                        value={member.name}
+                        onChangeText={(text) => updateTeamMember(index, 'name', text)}
+                      />
+                    </View>
+
+                    <View className="mb-0">
+                      <Text className="text-slate-700 text-sm font-medium mb-2">
+                        Contact <Text className="text-red-500">*</Text>
+                      </Text>
+                      <TextInput
+                        className="bg-gray-50 border border-gray-300 rounded-lg px-4 py-3 text-slate-900"
+                        placeholder="10-digit number"
+                        value={member.contact}
+                        onChangeText={(text) => updateTeamMember(index, 'contact', text.replace(/[^0-9]/g, ''))}
+                        keyboardType="phone-pad"
+                        maxLength={10}
+                      />
+                    </View>
+
+                    {index < teamMembers.length - 1 && (
+                      <View className="border-b border-gray-200 mt-5" />
+                    )}
+                  </View>
+                ))}
+              </View>
+
+              {/* Fee Summary */}
+              <View className="bg-green-50 border border-green-200 rounded-xl p-5 mb-6">
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-slate-700 text-base font-semibold">
+                    Team Registration Fee
+                  </Text>
+                  <Text className="text-green-700 text-2xl font-bold">
+                    ₹{event.fees.amount}
+                  </Text>
+                </View>
+                <Text className="text-slate-600 text-sm mt-2">
+                  {event.fees.type.replace('_', ' ')}
+                </Text>
+              </View>
+            </>
+          )}
+
+          {/* Register Button */}
+          {isRegistrationOpen && (
             <TouchableOpacity
               className={`${isRegistering ? 'bg-gray-400' : 'bg-green-600'} rounded-xl py-4 shadow-lg`}
-              onPress={handleRegistration} // This now calls the fixed function
+              onPress={handleRegistration}
               disabled={isRegistering}
+              activeOpacity={0.8}
             >
               <Text className="text-white text-center text-lg font-bold">
-                {isRegistering ? 'Processing...' : 'Register Now'}
+                {isRegistering ? 'Processing...' : `Register ${event.participationType === 'team' ? 'Team' : 'Now'}`}
               </Text>
             </TouchableOpacity>
           )}
-         </View>
+
+          {/* Terms */}
+          <View className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <View className="flex-row items-start">
+              <Ionicons name="information-circle" size={20} color="#2563eb" className="mt-0.5" />
+              <Text className="text-blue-800 text-sm ml-3 flex-1 leading-relaxed">
+                By registering, you agree to the event terms and conditions. Payment will be collected at the venue.
+              </Text>
+            </View>
+          </View>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -286,20 +757,90 @@ const EventDetailsScreen: React.FC = () => {
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      {/* ... (Your Header and Tabs UI) ... */}
-       <View className="bg-slate-900 px-4 py-3 flex-row items-center">
-            <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={24} color="white" /></TouchableOpacity>
-            <Text className="text-white font-bold text-lg ml-4">{event.name}</Text>
-       </View>
+      
+      {/* Header */}
+      <View className="bg-slate-900 px-4 py-3 flex-row items-center shadow-sm border-b border-gray-100">
+        <TouchableOpacity 
+          onPress={() => router.back()}
+          className="mr-4"
+        >
+          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        </TouchableOpacity>
+        
+        <View className="flex-1">
+          <Text className="text-lg font-bold text-white" numberOfLines={1}>
+            {event.name}
+          </Text>
+          <Text className="text-sm text-white">
+            {eventDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+          </Text>
+        </View>
+      </View>
 
-       {/* Tab Buttons */}
-       <View className="flex-row bg-white">
-          <TouchableOpacity onPress={() => setActiveTab('details')} className="p-4"><Text>Details</Text></TouchableOpacity>
-          <TouchableOpacity onPress={() => setActiveTab('registration')} className="p-4"><Text>Registration</Text></TouchableOpacity>
-       </View>
+      {/* Tab Navigation */}
+      <View className="bg-white border-b border-gray-200">
+        <View className="flex-row px-6">
+          {[
+            { key: 'details', label: 'Event Details', icon: 'information-circle-outline' },
+            { key: 'registration', label: 'Registration', icon: 'clipboard-outline' },
+          ].map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
+              className={`py-4 mr-8 border-b-3 flex-row items-center ${
+                activeTab === tab.key 
+                  ? 'border-green-600' 
+                  : 'border-transparent'
+              }`}
+              onPress={() => setActiveTab(tab.key as any)}
+            >
+              <Ionicons 
+                name={tab.icon as any} 
+                size={18} 
+                color={activeTab === tab.key ? '#16a34a' : '#64748b'} 
+              />
+              <Text className={`font-bold text-base ml-2 ${
+                activeTab === tab.key 
+                  ? 'text-green-700' 
+                  : 'text-slate-500'
+              }`}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
 
+      {/* Content */}
       {activeTab === 'details' && renderDetailsTab()}
       {activeTab === 'registration' && renderRegistrationTab()}
+
+      {/* Floating Action Button (only on details tab) */}
+      {activeTab === 'details' && isRegistrationOpen && (
+        <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4 shadow-lg">
+          <TouchableOpacity
+            className="bg-green-600 rounded-xl py-4 flex-row items-center justify-center shadow-lg"
+            onPress={() => setActiveTab('registration')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="create-outline" size={22} color="white" />
+            <Text className="text-white text-center text-lg font-bold ml-2">
+              Register for Event
+            </Text>
+          </TouchableOpacity>
+          
+          <View className="flex-row items-center justify-center mt-3">
+            <Text className="text-slate-600 text-sm">
+              Entry Fee: 
+            </Text>
+            <Text className="text-green-700 text-lg font-bold ml-2">
+              ₹{event.fees.amount}
+            </Text>
+            <Text className="text-slate-500 text-xs ml-2">
+              ({event.fees.type.replace('_', ' ')})
+            </Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };

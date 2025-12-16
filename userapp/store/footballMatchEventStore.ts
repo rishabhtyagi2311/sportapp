@@ -1,6 +1,5 @@
-// stores/matchExecutionStore.ts (updated to support live timer and automatic event timing)
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
+import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { MatchCreationData } from './footballMatchCreationStore';
 
@@ -15,7 +14,7 @@ export interface MatchEvent {
   assistPlayerId?: string;
   assistPlayerName?: string;
   minute: number;
-  seconds : number,
+  seconds: number;
   isExtraTime: boolean;
   timestamp: Date;
 }
@@ -23,13 +22,9 @@ export interface MatchEvent {
 export type EventType = 'goal' | 'penalty' | 'card' | 'substitution' | 'offside' | 'foul' | 'corner' | 'free_kick';
 
 export type EventSubType = 
-  // Goal types
   | 'header' | 'left_foot' | 'right_foot' | 'penalty_goal' | 'free_kick_goal' | 'own_goal'
-  // Card types  
   | 'yellow_card' | 'red_card' | 'second_yellow'
-  // Foul types
   | 'dangerous_play' | 'unsporting_behavior' | 'dissent' | 'handball'
-  // Other
   | 'injury_time' | 'time_wasting';
 
 // Match status
@@ -63,133 +58,114 @@ export interface PlayerStats {
 // Complete match data
 export interface CompletedMatch {
   id: string;
-  
-  // Match setup data (from MatchCreationData)
   matchSetup: MatchCreationData;
-  
-  // Match execution data
   startTime: Date;
   endTime?: Date;
-  actualDuration: number; // in minutes
+  actualDuration: number;
   status: MatchStatus;
-  
-  // Score
   homeTeamScore: number;
   awayTeamScore: number;
-  
-  // Events
   events: MatchEvent[];
-  
-  // Statistics
   homeTeamStats: TeamStats;
   awayTeamStats: TeamStats;
   playerStats: PlayerStats[];
-  
-  // Match officials
   referees: string[];
-  
-  // Venue and conditions
   venue: string;
   weather?: string;
   attendance?: number;
-  
-  // Match notes
   notes?: string;
-  
-  // Metadata
   createdAt: Date;
   updatedAt: Date;
 }
 
-// Active match state - added timerStartedAt field
+// Active match state
 export interface ActiveMatch {
   id: string;
+  context?: {
+    type: 'friendly' | 'tournament';
+    tournamentId?: string;
+    fixtureId?: string;
+    tableId?: string;
+  };
   matchSetup: MatchCreationData;
   startTime: Date;
-  timerStartedAt: Date; // Added this field to track when the timer was started
+  timerStartedAt: Date;
   currentMinute: number;
   status: MatchStatus;
   events: MatchEvent[];
   homeTeamScore: number;
   awayTeamScore: number;
   isExtraTime: boolean;
- 
   notes: string;
+
+  // NEW: Roster State
+  homeTeamOnPitch: string[];
+  homeTeamBench: string[];
+  awayTeamOnPitch: string[];
+  awayTeamBench: string[];
+  
+  // NEW: Substitution Limits
+  homeSubsUsed: number;
+  awaySubsUsed: number;
 }
 
-// Store state - added new timer-related fields and methods
 export interface MatchExecutionState {
-  // Current active match
   activeMatch: ActiveMatch | null;
-  
-  // Live matches (ongoing matches)
   liveMatches: ActiveMatch[];
-  
-  // Completed matches history
   completedMatches: CompletedMatch[];
-  
-  // Loading states
   isStartingMatch: boolean;
   isSavingEvent: boolean;
   isEndingMatch: boolean;
-  
-  // Error handling
   error: string | null;
-  
-  // Actions for match lifecycle
+
+  // Actions
   startMatch: (matchSetup: MatchCreationData) => void;
+  setMatchContext: (context: ActiveMatch['context']) => void;
   endMatch: (notes?: string) => CompletedMatch | null;
   abandonMatch: (reason: string) => void;
-  
-  // Actions for events
   addEvent: (event: Omit<MatchEvent, 'id' | 'timestamp'>) => void;
+  
+  // NEW: Substitution Action
+  performSubstitution: (teamId: string, playerOutId: string, playerInId: string, playerOutName: string, playerInName: string, minute: number, seconds: number) => void;
+  
   updateEvent: (eventId: string, updates: Partial<MatchEvent>) => void;
   removeEvent: (eventId: string) => void;
-  
-  // Actions for match state
   updateMatchStatus: (status: MatchStatus) => void;
   updateCurrentMinute: (minute: number) => void;
- 
- 
   addMatchNotes: (notes: string) => void;
-  
+
   // Computed values
   getMatchDuration: () => number;
   getTeamScore: (teamId: string) => number;
   getTeamEvents: (teamId: string) => MatchEvent[];
   getPlayerEvents: (playerId: string) => MatchEvent[];
   getMatchStats: () => { homeStats: TeamStats; awayStats: TeamStats };
-  
-  // History management
   getCompletedMatches: () => CompletedMatch[];
   getMatchById: (matchId: string) => CompletedMatch | null;
   clearMatchHistory: () => void;
-  
-  // Error handling
   setError: (error: string | null) => void;
   clearError: () => void;
-  
-  // New actions for live matches
-  addLiveMatch: (matchSetup: MatchCreationData) => string; // Returns match ID
+
+  // Live match management
+  addLiveMatch: (matchSetup: MatchCreationData) => string;
   updateLiveMatch: (matchId: string, updates: Partial<ActiveMatch>) => void;
   completeLiveMatch: (matchId: string, notes?: string) => CompletedMatch | null;
   getLiveMatches: () => ActiveMatch[];
-  
-  // New timer-related methods
-  getCurrentMatchTime: () => { minutes: number, seconds: number }; // Get current time in min:sec format
-  getElapsedSeconds: () => number; // Get elapsed seconds since match start
-  resetTimer: () => void; // Reset the timer (for example at half-time)
+
+  // Timer methods
+  getCurrentMatchTime: () => { minutes: number, seconds: number };
+  getElapsedSeconds: () => number;
+  resetTimer: () => void;
 }
 
 // Helper functions
 const calculateTeamStats = (events: MatchEvent[], teamId: string): TeamStats => {
   const teamEvents = events.filter(event => event.teamId === teamId);
-  
   return {
     goals: teamEvents.filter(e => e.eventType === 'goal' && e.eventSubType !== 'own_goal').length,
-    shots: 0, // Can be manually tracked or estimated
+    shots: 0,
     shotsOnTarget: 0,
-    possession: 0, // Would need to be manually entered
+    possession: 0,
     corners: teamEvents.filter(e => e.eventType === 'corner').length,
     fouls: teamEvents.filter(e => e.eventType === 'foul').length,
     yellowCards: teamEvents.filter(e => e.eventType === 'card' && e.eventSubType === 'yellow_card').length,
@@ -213,22 +189,21 @@ const calculatePlayerStats = (events: MatchEvent[], matchSetup: MatchCreationDat
     const yellowCards = playerEvents.filter(e => e.playerId === playerId && e.eventType === 'card' && e.eventSubType === 'yellow_card').length;
     const redCards = playerEvents.filter(e => e.playerId === playerId && e.eventType === 'card' && (e.eventSubType === 'red_card' || e.eventSubType === 'second_yellow')).length;
     
-    // Find substitution events
     const substitutionOut = events.find(e => e.playerId === playerId && e.eventType === 'substitution');
     const substitutionIn = events.find(e => e.assistPlayerId === playerId && e.eventType === 'substitution');
     
-    // Calculate minutes played
     let minutesPlayed = 0;
+    // Check if player was in starting lineup
     const isStartingPlayer = matchSetup.myTeam.selectedPlayers.includes(playerId) || matchSetup.opponentTeam.selectedPlayers.includes(playerId);
     
     if (isStartingPlayer) {
-      minutesPlayed = substitutionOut ? substitutionOut.minute : 90; // Assume 90 minutes if not substituted
+      minutesPlayed = substitutionOut ? substitutionOut.minute : 90; 
     } else if (substitutionIn) {
-      minutesPlayed = 90 - substitutionIn.minute; // Minutes from substitution to end
+      minutesPlayed = 90 - substitutionIn.minute; 
     }
     return {
       playerId,
-      playerName: 'Player Name', // Would need to fetch from players store
+      playerName: 'Player Name', 
       goals,
       assists,
       yellowCards,
@@ -240,7 +215,6 @@ const calculatePlayerStats = (events: MatchEvent[], matchSetup: MatchCreationDat
   });
 };
 
-// Initial state
 const initialState = {
   activeMatch: null,
   liveMatches: [],
@@ -251,478 +225,389 @@ const initialState = {
   error: null,
 };
 
-// Create the store
 export const useMatchExecutionStore = create<MatchExecutionState>()(
   devtools(
-    immer((set, get) => ({
-      ...initialState,
-      
-      // Add a match to live matches
-      addLiveMatch: (matchSetup) => {
-        const matchId = `match_${Date.now()}`;
-        const now = new Date();
-        
-        set((state) => {
+    persist(
+      immer((set, get) => ({
+        ...initialState,
+
+        startMatch: (matchSetup) => set((state) => {
+          const matchId = `match_${Date.now()}`;
+          const now = new Date();
+          
           const newMatch: ActiveMatch = {
             id: matchId,
             matchSetup,
             startTime: now,
-            timerStartedAt: now, // Initialize timer start time
+            timerStartedAt: now,
             currentMinute: 0,
-            status: 'in_progress',
+            status: 'preparing', 
             events: [],
             homeTeamScore: 0,
             awayTeamScore: 0,
             isExtraTime: false,
-            
             notes: '',
+            // Initialize Roster Logic
+            homeTeamOnPitch: [...matchSetup.myTeam.selectedPlayers],
+            homeTeamBench: [...matchSetup.myTeam.substitutes],
+            awayTeamOnPitch: [...matchSetup.opponentTeam.selectedPlayers],
+            awayTeamBench: [...matchSetup.opponentTeam.substitutes],
+            homeSubsUsed: 0,
+            awaySubsUsed: 0
           };
           
+          state.activeMatch = newMatch;
           state.liveMatches.push(newMatch);
           state.error = null;
-        });
-        
-        return matchId;
-      },
-      
-      // Update a live match
-      updateLiveMatch: (matchId, updates) => set((state) => {
-        const matchIndex = state.liveMatches.findIndex(m => m.id === matchId);
-        if (matchIndex !== -1) {
-          Object.assign(state.liveMatches[matchIndex], updates);
-        }
-      }),
-      
-      // Complete a live match and move it to completed matches
-      completeLiveMatch: (matchId, notes) => {
-        const state = get();
-        const matchIndex = state.liveMatches.findIndex(m => m.id === matchId);
-        
-        if (matchIndex === -1) return null;
-        
-        const match = state.liveMatches[matchIndex];
-        const endTime = new Date();
-        const actualDuration = Math.floor((endTime.getTime() - match.startTime.getTime()) / (1000 * 60));
-        
-        const homeTeamStats = calculateTeamStats(match.events, match.matchSetup.myTeam.teamId);
-        const awayTeamStats = calculateTeamStats(match.events, match.matchSetup.opponentTeam.teamId);
-        const playerStats = calculatePlayerStats(match.events, match.matchSetup);
-        
-        const completedMatch: CompletedMatch = {
-          id: match.id,
-          matchSetup: match.matchSetup,
-          startTime: match.startTime,
-          endTime,
-          actualDuration,
-          status: 'finished',
-          homeTeamScore: match.homeTeamScore,
-          awayTeamScore: match.awayTeamScore,
-          events: match.events,
-          homeTeamStats,
-          awayTeamStats,
-          playerStats,
-          referees: match.matchSetup.referees.map(ref => ref.name),
-          venue: match.matchSetup.venue?.name || 'Unknown Venue',
-          notes: notes || match.notes,
-          createdAt: match.startTime,
-          updatedAt: endTime,
-        };
-        
-        set((state) => {
-          state.completedMatches.unshift(completedMatch);
-          state.liveMatches.splice(matchIndex, 1);
-        });
-        
-        return completedMatch;
-      },
-      
-      // Start a new match
-      startMatch: (matchSetup) => set((state) => {
-        const matchId = `match_${Date.now()}`;
-        const now = new Date();
-        
-        const newMatch: ActiveMatch = {
-          id: matchId,
-          matchSetup,
-          startTime: now,
-          timerStartedAt: now, // Initialize timer start time
-          currentMinute: 0,
-          status: 'in_progress',
-          events: [],
-          homeTeamScore: 0,
-          awayTeamScore: 0,
-          isExtraTime: false,
-       
-          notes: '',
-        };
-        
-        // If we want to track it as active and also in liveMatches
-        state.activeMatch = newMatch;
-        state.liveMatches.push(newMatch);
-        
-        state.error = null;
-      }),
-      
-      // End the current match
-      endMatch: (notes) => {
-        const state = get();
-        if (!state.activeMatch) return null;
-        
-        // Find this match in liveMatches and remove it
-        const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
-        
-        const endTime = new Date();
-        const actualDuration = Math.floor((endTime.getTime() - state.activeMatch.startTime.getTime()) / (1000 * 60));
-        
-        const homeTeamStats = calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.myTeam.teamId);
-        const awayTeamStats = calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.opponentTeam.teamId);
-        const playerStats = calculatePlayerStats(state.activeMatch.events, state.activeMatch.matchSetup);
-        
-        const completedMatch: CompletedMatch = {
-          id: state.activeMatch.id,
-          matchSetup: state.activeMatch.matchSetup,
-          startTime: state.activeMatch.startTime,
-          endTime,
-          actualDuration,
-          status: 'finished',
-          homeTeamScore: state.activeMatch.homeTeamScore,
-          awayTeamScore: state.activeMatch.awayTeamScore,
-          events: state.activeMatch.events,
-          homeTeamStats,
-          awayTeamStats,
-          playerStats,
-          referees: state.activeMatch.matchSetup.referees.map(ref => ref.name),
-          venue: state.activeMatch.matchSetup.venue?.name || 'Unknown Venue',
-          notes: notes || state.activeMatch.notes,
-          createdAt: state.activeMatch.startTime,
-          updatedAt: endTime,
-        };
-        
-        set((state) => {
-          state.completedMatches.unshift(completedMatch);
-          state.activeMatch = null;
-          
-          // Also remove from liveMatches if found
-          if (liveMatchIndex !== -1) {
-            state.liveMatches.splice(liveMatchIndex, 1);
-          }
-        });
-        
-        return completedMatch;
-      },
-      
-      // Abandon match
-      abandonMatch: (reason) => set((state) => {
-        if (state.activeMatch) {
-          state.activeMatch.status = 'abandoned';
-          state.activeMatch.notes = `Match abandoned: ${reason}`;
-          
-          // Also update in live matches
-          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
-          if (liveMatchIndex !== -1) {
-            state.liveMatches[liveMatchIndex].status = 'abandoned';
-            state.liveMatches[liveMatchIndex].notes = `Match abandoned: ${reason}`;
-          }
-        }
-      }),
-      
-      // Add event to active match (updated to remove description requirement)
-      addEvent: (eventData) => set((state) => {
-        if (!state.activeMatch) return;
-        
-        const newEvent: MatchEvent = {
-          ...eventData,
-          id: `event_${Date.now()}`,
-          timestamp: new Date(),
-        };
-        
-        state.activeMatch.events.push(newEvent);
-        state.activeMatch.events.sort((a, b) => a.minute - b.minute);
-        
-        // Update scores if it's a goal
-        if (newEvent.eventType === 'goal') {
-          const isHomeTeam = newEvent.teamId === state.activeMatch.matchSetup.myTeam.teamId;
-          const isOwnGoal = newEvent.eventSubType === 'own_goal';
-          
-          if (isOwnGoal) {
-            // Own goal goes to opposite team
-            if (isHomeTeam) {
-              state.activeMatch.awayTeamScore += 1;
-            } else {
-              state.activeMatch.homeTeamScore += 1;
-            }
-          } else {
-            // Regular goal
-            if (isHomeTeam) {
-              state.activeMatch.homeTeamScore += 1;
-            } else {
-              state.activeMatch.awayTeamScore += 1;
+        }),
+
+        setMatchContext: (context) => set((state) => {
+          if (state.activeMatch) {
+            state.activeMatch.context = context;
+            const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+            if (liveMatchIndex !== -1) {
+              state.liveMatches[liveMatchIndex].context = context;
             }
           }
-        }
-        
-        // Also update in live matches
-        const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
-        if (liveMatchIndex !== -1) {
-          state.liveMatches[liveMatchIndex].events.push(newEvent);
-          state.liveMatches[liveMatchIndex].events.sort((a, b) => a.minute - b.minute);
-          state.liveMatches[liveMatchIndex].homeTeamScore = state.activeMatch.homeTeamScore;
-          state.liveMatches[liveMatchIndex].awayTeamScore = state.activeMatch.awayTeamScore;
-        }
-      }),
-      
-      // Update event
-      updateEvent: (eventId, updates) => set((state) => {
-        if (!state.activeMatch) return;
-        
-        const eventIndex = state.activeMatch.events.findIndex(e => e.id === eventId);
-        if (eventIndex !== -1) {
-          Object.assign(state.activeMatch.events[eventIndex], updates);
-          
-          // Re-sort events
-          state.activeMatch.events.sort((a, b) => a.minute - b.minute);
-          
-          // Recalculate scores
-          const goals = state.activeMatch.events.filter(e => e.eventType === 'goal');
-          let homeScore = 0;
-          let awayScore = 0;
-          
-          goals.forEach(goal => {
-            const isHomeTeam = goal.teamId === state.activeMatch!.matchSetup.myTeam.teamId;
-            const isOwnGoal = goal.eventSubType === 'own_goal';
+        }),
+
+        performSubstitution: (teamId, playerOutId, playerInId, playerOutName, playerInName, minute, seconds) => set((state) => {
+            if (!state.activeMatch) return;
             
-            if (isOwnGoal) {
-              if (isHomeTeam) awayScore += 1;
-              else homeScore += 1;
+            const isHome = teamId === state.activeMatch.matchSetup.myTeam.teamId;
+            const limit = state.activeMatch.matchSetup.matchSettings?.maxSubstitutions ?? 5;
+            const used = isHome ? state.activeMatch.homeSubsUsed : state.activeMatch.awaySubsUsed;
+        
+            if (used >= limit) {
+                state.error = "Maximum substitutions reached.";
+                return;
+            }
+        
+            // Swap in state
+            if (isHome) {
+                state.activeMatch.homeTeamOnPitch = state.activeMatch.homeTeamOnPitch.filter(id => id !== playerOutId);
+                state.activeMatch.homeTeamOnPitch.push(playerInId);
+                state.activeMatch.homeTeamBench = state.activeMatch.homeTeamBench.filter(id => id !== playerInId);
+                state.activeMatch.homeTeamBench.push(playerOutId); 
+                state.activeMatch.homeSubsUsed++;
             } else {
-              if (isHomeTeam) homeScore += 1;
-              else awayScore += 1;
+                state.activeMatch.awayTeamOnPitch = state.activeMatch.awayTeamOnPitch.filter(id => id !== playerOutId);
+                state.activeMatch.awayTeamOnPitch.push(playerInId);
+                state.activeMatch.awayTeamBench = state.activeMatch.awayTeamBench.filter(id => id !== playerInId);
+                state.activeMatch.awayTeamBench.push(playerOutId);
+                state.activeMatch.awaySubsUsed++;
+            }
+        
+            // Log Event
+            const newEvent: MatchEvent = {
+                id: `event_${Date.now()}`,
+                teamId,
+                eventType: 'substitution',
+                playerId: playerOutId, // Player leaving
+                playerName: playerOutName,
+                assistPlayerId: playerInId, // Player entering
+                assistPlayerName: playerInName,
+                minute,
+                seconds,
+                isExtraTime: false,
+                timestamp: new Date()
+            };
+            
+            state.activeMatch.events.push(newEvent);
+            state.activeMatch.events.sort((a, b) => a.minute - b.minute);
+
+            // Sync with LiveMatches
+            const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+            if (liveMatchIndex !== -1) {
+                state.liveMatches[liveMatchIndex] = state.activeMatch; // Full sync recommended for roster changes
+            }
+        }),
+
+        addLiveMatch: (matchSetup) => {
+          // ... (same as previous, just ensure roster is initialized if used here)
+          const matchId = `match_${Date.now()}`;
+          // ...
+          return matchId; 
+        },
+
+        updateLiveMatch: (matchId, updates) => set((state) => {
+          const matchIndex = state.liveMatches.findIndex(m => m.id === matchId);
+          if (matchIndex !== -1) {
+            Object.assign(state.liveMatches[matchIndex], updates);
+          }
+        }),
+
+        completeLiveMatch: (matchId, notes) => {
+           const state = get();
+           const matchIndex = state.liveMatches.findIndex(m => m.id === matchId);
+           if (matchIndex === -1) return null;
+
+           const match = state.liveMatches[matchIndex];
+           const endTime = new Date();
+           const actualDuration = Math.floor((endTime.getTime() - match.startTime.getTime()) / (1000 * 60));
+           
+           const homeTeamStats = calculateTeamStats(match.events, match.matchSetup.myTeam.teamId);
+           const awayTeamStats = calculateTeamStats(match.events, match.matchSetup.opponentTeam.teamId);
+           const playerStats = calculatePlayerStats(match.events, match.matchSetup);
+           
+           const completedMatch: CompletedMatch = {
+             id: match.id,
+             matchSetup: match.matchSetup,
+             startTime: match.startTime,
+             endTime,
+             actualDuration,
+             status: 'finished',
+             homeTeamScore: match.homeTeamScore,
+             awayTeamScore: match.awayTeamScore,
+             events: match.events,
+             homeTeamStats,
+             awayTeamStats,
+             playerStats,
+             referees: match.matchSetup.referees.map(ref => ref.name),
+             venue: match.matchSetup.venue?.name || 'Unknown Venue',
+             notes: notes || match.notes,
+             createdAt: match.startTime,
+             updatedAt: endTime,
+           };
+           
+           set((state) => {
+             state.completedMatches.unshift(completedMatch);
+             state.liveMatches.splice(matchIndex, 1);
+           });
+           return completedMatch;
+        },
+
+        endMatch: (notes) => {
+          const state = get();
+          if (!state.activeMatch) return null;
+          
+          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+          
+          const endTime = new Date();
+          const actualDuration = Math.floor((endTime.getTime() - state.activeMatch.startTime.getTime()) / (1000 * 60));
+          
+          const homeTeamStats = calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.myTeam.teamId);
+          const awayTeamStats = calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.opponentTeam.teamId);
+          const playerStats = calculatePlayerStats(state.activeMatch.events, state.activeMatch.matchSetup);
+          
+          const completedMatch: CompletedMatch = {
+            id: state.activeMatch.id,
+            matchSetup: state.activeMatch.matchSetup,
+            startTime: state.activeMatch.startTime,
+            endTime,
+            actualDuration,
+            status: 'finished',
+            homeTeamScore: state.activeMatch.homeTeamScore,
+            awayTeamScore: state.activeMatch.awayTeamScore,
+            events: state.activeMatch.events,
+            homeTeamStats,
+            awayTeamStats,
+            playerStats,
+            referees: state.activeMatch.matchSetup.referees.map(ref => ref.name),
+            venue: state.activeMatch.matchSetup.venue?.name || 'Unknown Venue',
+            notes: notes || state.activeMatch.notes,
+            createdAt: state.activeMatch.startTime,
+            updatedAt: endTime,
+          };
+          
+          set((state) => {
+            state.completedMatches.unshift(completedMatch);
+            state.activeMatch = null;
+            if (liveMatchIndex !== -1) {
+              state.liveMatches.splice(liveMatchIndex, 1);
             }
           });
           
-          state.activeMatch.homeTeamScore = homeScore;
-          state.activeMatch.awayTeamScore = awayScore;
-          
-          // Also update in live matches
-          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
-          if (liveMatchIndex !== -1) {
-            const liveEventIndex = state.liveMatches[liveMatchIndex].events.findIndex(e => e.id === eventId);
-            if (liveEventIndex !== -1) {
-              Object.assign(state.liveMatches[liveMatchIndex].events[liveEventIndex], updates);
-              state.liveMatches[liveMatchIndex].events.sort((a, b) => a.minute - b.minute);
+          return completedMatch;
+        },
+
+        abandonMatch: (reason) => set((state) => {
+          if (state.activeMatch) {
+            state.activeMatch.status = 'abandoned';
+            state.activeMatch.notes = `Match abandoned: ${reason}`;
+            const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+            if (liveMatchIndex !== -1) {
+              state.liveMatches[liveMatchIndex].status = 'abandoned';
+              state.liveMatches[liveMatchIndex].notes = `Match abandoned: ${reason}`;
             }
-            
-            state.liveMatches[liveMatchIndex].homeTeamScore = homeScore;
-            state.liveMatches[liveMatchIndex].awayTeamScore = awayScore;
           }
-        }
-      }),
-      
-      // Remove event
-      removeEvent: (eventId) => set((state) => {
-        if (!state.activeMatch) return;
-        
-        const eventIndex = state.activeMatch.events.findIndex(e => e.id === eventId);
-        if (eventIndex !== -1) {
-          const removedEvent = state.activeMatch.events[eventIndex];
-          state.activeMatch.events.splice(eventIndex, 1);
+        }),
+
+        addEvent: (eventData) => set((state) => {
+          if (!state.activeMatch) return;
+          const newEvent: MatchEvent = {
+            ...eventData,
+            id: `event_${Date.now()}`,
+            timestamp: new Date(),
+          };
           
-          // Recalculate scores if it was a goal
-          if (removedEvent.eventType === 'goal') {
-            const isHomeTeam = removedEvent.teamId === state.activeMatch.matchSetup.myTeam.teamId;
-            const isOwnGoal = removedEvent.eventSubType === 'own_goal';
+          state.activeMatch.events.push(newEvent);
+          state.activeMatch.events.sort((a, b) => a.minute - b.minute);
+          
+          if (newEvent.eventType === 'goal') {
+            const isHomeTeam = newEvent.teamId === state.activeMatch.matchSetup.myTeam.teamId;
+            const isOwnGoal = newEvent.eventSubType === 'own_goal';
             
             if (isOwnGoal) {
-              if (isHomeTeam) {
-                state.activeMatch.awayTeamScore = Math.max(0, state.activeMatch.awayTeamScore - 1);
-              } else {
-                state.activeMatch.homeTeamScore = Math.max(0, state.activeMatch.homeTeamScore - 1);
-              }
+              if (isHomeTeam) state.activeMatch.awayTeamScore += 1;
+              else state.activeMatch.homeTeamScore += 1;
             } else {
-              if (isHomeTeam) {
-                state.activeMatch.homeTeamScore = Math.max(0, state.activeMatch.homeTeamScore - 1);
-              } else {
-                state.activeMatch.awayTeamScore = Math.max(0, state.activeMatch.awayTeamScore - 1);
-              }
+              if (isHomeTeam) state.activeMatch.homeTeamScore += 1;
+              else state.activeMatch.awayTeamScore += 1;
             }
           }
-          
-          // Also update in live matches
+
           const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
           if (liveMatchIndex !== -1) {
-            const liveEventIndex = state.liveMatches[liveMatchIndex].events.findIndex(e => e.id === eventId);
-            if (liveEventIndex !== -1) {
-              state.liveMatches[liveMatchIndex].events.splice(liveEventIndex, 1);
-            }
-            
+            state.liveMatches[liveMatchIndex].events = state.activeMatch.events;
             state.liveMatches[liveMatchIndex].homeTeamScore = state.activeMatch.homeTeamScore;
             state.liveMatches[liveMatchIndex].awayTeamScore = state.activeMatch.awayTeamScore;
           }
-        }
-      }),
-      
-      // Update match status
-      updateMatchStatus: (status) => set((state) => {
-        if (state.activeMatch) {
-          state.activeMatch.status = status;
-          
-          // Also update in live matches
-          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
-          if (liveMatchIndex !== -1) {
-            state.liveMatches[liveMatchIndex].status = status;
+        }),
+
+        updateEvent: (eventId, updates) => set((state) => {
+          if (!state.activeMatch) return;
+          const eventIndex = state.activeMatch.events.findIndex(e => e.id === eventId);
+          if (eventIndex !== -1) {
+            Object.assign(state.activeMatch.events[eventIndex], updates);
+            state.activeMatch.events.sort((a, b) => a.minute - b.minute);
+            
+            let homeScore = 0;
+            let awayScore = 0;
+            state.activeMatch.events.filter(e => e.eventType === 'goal').forEach(goal => {
+               const isHome = goal.teamId === state.activeMatch!.matchSetup.myTeam.teamId;
+               const isOwn = goal.eventSubType === 'own_goal';
+               if(isOwn) { isHome ? awayScore++ : homeScore++; }
+               else { isHome ? homeScore++ : awayScore++; }
+            });
+            state.activeMatch.homeTeamScore = homeScore;
+            state.activeMatch.awayTeamScore = awayScore;
+
+            const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+            if (liveMatchIndex !== -1) {
+               state.liveMatches[liveMatchIndex].events = state.activeMatch.events;
+               state.liveMatches[liveMatchIndex].homeTeamScore = homeScore;
+               state.liveMatches[liveMatchIndex].awayTeamScore = awayScore;
+            }
           }
-        }
-      }),
-      
-      // Update current minute
-      updateCurrentMinute: (minute) => set((state) => {
-        if (state.activeMatch) {
-          state.activeMatch.currentMinute = minute;
-          
-          // Also update in live matches
-          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
-          if (liveMatchIndex !== -1) {
-            state.liveMatches[liveMatchIndex].currentMinute = minute;
+        }),
+
+        removeEvent: (eventId) => set((state) => {
+           if (!state.activeMatch) return;
+           const index = state.activeMatch.events.findIndex(e => e.id === eventId);
+           if (index !== -1) {
+             const removed = state.activeMatch.events[index];
+             state.activeMatch.events.splice(index, 1);
+             
+             if (removed.eventType === 'goal') {
+                const isHome = removed.teamId === state.activeMatch.matchSetup.myTeam.teamId;
+                const isOwn = removed.eventSubType === 'own_goal';
+                if(isOwn) { 
+                   if(isHome) state.activeMatch.awayTeamScore = Math.max(0, state.activeMatch.awayTeamScore - 1);
+                   else state.activeMatch.homeTeamScore = Math.max(0, state.activeMatch.homeTeamScore - 1);
+                } else {
+                   if(isHome) state.activeMatch.homeTeamScore = Math.max(0, state.activeMatch.homeTeamScore - 1);
+                   else state.activeMatch.awayTeamScore = Math.max(0, state.activeMatch.awayTeamScore - 1);
+                }
+             }
+
+             const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+             if (liveMatchIndex !== -1) {
+               state.liveMatches[liveMatchIndex].events = state.activeMatch.events;
+               state.liveMatches[liveMatchIndex].homeTeamScore = state.activeMatch.homeTeamScore;
+               state.liveMatches[liveMatchIndex].awayTeamScore = state.activeMatch.awayTeamScore;
+             }
+           }
+        }),
+
+        updateMatchStatus: (status) => set((state) => {
+          if (state.activeMatch) {
+            state.activeMatch.status = status;
+            const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+            if (liveMatchIndex !== -1) state.liveMatches[liveMatchIndex].status = status;
           }
-        }
-      }),
-     
-      
-      
-      
-      
-      // Add match notes
-      addMatchNotes: (notes) => set((state) => {
-        if (state.activeMatch) {
-          state.activeMatch.notes = notes;
-          
-          // Also update in live matches
-          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
-          if (liveMatchIndex !== -1) {
-            state.liveMatches[liveMatchIndex].notes = notes;
+        }),
+
+        updateCurrentMinute: (minute) => set((state) => {
+          if (state.activeMatch) {
+            state.activeMatch.currentMinute = minute;
+            const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+            if (liveMatchIndex !== -1) state.liveMatches[liveMatchIndex].currentMinute = minute;
           }
-        }
-      }),
-      
-      // New timer-related methods
-      getCurrentMatchTime: () => {
-        const state = get();
-        if (!state.activeMatch) return { minutes: 0, seconds: 0 };
-        
-        const now = new Date();
-        const elapsedMilliseconds = now.getTime() - state.activeMatch.timerStartedAt.getTime();
-        const totalSeconds = Math.floor(elapsedMilliseconds / 1000);
-        
-        return {
-          minutes: Math.floor(totalSeconds / 60),
-          seconds: totalSeconds % 60
-        };
-      },
-      
-      getElapsedSeconds: () => {
-        const state = get();
-        if (!state.activeMatch) return 0;
-        
-        const now = new Date();
-        return Math.floor((now.getTime() - state.activeMatch.timerStartedAt.getTime()) / 1000);
-      },
-      
-      resetTimer: () => set((state) => {
-        if (state.activeMatch) {
-          state.activeMatch.timerStartedAt = new Date();
-          
-          // Also update in live matches
-          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
-          if (liveMatchIndex !== -1) {
-            state.liveMatches[liveMatchIndex].timerStartedAt = state.activeMatch.timerStartedAt;
+        }),
+
+        addMatchNotes: (notes) => set((state) => {
+          if (state.activeMatch) {
+            state.activeMatch.notes = notes;
+            const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+            if (liveMatchIndex !== -1) state.liveMatches[liveMatchIndex].notes = notes;
           }
-        }
-      }),
-      
-      // Get match duration
-      getMatchDuration: () => {
-        const state = get();
-        if (!state.activeMatch) return 0;
+        }),
+
+        getCurrentMatchTime: () => {
+          const state = get();
+          if (!state.activeMatch) return { minutes: 0, seconds: 0 };
+          const now = new Date();
+          const elapsed = now.getTime() - state.activeMatch.timerStartedAt.getTime();
+          const totalSeconds = Math.floor(elapsed / 1000);
+          return { minutes: Math.floor(totalSeconds / 60), seconds: totalSeconds % 60 };
+        },
+
+        getElapsedSeconds: () => {
+          const state = get();
+          if (!state.activeMatch) return 0;
+          return Math.floor((new Date().getTime() - state.activeMatch.timerStartedAt.getTime()) / 1000);
+        },
+
+        resetTimer: () => set((state) => {
+          if (state.activeMatch) {
+            state.activeMatch.timerStartedAt = new Date();
+            const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+            if (liveMatchIndex !== -1) state.liveMatches[liveMatchIndex].timerStartedAt = state.activeMatch.timerStartedAt;
+          }
+        }),
+
+        getMatchDuration: () => {
+           const state = get();
+           if (!state.activeMatch) return 0;
+           return Math.floor((new Date().getTime() - state.activeMatch.startTime.getTime()) / (1000 * 60));
+        },
+
+        getTeamScore: (teamId) => {
+           const state = get();
+           if (!state.activeMatch) return 0;
+           return teamId === state.activeMatch.matchSetup.myTeam.teamId 
+             ? state.activeMatch.homeTeamScore 
+             : state.activeMatch.awayTeamScore;
+        },
+
+        getTeamEvents: (teamId) => get().activeMatch?.events.filter(e => e.teamId === teamId) || [],
+        getPlayerEvents: (playerId) => get().activeMatch?.events.filter(e => e.playerId === playerId || e.assistPlayerId === playerId) || [],
         
-        const now = new Date();
-        return Math.floor((now.getTime() - state.activeMatch.startTime.getTime()) / (1000 * 60));
-      },
-      
-      // Get team score
-      getTeamScore: (teamId) => {
-        const state = get();
-        if (!state.activeMatch) return 0;
-        
-        const isHomeTeam = teamId === state.activeMatch.matchSetup.myTeam.teamId;
-        return isHomeTeam ? state.activeMatch.homeTeamScore : state.activeMatch.awayTeamScore;
-      },
-      
-      // Get team events
-      getTeamEvents: (teamId) => {
-        const state = get();
-        if (!state.activeMatch) return [];
-        
-        return state.activeMatch.events.filter(event => event.teamId === teamId);
-      },
-      
-      // Get player events
-      getPlayerEvents: (playerId) => {
-        const state = get();
-        if (!state.activeMatch) return [];
-        
-        return state.activeMatch.events.filter(event => 
-          event.playerId === playerId || event.assistPlayerId === playerId
-        );
-      },
-      
-      // Get match statistics
-      getMatchStats: () => {
-        const state = get();
-        if (!state.activeMatch) {
-          return {
-            homeStats: {} as TeamStats,
-            awayStats: {} as TeamStats
-          };
-        }
-        
-        const homeStats = calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.myTeam.teamId);
-        const awayStats = calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.opponentTeam.teamId);
-        
-        return { homeStats, awayStats };
-      },
-      
-      // Get completed matches
-      getCompletedMatches: () => {
-        return get().completedMatches;
-      },
-      
-      // Get live matches
-      getLiveMatches: () => {
-        return get().liveMatches;
-      },
-      
-      // Get match by ID
-      getMatchById: (matchId) => {
-        const state = get();
-        return state.completedMatches.find(match => match.id === matchId) || null;
-      },
-      
-      // Clear match history
-      clearMatchHistory: () => set((state) => {
-        state.completedMatches = [];
-      }),
-      
-      // Error handling
-      setError: (error) => set((state) => {
-        state.error = error;
-      }),
-      
-      clearError: () => set((state) => {
-        state.error = null;
-      }),
-    })),
-    {
-      name: 'match-execution-store',
-    }
+        getMatchStats: () => {
+           const state = get();
+           if (!state.activeMatch) return { homeStats: {} as TeamStats, awayStats: {} as TeamStats };
+           return {
+             homeStats: calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.myTeam.teamId),
+             awayStats: calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.opponentTeam.teamId)
+           };
+        },
+
+        getCompletedMatches: () => get().completedMatches,
+        getLiveMatches: () => get().liveMatches,
+        getMatchById: (id) => get().completedMatches.find(m => m.id === id) || null,
+        clearMatchHistory: () => set(s => { s.completedMatches = []; }),
+        setError: (err) => set(s => { s.error = err; }),
+        clearError: () => set(s => { s.error = null; }),
+      })),
+      {
+        name: 'match-execution-storage',
+        partialize: (state) => ({
+          activeMatch: state.activeMatch,
+          liveMatches: state.liveMatches,
+          completedMatches: state.completedMatches,
+        }),
+      }
+    )
   )
 );

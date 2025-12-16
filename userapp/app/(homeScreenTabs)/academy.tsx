@@ -1,5 +1,5 @@
 // app/(academy)/academyMainScreen.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useRef } from "react";
 import {
   SafeAreaView,
   View,
@@ -7,146 +7,172 @@ import {
   Text,
   TouchableWithoutFeedback,
   Dimensions,
-  ScrollView,
   Animated,
-  FlatList,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
   StyleSheet,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
 const { width } = Dimensions.get("window");
-const CARD_WIDTH = width * 0.86;
-const CARD_SPACING = 16;
-const CARD_HEIGHT = 230;
+
+// 🔹 CAROUSEL CONFIGURATION
+const ITEM_WIDTH = width * 0.82; // Card width
+const SPACING = 12; // Gap between cards
+const EMPTY_ITEM_SIZE = (width - ITEM_WIDTH) / 2; // To center the first/last item
+const CARD_HEIGHT = 240;
 
 export default function AcademyMainScreen() {
-  // 🔹 1) CAROUSEL DATA
+  const scrollX = useRef(new Animated.Value(0)).current;
   const mainBanner = require("@/assets/images/heroBannerAcademy.png");
 
-  const baseItems = useMemo(
-    () => [
-      {
-        id: "hero",
-        type: "image" as const,
-        title: "Discover top academies\nfor your child",
-        subtitle: "Browse, compare and track progress in one place.",
-        source: mainBanner,
-      },
-      {
-        id: "placeholder-1",
-        type: "placeholder" as const,
-        title: "Academy banner spot",
-        subtitle: "Registered academy’s cover image will appear here.",
-      },
-      {
-        id: "placeholder-2",
-        type: "placeholder" as const,
-        title: "Showcase your academy",
-        subtitle: "Highlight facilities, coaches and training style.",
-      },
-      {
-        id: "placeholder-3",
-        type: "placeholder" as const,
-        title: "More academies coming",
-        subtitle: "Parents will scroll through banners like this.",
-      },
-    ],
-    []
-  );
+  // 🔹 1) DATA
+  const data = [
+    { key: "spacer-left" }, // Spacer for centering
+    {
+      id: "hero",
+      type: "image",
+      title: "Discover top academies\nfor your child",
+      subtitle: "Browse, compare and track progress.",
+      source: mainBanner,
+    },
+    {
+      id: "placeholder-1",
+      type: "placeholder",
+      title: "Academy banner spot",
+      subtitle: "Registered academy’s cover image will appear here.",
+      icon: "easel-outline",
+    },
+    {
+      id: "placeholder-2",
+      type: "placeholder",
+      title: "Showcase your academy",
+      subtitle: "Highlight facilities, coaches and training style.",
+      icon: "ribbon-outline",
+    },
+    {
+      id: "placeholder-3",
+      type: "placeholder",
+      title: "More coming soon",
+      subtitle: "Parents will scroll through banners like this.",
+      icon: "layers-outline",
+    },
+    { key: "spacer-right" }, // Spacer for centering
+  ];
 
-  // create looped data (x3) and start in the middle block
-  const loopData = useMemo(
-    () => [...baseItems, ...baseItems, ...baseItems],
-    [baseItems]
-  );
-
-  const BASE_LEN = baseItems.length;
-  const [currentIndex, setCurrentIndex] = useState(BASE_LEN);
-  const carouselRef = useRef<FlatList<any>>(null);
-
-  useEffect(() => {
-    // jump to middle block on mount
-    setTimeout(() => {
-      carouselRef.current?.scrollToIndex({
-        index: BASE_LEN,
-        animated: false,
-      });
-    }, 0);
-  }, [BASE_LEN]);
-
-  const getItemLayout = (_: any, index: number) => ({
-    length: CARD_WIDTH + CARD_SPACING,
-    offset: (CARD_WIDTH + CARD_SPACING) * index,
-    index,
-  });
-
-  const handleCarouselScrollEnd = (
-    e: NativeSyntheticEvent<NativeScrollEvent>
-  ) => {
-    const offsetX = e.nativeEvent.contentOffset.x;
-    const index = Math.round(offsetX / (CARD_WIDTH + CARD_SPACING));
-    setCurrentIndex(index);
-
-    // if we’ve reached near the edges, jump back into the middle block
-    if (index < BASE_LEN || index >= BASE_LEN * 2) {
-      let newIndex = index;
-      if (index < BASE_LEN) newIndex = index + BASE_LEN;
-      if (index >= BASE_LEN * 2) newIndex = index - BASE_LEN;
-
-      setTimeout(() => {
-        carouselRef.current?.scrollToIndex({
-          index: newIndex,
-          animated: false,
-        });
-        setCurrentIndex(newIndex);
-      }, 0);
+  // 🔹 2) CAROUSEL RENDERER
+  const renderItem = ({ item, index }: { item: any; index: number }) => {
+    if (!item.id) {
+      return <View style={{ width: EMPTY_ITEM_SIZE }} />;
     }
-  };
 
-  const renderCarouselItem = ({ item }: { item: any }) => {
-    const isImage = item.type === "image";
+    // INTERPOLATION: Scale up the center item, scale down side items
+    const inputRange = [
+      (index - 2) * ITEM_WIDTH,
+      (index - 1) * ITEM_WIDTH,
+      index * ITEM_WIDTH,
+    ];
+
+    const translateY = scrollX.interpolate({
+      inputRange,
+      outputRange: [20, -10, 20], // Parallax vertical move
+      extrapolate: "clamp",
+    });
+
+    const scale = scrollX.interpolate({
+      inputRange,
+      outputRange: [0.9, 1, 0.9], // Grow center, shrink sides
+      extrapolate: "clamp",
+    });
+
+    const opacity = scrollX.interpolate({
+      inputRange,
+      outputRange: [0.6, 1, 0.6], // Fade sides
+      extrapolate: "clamp",
+    });
 
     return (
-      <View
-        style={[
-          styles.cardContainer,
-          {
-            width: CARD_WIDTH,
-            height: CARD_HEIGHT,
-            marginRight: CARD_SPACING,
-          },
-        ]}
-      >
-        {isImage ? (
-          <>
-            <RNImage
-              source={item.source}
-              style={styles.cardImage}
-              resizeMode="cover"
-            />
-            <View style={styles.cardGradientOverlay} />
-            <View style={styles.cardTextOverlay}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={styles.cardSubtitle}>{item.subtitle}</Text>
+      <View style={{ width: ITEM_WIDTH }}>
+        <Animated.View
+          style={[
+            styles.cardContainer,
+            {
+              transform: [{ scale }],
+              opacity,
+            },
+          ]}
+        >
+          {item.type === "image" ? (
+            <>
+              <RNImage
+                source={item.source}
+                style={styles.cardImage}
+                resizeMode="cover"
+              />
+              <View style={styles.cardGradientOverlay} />
+              <View style={styles.cardTextOverlay}>
+                <Text style={styles.cardTitle}>{item.title}</Text>
+                <Text style={styles.cardSubtitle}>{item.subtitle}</Text>
+              </View>
+            </>
+          ) : (
+            <View style={styles.placeholderInner}>
+              <View style={styles.placeholderIconCircle}>
+                <Ionicons name={item.icon || "image"} size={32} color="#64748b" />
+              </View>
+              <Text style={styles.placeholderTitle}>{item.title}</Text>
+              <Text style={styles.placeholderSubtitle}>{item.subtitle}</Text>
             </View>
-          </>
-        ) : (
-          <View style={styles.placeholderInner}>
-            <View style={styles.placeholderIconCircle}>
-              <Ionicons name="image-outline" size={32} color="#64748b" />
-            </View>
-            <Text style={styles.placeholderTitle}>{item.title}</Text>
-            <Text style={styles.placeholderSubtitle}>{item.subtitle}</Text>
-          </View>
-        )}
+          )}
+        </Animated.View>
       </View>
     );
   };
 
-  // 🔹 2) BUTTON COMPONENT
+  // 🔹 3) PAGINATION DOTS
+  const Pagination = () => {
+    // Filter out spacers
+    const actualData = data.filter((item) => item.id);
+    
+    return (
+      <View style={styles.paginationContainer}>
+        {actualData.map((_, idx) => {
+          // Because we added a spacer at index 0, the real items start at index 1
+          const realIndex = idx + 1; 
+          
+          const inputRange = [
+            (realIndex - 1) * ITEM_WIDTH,
+            realIndex * ITEM_WIDTH,
+            (realIndex + 1) * ITEM_WIDTH,
+          ];
+
+          const dotWidth = scrollX.interpolate({
+            inputRange,
+            outputRange: [8, 20, 8], // Active dot gets wider
+            extrapolate: "clamp",
+          });
+
+          const dotColor = scrollX.interpolate({
+            inputRange,
+            outputRange: ["#334155", "#60a5fa", "#334155"], // Blue when active
+            extrapolate: "clamp",
+          });
+
+          return (
+            <Animated.View
+              key={idx.toString()}
+              style={[
+                styles.dot,
+                { width: dotWidth, backgroundColor: dotColor },
+              ]}
+            />
+          );
+        })}
+      </View>
+    );
+  };
+
+  // 🔹 4) BUTTON COMPONENT
   const handlePress = (action: string): void => {
     if (action === "Explore") {
       router.navigate("./../(academy)/browseAcademy");
@@ -155,65 +181,38 @@ export default function AcademyMainScreen() {
     }
   };
 
-  interface ButtonProps {
-    icon: keyof typeof Ionicons.glyphMap;
-    label: string;
-    onPress: () => void;
-    style: any;
-  }
-
-  const ButtonComponent: React.FC<ButtonProps> = ({
-    icon,
-    label,
-    onPress,
-    style,
-  }) => {
+  const ButtonComponent = ({ icon, label, onPress, style }: any) => {
     const scaleAnim = useRef(new Animated.Value(1)).current;
-
-    const animateIn = () => {
-      Animated.spring(scaleAnim, {
-        toValue: 0.92,
-        useNativeDriver: true,
-      }).start();
-    };
-
-    const animateOut = () => {
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 3,
-        tension: 80,
-        useNativeDriver: true,
-      }).start();
-    };
 
     return (
       <TouchableWithoutFeedback
-        onPressIn={animateIn}
-        onPressOut={animateOut}
+        onPressIn={() => {
+          Animated.spring(scaleAnim, {
+            toValue: 0.95,
+            useNativeDriver: true,
+          }).start();
+        }}
+        onPressOut={() => {
+          Animated.spring(scaleAnim, {
+            toValue: 1,
+            friction: 4,
+            useNativeDriver: true,
+          }).start();
+        }}
         onPress={onPress}
       >
         <Animated.View
           style={[
+            styles.actionButton,
             style,
-            {
-              backgroundColor: "#334155",
-              borderRadius: 20,
-              shadowColor: "#000",
-              shadowOpacity: 0.4,
-              shadowRadius: 6,
-              elevation: 6,
-              transform: [{ scale: scaleAnim }],
-            },
+            { transform: [{ scale: scaleAnim }] },
           ]}
         >
-          <View className="flex-1 items-center justify-center p-3">
-            <View className="bg-white/10 rounded-full p-2 mb-2">
-              <Ionicons name={icon} size={24} color="white" />
+          <View className="items-center justify-center p-2">
+            <View className="bg-white/10 rounded-full p-3 mb-2">
+              <Ionicons name={icon} size={26} color="white" />
             </View>
-            <Text
-              className="text-white font-semibold text-center text-sm"
-              numberOfLines={2}
-            >
+            <Text className="text-white font-semibold text-center text-sm">
               {label}
             </Text>
           </View>
@@ -222,113 +221,101 @@ export default function AcademyMainScreen() {
     );
   };
 
-  // 🔹 3) MAIN RENDER
   return (
     <SafeAreaView className="flex-1 bg-slate-900">
-      {/* TOP CAROUSEL */}
-      <View style={styles.carouselWrapper}>
-        <FlatList
-          ref={carouselRef}
-          horizontal
-          data={loopData}
-          keyExtractor={(item, index) => `${item.id}-${index}`}
-          renderItem={renderCarouselItem}
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={CARD_WIDTH + CARD_SPACING}
-          decelerationRate="fast"
-          snapToAlignment="start"
-          getItemLayout={getItemLayout}
-          contentContainerStyle={{
-            paddingHorizontal: (width - CARD_WIDTH) / 2,
-          }}
-          onMomentumScrollEnd={handleCarouselScrollEnd}
-        />
+      {/* 🔹 MAIN SCROLL CONTENT */}
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        {/* CAROUSEL SECTION */}
+        <View style={{ marginTop: 20 }}>
+          <Animated.FlatList
+            data={data}
+            keyExtractor={(item, index) => index.toString()}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={ITEM_WIDTH}
+            snapToAlignment="start"
+            decelerationRate="fast" // Ensures crisp snap
+            bounces={false}
+            scrollEventThrottle={16} // 60fps updates
+            contentContainerStyle={{ alignItems: "center" }}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+              { useNativeDriver: true }
+            )}
+            renderItem={renderItem}
+          />
 
-        {/* arrows as visual “swipe” hints only */}
-        <View style={[styles.arrowContainer, { left: 12 }]}>
-          <Ionicons name="chevron-back" size={18} color="#cbd5f5" />
-          <Text style={styles.arrowText}>Swipe</Text>
+          {/* Pagination Dots */}
+          <Pagination />
         </View>
-        <View style={[styles.arrowContainer, { right: 12 }]}>
-          <Text style={styles.arrowText}>Swipe</Text>
-          <Ionicons name="chevron-forward" size={18} color="#cbd5f5" />
+
+        {/* HEADER TEXT */}
+        <View className="px-6 mt-2 mb-8">
+          <Text className="text-white text-3xl font-bold text-center mb-2">
+            Academy Connect
+          </Text>
+          <Text className="text-slate-400 text-center text-base leading-6">
+            Empowering sports academies with{'\n'}discovery and management tools.
+          </Text>
         </View>
-      </View>
 
-      {/* CONTENT AREA */}
-      <View className="flex-1 bg-slate-900">
-        <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 20 }}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header Section */}
-          <View className="mb-6">
-            <Text className="text-white text-2xl font-bold text-center mb-2">
-              Academy Connect
-            </Text>
-            <Text className="text-slate-300 text-center text-base leading-5 px-2">
-              Empowering sports academies with discovery and management
-            </Text>
-          </View>
+        {/* STATS SECTION */}
+        <View className="flex-row justify-between mb-10 px-6">
+          <StatBox value="1.2k+" label="Academies" color="#60a5fa" />
+          <View style={styles.statDivider} />
+          <StatBox value="50k+" label="Students" color="#4ade80" />
+          <View style={styles.statDivider} />
+          <StatBox value="98%" label="Success" color="#c084fc" />
+        </View>
 
-          {/* Stats Section */}
-          <View className="flex-row justify-between mb-14 px-2">
-            <View className="items-center">
-              <Text className="text-blue-400 text-xl font-bold">1,200+</Text>
-              <Text className="text-slate-400 text-xs">Academies</Text>
-            </View>
-            <View className="items-center">
-              <Text className="text-green-400 text-xl font-bold">50K+</Text>
-              <Text className="text-slate-400 text-xs">Students</Text>
-            </View>
-            <View className="items-center">
-              <Text className="text-purple-400 text-xl font-bold">98%</Text>
-              <Text className="text-slate-400 text-xs">Success Rate</Text>
-            </View>
-          </View>
-
-          {/* Action Buttons */}
-          <View className="items-center mb-4 mt-8">
-            <View className="flex-row justify-center mb-8">
-              <View className="items-center mx-6">
-                <ButtonComponent
-                  icon="compass-outline"
-                  label="Explore Academies"
-                  onPress={() => handlePress("Explore")}
-                  style={{
-                    width: width * 0.25,
-                    height: width * 0.25,
-                  }}
-                />
-              </View>
-              <View className="items-center mx-6">
-                <ButtonComponent
-                  icon="trophy-outline"
-                  label="Manage Academy"
-                  onPress={() => handlePress("Manage")}
-                  style={{
-                    width: width * 0.25,
-                    height: width * 0.25,
-                  }}
-                />
-              </View>
-            </View>
-          </View>
-        </ScrollView>
-      </View>
+        {/* ACTION BUTTONS */}
+        <View className="flex-row justify-center gap-6 px-4">
+          <ButtonComponent
+            icon="compass-outline"
+            label="Explore"
+            onPress={() => handlePress("Explore")}
+            style={{ width: width * 0.38, height: width * 0.32 }}
+          />
+          <ButtonComponent
+            icon="trophy-outline"
+            label="Manage"
+            onPress={() => handlePress("Manage")}
+            style={{ width: width * 0.38, height: width * 0.32 }}
+          />
+        </View>
+      </Animated.ScrollView>
     </SafeAreaView>
   );
 }
 
+// Helper Component for Stats
+const StatBox = ({ value, label, color }: any) => (
+  <View className="items-center flex-1">
+    <Text style={{ color, fontSize: 22, fontWeight: "bold" }}>{value}</Text>
+    <Text className="text-slate-500 text-xs font-medium uppercase tracking-wider mt-1">
+      {label}
+    </Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
-  carouselWrapper: {
-    paddingVertical: 12,
-  },
   cardContainer: {
+    height: CARD_HEIGHT,
+    marginHorizontal: SPACING / 2, // Split spacing between items
     borderRadius: 24,
+    backgroundColor: "#1e293b",
     overflow: "hidden",
-    backgroundColor: "#e5e7eb",
+    borderWidth: 1,
+    borderColor: "#334155",
+    // Shadows
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   cardImage: {
     width: "100%",
@@ -336,61 +323,88 @@ const styles = StyleSheet.create({
   },
   cardGradientOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(15,23,42,0.40)",
+    backgroundColor: "rgba(0,0,0,0.3)",
   },
   cardTextOverlay: {
     position: "absolute",
-    left: 18,
-    right: 18,
-    bottom: 18,
+    left: 20,
+    right: 20,
+    bottom: 24,
   },
   cardTitle: {
     color: "white",
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 4,
+    fontSize: 22,
+    fontWeight: "800",
+    marginBottom: 6,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   cardSubtitle: {
-    color: "#e5e7eb",
-    fontSize: 13,
+    color: "#e2e8f0",
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 20,
   },
   placeholderInner: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
+    backgroundColor: "#1e293b",
   },
   placeholderIconCircle: {
-    padding: 12,
-    borderRadius: 999,
-    backgroundColor: "#cbd5f5",
-    marginBottom: 10,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#334155",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
   },
   placeholderTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#0f172a",
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#f8fafc",
     textAlign: "center",
-    marginBottom: 4,
+    marginBottom: 6,
   },
   placeholderSubtitle: {
-    fontSize: 12,
-    color: "#475569",
+    fontSize: 13,
+    color: "#94a3b8",
     textAlign: "center",
+    lineHeight: 20,
   },
-  arrowContainer: {
-    position: "absolute",
-    top: CARD_HEIGHT / 2 - 10,
+  paginationContainer: {
     flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(15,23,42,0.6)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
+    marginTop: 20,
+    height: 20,
   },
-  arrowText: {
-    color: "#cbd5f5",
-    fontSize: 10,
+  dot: {
+    height: 8,
+    borderRadius: 4,
     marginHorizontal: 4,
+  },
+  actionButton: {
+    backgroundColor: "#1e293b",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#334155",
+    justifyContent: "center",
+    alignItems: "center",
+    // Shadow
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  statDivider: {
+    width: 1,
+    height: "80%",
+    backgroundColor: "#334155",
+    alignSelf: "center",
   },
 });

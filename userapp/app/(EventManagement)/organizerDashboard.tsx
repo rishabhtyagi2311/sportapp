@@ -1,4 +1,4 @@
-// app/eventManager/dashboard.tsx
+// app/(venue)/eventManager/dashboard.tsx
 
 import React, { useMemo, useState } from 'react'
 import {
@@ -28,8 +28,8 @@ export default function EventManagerDashboard() {
   const filteredEvents = useMemo(() => {
     return managedEvents.filter((event) =>
       activeTab === 'upcoming'
-        ? event.status !== 'completed'
-        : event.status === 'completed'
+        ? event.status !== 'completed' && event.status !== 'cancelled'
+        : event.status === 'completed' || event.status === 'cancelled'
     )
   }, [managedEvents, activeTab])
 
@@ -37,7 +37,11 @@ export default function EventManagerDashboard() {
   const renderEventCard = ({ item }: { item: Event }) => (
     <TouchableOpacity
       activeOpacity={0.85}
-      onPress={() => router.push(`/(EventManagement)/requestDetailScreen/${item.id}`)}
+      // FIXED: Passing eventId so the next screen knows which event to load
+      onPress={() => router.push({
+        pathname: '/(EventManagement)/requestListScreen', // Ensure this matches your file name
+        params: { eventId: item.id }
+      })}
       className="bg-white rounded-xl p-5 mb-4 border border-gray-200 shadow-sm"
     >
       {/* Title & Status */}
@@ -91,7 +95,7 @@ export default function EventManagerDashboard() {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
-      {/* ---------- HEADER ---------- */}
+      {/* ---------- HEADER (Settings Button Restored) ---------- */}
       <View className="bg-white px-6 py-4 border-b border-gray-200">
         <View className="flex-row justify-between items-center">
           <View>
@@ -161,7 +165,7 @@ export default function EventManagerDashboard() {
         }
       />
 
-      {/* ---------- FAB ---------- */}
+      {/* ---------- FAB (Restored to Bottom Right) ---------- */}
       <TouchableOpacity
         onPress={() => router.push('/(EventManagement)/createEvent')}
         className="absolute right-6 bottom-6 bg-green-600 w-14 h-14 rounded-full items-center justify-center shadow-lg"

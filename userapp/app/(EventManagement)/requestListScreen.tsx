@@ -11,29 +11,30 @@ import { KeyboardAvoidingView } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 
-// 1. Correct Import Paths (Ensure these match your file structure)
-import { useBookingStore } from '@/store/venueStore'
-import { useRegistrationRequestStore } from '@/store/eventRegistrationRequestStore' // Fixed filename
+// 1. UPDATED IMPORTS: Removed BookingStore dependency for fetching the event
+import { useRegistrationRequestStore } from '@/store/eventRegistrationRequestStore'
 import { useEventManagerStore } from '@/store/eventManagerStore'
 
 type FilterKey = 'pending' | 'accepted' | 'rejected'
 
 const EventRegistrationRequestsScreen: React.FC = () => {
   const router = useRouter()
-  // Ensure your file is named [eventId].tsx or similar to capture this param
   const { eventId } = useLocalSearchParams<{ eventId: string }>()
 
-  const { getEventById } = useBookingStore()
-  const { deleteEvent } = useEventManagerStore()
+  // 2. FIXED: Fetch event from Manager Store instead of Booking Store
+  const { deleteEvent, managedEvents } = useEventManagerStore()
+  
   const { 
     getRequestsByEvent, 
     getEventStats, 
-    deleteRequestsByEvent // Added this action to store below
+    deleteRequestsByEvent
   } = useRegistrationRequestStore()
 
   const [activeFilter, setActiveFilter] = useState<FilterKey>('pending')
 
-  const event = getEventById(eventId!)
+  // 3. FIXED: Find the event in the managedEvents array
+  const event = managedEvents.find((e) => e.id === eventId)
+  
   const requests = getRequestsByEvent(eventId!)
   const stats = getEventStats(eventId!)
 
@@ -174,7 +175,6 @@ const EventRegistrationRequestsScreen: React.FC = () => {
             <TouchableOpacity
               key={req.id}
               onPress={() =>
-                // Fixed: Consistent routing structure
                 router.push({
                   pathname: '/eventManager/requestDetails',
                   params: { requestId: req.id, eventId: event.id },
@@ -183,7 +183,6 @@ const EventRegistrationRequestsScreen: React.FC = () => {
               className="bg-white p-4 rounded-xl border border-gray-200 mb-3 shadow-sm"
             >
               <Text className="font-bold text-slate-900 text-base">
-                {/* Fixed: Cleaner TypeScript narrowing */}
                 {req.participationType === 'team' ? req.teamName : req.participantName}
               </Text>
               <Text className="text-sm text-slate-600 mt-1">
@@ -207,7 +206,6 @@ const EventRegistrationRequestsScreen: React.FC = () => {
             </TouchableOpacity>
           ))
         )}
-        {/* Spacer for bottom scrolling */}
         <View className="h-10" />
       </ScrollView>
     </KeyboardAvoidingView>
