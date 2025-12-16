@@ -1,3 +1,5 @@
+// types.ts
+
 export type Academy = {
   id: string;
   academyName: string;
@@ -6,12 +8,14 @@ export type Academy = {
   coachName: string;
   contactNumber: string;
   facilities: string;
- 
-  Fee: string;
+  
+  Fee: string; // Note: You capitalize 'Fee' here, ensuring it matches your usage
   city: string;
   coaches?: Coach[];
   headCoach?: string;
   
+  // ✅ Added for the Gallery feature
+  photos?: string[]; 
 };
 
 export type Coach = {
@@ -37,7 +41,6 @@ export type Attendance = {
   date: string;
   present: boolean;
 };
-
 
 export type Certificate = {
   id: string;

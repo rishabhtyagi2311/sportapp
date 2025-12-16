@@ -30,6 +30,10 @@ interface AcademyStore {
   // Coach actions
   addCoach: (academyId: string, coach: Coach) => void;
   removeCoach: (academyId: string, coachId: string) => void;
+
+  // ✅ Photo actions
+  addPhoto: (academyId: string, photoUri: string) => void;
+  removePhoto: (academyId: string, photoUri: string) => void;
 }
 
 export const useAcademyStore = create<AcademyStore>((set, get) => ({
@@ -38,12 +42,16 @@ export const useAcademyStore = create<AcademyStore>((set, get) => ({
   attendance: [],
   certificates: [],
 
+  // --- Academy Implementation ---
   addAcademy: (academy) =>
     set((state) => ({
       academies: [...state.academies, academy],
     })),
+
   getAcademies: () => get().academies,
+  
   getAcademyById: (id) => get().academies.find((academy) => academy.id === id),
+  
   clearAcademies: () => set({ academies: [] }),
   
   updateAcademy: (academy) =>
@@ -51,6 +59,7 @@ export const useAcademyStore = create<AcademyStore>((set, get) => ({
       academies: state.academies.map((a) => (a.id === academy.id ? academy : a)),
     })),
   
+  // --- Student Implementation ---
   addStudent: (student) =>
     set((state) => ({
       students: [...state.students, student],
@@ -60,6 +69,7 @@ export const useAcademyStore = create<AcademyStore>((set, get) => ({
     return get().students.filter((student) => student.academyId === academyId);
   },
   
+  // --- Attendance Implementation ---
   markAttendance: (studentId, date, present) =>
     set((state) => {
       const existing = state.attendance.findIndex(
@@ -80,6 +90,7 @@ export const useAcademyStore = create<AcademyStore>((set, get) => ({
     return record?.present;
   },
   
+  // --- Certificate Implementation ---
   addCertificate: (certificate) =>
     set((state) => ({
       certificates: [...state.certificates, certificate],
@@ -92,7 +103,7 @@ export const useAcademyStore = create<AcademyStore>((set, get) => ({
     );
   },
 
-  // --- Coach actions ---
+  // --- Coach Implementation ---
   addCoach: (academyId, coach) =>
     set((state) => ({
       academies: state.academies.map((a) =>
@@ -107,6 +118,26 @@ export const useAcademyStore = create<AcademyStore>((set, get) => ({
       academies: state.academies.map((a) =>
         a.id === academyId
           ? { ...a, coaches: a.coaches?.filter((c) => c.id !== coachId) }
+          : a
+      ),
+    })),
+
+  // --- ✅ Photo Implementation ---
+  addPhoto: (academyId, photoUri) =>
+    set((state) => ({
+      academies: state.academies.map((a) =>
+        a.id === academyId
+          // Adds new photo to the START of the array
+          ? { ...a, photos: [photoUri, ...(a.photos || [])] }
+          : a
+      ),
+    })),
+
+  removePhoto: (academyId, photoUri) =>
+    set((state) => ({
+      academies: state.academies.map((a) =>
+        a.id === academyId
+          ? { ...a, photos: a.photos?.filter((p) => p !== photoUri) }
           : a
       ),
     })),

@@ -6,6 +6,7 @@ import {
   Dimensions,
   ScrollView,
   TouchableOpacity,
+  Image, // <--- 1. Imported Image
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -48,7 +49,12 @@ const renderActionButton = (
 );
 
 export default function AcademyMainScreen() {
-  // ✅ All hooks at the top (no hooks used here, but if needed, put them here)
+  
+  // 2. Logic for Image Logic
+  // Set this to the URL string if the user has a logo, or null if they don't.
+  const academyLogo = null; 
+  
+  const fallbackImage = require("@/assets/images/academyPartnerBanner.png"); 
 
   const handlePress = (action: string): void => {
     console.log(`${action} pressed`);
@@ -68,29 +74,38 @@ export default function AcademyMainScreen() {
           contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 20 }}
           showsVerticalScrollIndicator={false}
         >
+          {/* 3. Top Image Section (Conditional Rendering) */}
+          <View className="w-full h-8/12 mb-8 rounded-2xl overflow-hidden bg-slate-800 shadow-lg">
+             <Image 
+                source={academyLogo ? { uri: academyLogo } : fallbackImage}
+                className="w-full h-full"
+                resizeMode="cover"
+             />
+             {/* Optional: Add an overlay if you want text on top later */}
+             <View className="absolute inset-0 bg-black/20" />
+          </View>
+
           {/* Header Section */}
           <View className="mb-6">
             <Text className="text-white text-2xl font-bold text-center mb-2">
-              Academy Connect
+              Welcome to your Academy Center 
             </Text>
-            <Text className="text-slate-300 text-center text-base leading-5 px-2">
-              Empowering sports academies with discovery and management
-            </Text>
+            
           </View>
 
           {/* Stats Section */}
           <View className="flex-row justify-between mb-14 px-2">
             <View className="items-center">
-              <Text className="text-blue-400 text-xl font-bold">1,200+</Text>
+              <Text className="text-blue-400 text-xl font-bold">12</Text>
               <Text className="text-slate-400 text-xs">Academies</Text>
             </View>
             <View className="items-center">
-              <Text className="text-green-400 text-xl font-bold">50K+</Text>
+              <Text className="text-green-400 text-xl font-bold">501</Text>
               <Text className="text-slate-400 text-xs">Students</Text>
             </View>
             <View className="items-center">
-              <Text className="text-purple-400 text-xl font-bold">98%</Text>
-              <Text className="text-slate-400 text-xs">Success Rate</Text>
+              <Text className="text-purple-400 text-xl font-bold">4.1</Text>
+              <Text className="text-slate-400 text-xs">Average Review</Text>
             </View>
           </View>
 
