@@ -1,26 +1,24 @@
-// stores/eventManagerStore.ts
-
-import { create } from 'zustand'
-import { devtools } from 'zustand/middleware'
-import { immer } from 'zustand/middleware/immer'
-import { Event } from '@/types/booking'
-import { useBookingStore } from '@/store/venueStore'
+import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
+import { immer } from 'zustand/middleware/immer';
+import { Event } from '@/types/booking';
+import { useBookingStore } from '@/store/venueStore';
 
 interface EventManagerState {
-  managedEvents: Event[]
-  isLoading: boolean
-  error: string | null
+  managedEvents: Event[];
+  isLoading: boolean;
+  error: string | null;
 
   // Core actions
-  createEvent: (event: Event) => void
-  updateEvent: (eventId: string, update: Partial<Event>) => void
-  completeEvent: (eventId: string) => void
-  deleteEvent: (eventId: string) => void
+  createEvent: (event: Event) => void;
+  updateEvent: (eventId: string, update: Partial<Event>) => void;
+  completeEvent: (eventId: string) => void;
+  deleteEvent: (eventId: string) => void;
 
   // Queries
-  getEventsByManager: (managerId: string) => Event[]
-  getUpcomingEvents: (managerId: string) => Event[]
-  getCompletedEvents: (managerId: string) => Event[]
+  getEventsByManager: (managerId: string) => Event[];
+  getUpcomingEvents: (managerId: string) => Event[];
+  getCompletedEvents: (managerId: string) => Event[];
 }
 
 export const useEventManagerStore = create<EventManagerState>()(
@@ -33,68 +31,66 @@ export const useEventManagerStore = create<EventManagerState>()(
       /* ---------------- CREATE ---------------- */
       createEvent: (event) =>
         set((state) => {
-          state.managedEvents.push(event)
+          // 1. Update Manager Store
+          state.managedEvents.push(event);
 
-          // 🔁 Sync PUBLIC snapshot
-          useBookingStore.getState().addEvent(event)
+          // 2. Sync Booking Store (Public View)
+          // We access the store directly to trigger the update
+          useBookingStore.getState().addEvent(event);
         }),
 
       /* ---------------- UPDATE ---------------- */
       updateEvent: (eventId, update) =>
         set((state) => {
-          const idx = state.managedEvents.findIndex(e => e.id === eventId)
-          if (idx === -1) return
+          const idx = state.managedEvents.findIndex((e) => e.id === eventId);
+          if (idx === -1) return;
 
+          // Generate one timestamp so both stores match exactly
+          const timestamp = new Date().toISOString();
+          const finalUpdate = { ...update, updatedAt: timestamp };
+
+          // 1. Update Manager Store
           state.managedEvents[idx] = {
             ...state.managedEvents[idx],
-            ...update,
-            updatedAt: new Date().toISOString(),
-          }
+            ...finalUpdate,
+          };
 
-          // 🔁 Sync PUBLIC snapshot
-          useBookingStore
-            .getState()
-            .updateEvent(eventId, update)
+          // 2. Sync Booking Store
+          useBookingStore.getState().updateEvent(eventId, finalUpdate);
         }),
 
       /* ---------------- COMPLETE ---------------- */
-      completeEvent: (eventId) =>
-        set((state) => {
-          const event = state.managedEvents.find(e => e.id === eventId)
-          if (!event) return
-
-          event.status = 'completed'
-          event.updatedAt = new Date().toISOString()
-
-          // 🔁 Sync PUBLIC snapshot
-          useBookingStore
-            .getState()
-            .updateEvent(eventId, { status: 'completed' })
-        }),
+      completeEvent: (eventId) => {
+        // We reuse updateEvent to ensure sync logic happens automatically
+        get().updateEvent(eventId, { status: 'completed' });
+      },
 
       /* ---------------- DELETE ---------------- */
       deleteEvent: (eventId) =>
         set((state) => {
-          state.managedEvents = state.managedEvents.filter(e => e.id !== eventId)
+          // 1. Update Manager Store
+          state.managedEvents = state.managedEvents.filter(
+            (e) => e.id !== eventId
+          );
 
-          // 🔁 Remove from public store
-          useBookingStore.getState().deleteEvent(eventId)
+          // 2. Sync Booking Store
+          useBookingStore.getState().deleteEvent(eventId);
         }),
 
       /* ---------------- QUERIES ---------------- */
       getEventsByManager: (managerId) =>
-        get().managedEvents.filter(e => e.creatorId === managerId),
+        get().managedEvents.filter((e) => e.creatorId === managerId),
 
       getUpcomingEvents: (managerId) =>
         get().managedEvents.filter(
-          e => e.creatorId === managerId && e.status === 'upcoming'
+          (e) => e.creatorId === managerId && e.status === 'upcoming'
         ),
 
       getCompletedEvents: (managerId) =>
         get().managedEvents.filter(
-          e => e.creatorId === managerId && e.status === 'completed'
+          (e) => e.creatorId === managerId && e.status === 'completed'
         ),
     })),
     { name: 'event-manager-store' }
   )
-)
+);

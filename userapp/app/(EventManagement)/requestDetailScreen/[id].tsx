@@ -13,8 +13,11 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+
+// STORES
 import { useRegistrationRequestStore, RegistrationRequest } from '@/store/eventRegistrationRequestStore';
 import { useBookingStore } from '@/store/venueStore';
+import { useEventManagerStore } from '@/store/eventManagerStore'; // Added this
 
 const RequestDetailsScreen: React.FC = () => {
   const params = useLocalSearchParams();
@@ -22,8 +25,10 @@ const RequestDetailsScreen: React.FC = () => {
   const requestId = params.requestId as string;
   const eventId = params.eventId as string;
 
+  // 1. Get Actions from Stores
   const { getRequestById, updateRequestStatus } = useRegistrationRequestStore();
   const { getEventById } = useBookingStore();
+  const { updateEvent } = useEventManagerStore(); // Needed to update participant count
 
   const request = getRequestById(requestId) as RegistrationRequest | undefined;
   const event = getEventById(eventId);
@@ -32,20 +37,24 @@ const RequestDetailsScreen: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [showNotesInput, setShowNotesInput] = useState(false);
 
-  // Mock manager ID - replace with actual user ID from auth
+  // Mock manager ID
   const managerId = 'manager-123';
 
   if (!request || !event) {
     return (
       <SafeAreaView className="flex-1 bg-gray-100">
         <View className="flex-1 items-center justify-center">
-          <Text className="text-gray-600 text-lg">Request not found</Text>
+          <Text className="text-gray-600 text-lg">Request or Event not found</Text>
+          <TouchableOpacity onPress={() => router.back()} className="mt-4">
+             <Text className="text-blue-600">Go Back</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  const isTeamRequest = 'teamName' in request;
+  // Helper for type narrowing
+  const isTeam = request.participationType === 'team';
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -60,41 +69,63 @@ const RequestDetailsScreen: React.FC = () => {
     }
   };
 
+  /* ---------------- LOGIC: ACCEPT REQUEST ---------------- */
   const handleAccept = () => {
+    // 1. Calculate new participants
+    const addCount = isTeam ? request.teamSize : 1;
+    const newTotal = event.currentParticipants + addCount;
+
+    // 2. Validation: Check Capacity
+    if (newTotal > event.maxParticipants) {
+      Alert.alert(
+        'Capacity Full',
+        `Cannot accept this request. It requires ${addCount} spots, but only ${event.maxParticipants - event.currentParticipants} are available.`
+      );
+      return;
+    }
+
     Alert.alert(
       'Accept Registration',
-      `Are you sure you want to accept ${isTeamRequest ? `team "${request.teamName}"` : `${request.participantName}`}?`,
+      `Accept ${isTeam ? `team "${request.teamName}"` : request.participantName}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Accept',
           onPress: () => {
             setIsProcessing(true);
+            
+            // SIMULATE API CALL
             setTimeout(() => {
+              // 3. Update Request Status
               updateRequestStatus(requestId, 'accepted', managerId, notes || undefined);
+
+              // 4. CRITICAL: Update Event Participant Count (Syncs Manager & Public Store)
+              updateEvent(event.id, {
+                 currentParticipants: newTotal
+              });
+
               setIsProcessing(false);
-              Alert.alert('Success', 'Registration accepted successfully', [
+              Alert.alert('Success', 'Registration accepted', [
                 { text: 'OK', onPress: () => router.back() },
               ]);
-            }, 1000);
+            }, 500);
           },
         },
       ]
     );
   };
 
+  /* ---------------- LOGIC: REJECT REQUEST ---------------- */
   const handleReject = () => {
     Alert.alert(
       'Reject Registration',
-      `Are you sure you want to reject ${isTeamRequest ? `team "${request.teamName}"` : `${request.participantName}`}?`,
+      `Reject ${isTeam ? `team "${request.teamName}"` : request.participantName}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Reject',
           style: 'destructive',
-          onPress: () => {
-            setShowNotesInput(true);
-          },
+          onPress: () => setShowNotesInput(true),
         },
       ]
     );
@@ -103,30 +134,33 @@ const RequestDetailsScreen: React.FC = () => {
   const confirmReject = () => {
     setIsProcessing(true);
     setTimeout(() => {
+      // Update status to rejected (No need to update event participant count)
       updateRequestStatus(requestId, 'rejected', managerId, notes || 'No reason provided');
+      
       setIsProcessing(false);
       Alert.alert('Success', 'Registration rejected', [
         { text: 'OK', onPress: () => router.back() },
       ]);
-    }, 1000);
+    }, 500);
   };
 
   const statusColor = getStatusColor(request.status);
 
+  /* ---------------- UI RENDER ---------------- */
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
       {/* Header */}
-      <View className="bg-white px-6 py-4 border-b border-gray-200 flex-row items-center">
+      <View className="bg-white px-6 py-4 border-b border-gray-200 flex-row items-center pt-12">
         <TouchableOpacity onPress={() => router.back()} className="mr-4">
           <Ionicons name="arrow-back" size={24} color="#475569" />
         </TouchableOpacity>
         <View className="flex-1">
           <Text className="text-lg font-bold text-slate-900">
-            {isTeamRequest ? 'Team Registration' : 'Individual Registration'}
+            {isTeam ? 'Team Registration' : 'Individual Registration'}
           </Text>
-          <Text className="text-sm text-slate-600">{event.name}</Text>
+          <Text className="text-sm text-slate-600" numberOfLines={1}>{event.name}</Text>
         </View>
       </View>
 
@@ -160,35 +194,35 @@ const RequestDetailsScreen: React.FC = () => {
 
         {/* Registration Details */}
         <View className="mx-6 mb-6">
-          {isTeamRequest ? (
+          {isTeam ? (
             <>
               {/* Team Details */}
-              <View className="bg-white rounded-xl p-5 mb-4 border border-gray-200">
+              <View className="bg-white rounded-xl p-5 mb-4 border border-gray-200 shadow-sm">
                 <Text className="text-lg font-bold text-slate-900 mb-4">Team Details</Text>
 
                 <View className="mb-4">
-                  <Text className="text-slate-600 text-sm mb-1">Team Name</Text>
+                  <Text className="text-slate-500 text-xs mb-1 uppercase tracking-wider">Team Name</Text>
                   <Text className="text-slate-900 text-base font-semibold">
                     {request.teamName}
                   </Text>
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-slate-600 text-sm mb-1">Team Size</Text>
+                  <Text className="text-slate-500 text-xs mb-1 uppercase tracking-wider">Team Size</Text>
                   <Text className="text-slate-900 text-base font-semibold">
                     {request.teamSize} Players
                   </Text>
                 </View>
 
                 <View className="mb-4">
-                  <Text className="text-slate-600 text-sm mb-1">Captain Contact</Text>
+                  <Text className="text-slate-500 text-xs mb-1 uppercase tracking-wider">Captain Contact</Text>
                   <Text className="text-slate-900 text-base font-semibold">
                     {request.captainContact}
                   </Text>
                 </View>
 
                 <View>
-                  <Text className="text-slate-600 text-sm mb-1">Captain Email</Text>
+                  <Text className="text-slate-500 text-xs mb-1 uppercase tracking-wider">Captain Email</Text>
                   <Text className="text-slate-900 text-base font-semibold">
                     {request.captainEmail}
                   </Text>
@@ -196,7 +230,7 @@ const RequestDetailsScreen: React.FC = () => {
               </View>
 
               {/* Team Members */}
-              <View className="bg-white rounded-xl p-5 border border-gray-200">
+              <View className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
                 <Text className="text-lg font-bold text-slate-900 mb-4">Team Members</Text>
 
                 {request.teamMembers.map((member, index) => (
@@ -205,21 +239,20 @@ const RequestDetailsScreen: React.FC = () => {
                       <Text className="font-semibold text-slate-900">
                         Player {index + 1}
                       </Text>
-                      {index === request.teamMembers.length - 1 && <></>}
                     </View>
 
                     <View className="mb-2">
-                      <Text className="text-slate-600 text-sm mb-1">Name</Text>
+                      <Text className="text-slate-500 text-xs mb-1">NAME</Text>
                       <Text className="text-slate-900 font-medium">{member.name}</Text>
                     </View>
 
                     <View>
-                      <Text className="text-slate-600 text-sm mb-1">Contact</Text>
+                      <Text className="text-slate-500 text-xs mb-1">CONTACT</Text>
                       <Text className="text-slate-900 font-medium">{member.contact}</Text>
                     </View>
 
                     {index < request.teamMembers.length - 1 && (
-                      <View className="border-b border-gray-200 mt-3" />
+                      <View className="border-b border-gray-100 mt-3" />
                     )}
                   </View>
                 ))}
@@ -227,27 +260,27 @@ const RequestDetailsScreen: React.FC = () => {
             </>
           ) : (
             /* Individual Details */
-            <View className="bg-white rounded-xl p-5 border border-gray-200">
+            <View className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
               <Text className="text-lg font-bold text-slate-900 mb-4">
                 Participant Details
               </Text>
 
               <View className="mb-4">
-                <Text className="text-slate-600 text-sm mb-1">Full Name</Text>
+                <Text className="text-slate-500 text-xs mb-1 uppercase tracking-wider">Full Name</Text>
                 <Text className="text-slate-900 text-base font-semibold">
                   {request.participantName}
                 </Text>
               </View>
 
               <View className="mb-4">
-                <Text className="text-slate-600 text-sm mb-1">Contact Number</Text>
+                <Text className="text-slate-500 text-xs mb-1 uppercase tracking-wider">Contact Number</Text>
                 <Text className="text-slate-900 text-base font-semibold">
                   {request.contact}
                 </Text>
               </View>
 
               <View>
-                <Text className="text-slate-600 text-sm mb-1">Email Address</Text>
+                <Text className="text-slate-500 text-xs mb-1 uppercase tracking-wider">Email Address</Text>
                 <Text className="text-slate-900 text-base font-semibold">
                   {request.email}
                 </Text>
@@ -257,12 +290,9 @@ const RequestDetailsScreen: React.FC = () => {
         </View>
 
         {/* Submission Info */}
-        <View className="mx-6 mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <View className="flex-row items-center mb-2">
-            <Ionicons name="information-circle" size={18} color="#2563eb" />
-            <Text className="text-blue-900 font-semibold ml-2">Submission Details</Text>
-          </View>
-          <Text className="text-blue-800 text-sm">
+        <View className="mx-6 mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4 flex-row items-center">
+          <Ionicons name="time-outline" size={20} color="#2563eb" />
+          <Text className="text-blue-800 text-sm ml-2 flex-1">
             Submitted on{' '}
             {new Date(request.submittedAt).toLocaleDateString('en-IN', {
               day: 'numeric',
@@ -278,7 +308,7 @@ const RequestDetailsScreen: React.FC = () => {
         {request.notes && (
           <View className="mx-6 mb-6 bg-gray-100 rounded-xl p-4">
             <Text className="text-slate-900 font-semibold mb-2">Manager Notes</Text>
-            <Text className="text-slate-700 text-sm">{request.notes}</Text>
+            <Text className="text-slate-700 text-sm italic">"{request.notes}"</Text>
           </View>
         )}
 
@@ -293,57 +323,55 @@ const RequestDetailsScreen: React.FC = () => {
               value={notes}
               onChangeText={setNotes}
               multiline
-              numberOfLines={4}
+              numberOfLines={3}
+              textAlignVertical="top"
             />
             <View className="flex-row gap-3">
               <TouchableOpacity
                 onPress={() => setShowNotesInput(false)}
-                className="flex-1 bg-gray-300 py-2 rounded-lg items-center"
+                className="flex-1 bg-gray-200 py-3 rounded-lg items-center"
               >
                 <Text className="text-gray-700 font-semibold">Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={confirmReject}
                 disabled={isProcessing}
-                className="flex-1 bg-red-600 py-2 rounded-lg items-center"
+                className="flex-1 bg-red-600 py-3 rounded-lg items-center"
               >
                 <Text className="text-white font-semibold">
-                  {isProcessing ? 'Processing...' : 'Confirm Rejection'}
+                  {isProcessing ? 'Processing...' : 'Confirm'}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
+        
+        {/* Spacer */}
+        <View className="h-10" />
       </ScrollView>
 
       {/* Action Buttons - Only show if pending */}
       {request.status === 'pending' && !showNotesInput && (
-        <View className="bg-white border-t border-gray-200 px-6 py-4">
+        <View className="bg-white border-t border-gray-200 px-6 py-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
           <View className="flex-row gap-3">
             <TouchableOpacity
               onPress={handleReject}
               disabled={isProcessing}
-              className="flex-1 bg-red-600 py-4 rounded-xl items-center"
-              activeOpacity={0.8}
+              className="flex-1 bg-white border border-red-200 py-4 rounded-xl items-center"
+              activeOpacity={0.7}
             >
-              <View className="flex-row items-center">
-                <Ionicons name="close-circle" size={20} color="white" />
-                <Text className="text-white text-base font-bold ml-2">Reject</Text>
-              </View>
+              <Text className="text-red-600 text-base font-bold">Reject</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleAccept}
               disabled={isProcessing}
-              className="flex-1 bg-green-600 py-4 rounded-xl items-center"
+              className="flex-1 bg-green-600 py-4 rounded-xl items-center shadow-md shadow-green-200"
               activeOpacity={0.8}
             >
-              <View className="flex-row items-center">
-                <Ionicons name="checkmark-circle" size={20} color="white" />
-                <Text className="text-white text-base font-bold ml-2">
-                  {isProcessing ? 'Processing...' : 'Accept'}
-                </Text>
-              </View>
+              <Text className="text-white text-base font-bold">
+                {isProcessing ? 'Processing...' : 'Accept Request'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

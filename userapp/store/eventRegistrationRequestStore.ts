@@ -1,5 +1,3 @@
-// stores/registrationRequestStore.ts
-
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
@@ -54,6 +52,12 @@ export interface RegistrationRequestState {
   // Actions
   addRequest: (request: RegistrationRequest) => void;
   updateRequestStatus: (requestId: string, status: RequestStatus, managerId: string, notes?: string) => void;
+  deleteRequest: (requestId: string) => void;
+  // NEW: cleanup action
+  deleteRequestsByEvent: (eventId: string) => void; 
+  setRequests: (requests: RegistrationRequest[]) => void;
+
+  // Getters
   getRequestsByEvent: (eventId: string) => RegistrationRequest[];
   getRequestById: (requestId: string) => RegistrationRequest | undefined;
   getRequestsByUser: (userId: string) => RegistrationRequest[];
@@ -64,8 +68,6 @@ export interface RegistrationRequestState {
     rejected: number;
     total: number;
   };
-  deleteRequest: (requestId: string) => void;
-  setRequests: (requests: RegistrationRequest[]) => void;
 }
 
 export const useRegistrationRequestStore = create<RegistrationRequestState>()(
@@ -94,6 +96,24 @@ export const useRegistrationRequestStore = create<RegistrationRequestState>()(
           }
         }),
 
+      deleteRequest: (requestId: string) =>
+        set((state) => {
+          state.requests = state.requests.filter((r) => r.id !== requestId);
+        }),
+
+      // NEW: Action to prevent orphan requests when an Event is deleted
+      deleteRequestsByEvent: (eventId: string) =>
+        set((state) => {
+          state.requests = state.requests.filter((r) => r.eventId !== eventId);
+        }),
+
+      setRequests: (requests: RegistrationRequest[]) =>
+        set((state) => {
+          state.requests = requests;
+          state.isLoading = false;
+          state.error = null;
+        }),
+
       getRequestsByEvent: (eventId: string) => {
         return get().requests.filter((r) => r.eventId === eventId);
       },
@@ -119,18 +139,6 @@ export const useRegistrationRequestStore = create<RegistrationRequestState>()(
           total: eventRequests.length,
         };
       },
-
-      deleteRequest: (requestId: string) =>
-        set((state) => {
-          state.requests = state.requests.filter((r) => r.id !== requestId);
-        }),
-
-      setRequests: (requests: RegistrationRequest[]) =>
-        set((state) => {
-          state.requests = requests;
-          state.isLoading = false;
-          state.error = null;
-        }),
     })),
     {
       name: 'registration-request-store',

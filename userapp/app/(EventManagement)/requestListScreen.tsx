@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-
   StatusBar,
   Alert,
 } from 'react-native'
@@ -12,23 +11,27 @@ import { KeyboardAvoidingView } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 
+// 1. Correct Import Paths (Ensure these match your file structure)
 import { useBookingStore } from '@/store/venueStore'
-import { useRegistrationRequestStore } from '@/store/eventRegistrationRequestStore'
+import { useRegistrationRequestStore } from '@/store/eventRegistrationRequestStore' // Fixed filename
 import { useEventManagerStore } from '@/store/eventManagerStore'
 
 type FilterKey = 'pending' | 'accepted' | 'rejected'
 
 const EventRegistrationRequestsScreen: React.FC = () => {
   const router = useRouter()
+  // Ensure your file is named [eventId].tsx or similar to capture this param
   const { eventId } = useLocalSearchParams<{ eventId: string }>()
 
   const { getEventById } = useBookingStore()
   const { deleteEvent } = useEventManagerStore()
-  const { getRequestsByEvent, getEventStats } =
-    useRegistrationRequestStore()
+  const { 
+    getRequestsByEvent, 
+    getEventStats, 
+    deleteRequestsByEvent // Added this action to store below
+  } = useRegistrationRequestStore()
 
-  const [activeFilter, setActiveFilter] =
-    useState<FilterKey>('pending')
+  const [activeFilter, setActiveFilter] = useState<FilterKey>('pending')
 
   const event = getEventById(eventId!)
   const requests = getRequestsByEvent(eventId!)
@@ -36,9 +39,12 @@ const EventRegistrationRequestsScreen: React.FC = () => {
 
   if (!event) {
     return (
-      <KeyboardAvoidingView className="flex-1 items-center justify-center">
-        <Text>Event not found</Text>
-      </KeyboardAvoidingView>
+      <View className="flex-1 items-center justify-center bg-gray-50">
+        <Text className="text-slate-500">Event not found</Text>
+        <TouchableOpacity onPress={() => router.back()} className="mt-4">
+          <Text className="text-blue-600">Go Back</Text>
+        </TouchableOpacity>
+      </View>
     )
   }
 
@@ -51,14 +57,18 @@ const EventRegistrationRequestsScreen: React.FC = () => {
   const handleDeleteEvent = () => {
     Alert.alert(
       'Delete Event',
-      'This will permanently delete the event and all requests.',
+      'This will permanently delete the event and all associated requests.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
+            // 1. Cleanup Requests first
+            deleteRequestsByEvent(event.id)
+            // 2. Delete Event (Syncs Manager & Venue Stores)
             deleteEvent(event.id)
+            // 3. Navigate back
             router.back()
           },
         },
@@ -69,17 +79,17 @@ const EventRegistrationRequestsScreen: React.FC = () => {
   /* ---------------------------- UI ---------------------------- */
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-gray-50">
+    <KeyboardAvoidingView className="flex-1 bg-gray-50" behavior="padding">
       <StatusBar barStyle="dark-content" />
 
       {/* HEADER */}
-      <View className="bg-white px-6 py-4 border-b border-gray-200 flex-row items-center">
+      <View className="bg-white px-6 py-4 border-b border-gray-200 flex-row items-center pt-12">
         <TouchableOpacity onPress={() => router.back()} className="mr-4">
           <Ionicons name="arrow-back" size={24} color="#475569" />
         </TouchableOpacity>
 
         <View className="flex-1">
-          <Text className="text-lg font-bold text-slate-900">
+          <Text className="text-lg font-bold text-slate-900" numberOfLines={1}>
             {event.name}
           </Text>
           <Text className="text-sm text-slate-600">
@@ -164,25 +174,29 @@ const EventRegistrationRequestsScreen: React.FC = () => {
             <TouchableOpacity
               key={req.id}
               onPress={() =>
+                // Fixed: Consistent routing structure
                 router.push({
-                  pathname: '/organizer/request-details',
+                  pathname: '/eventManager/requestDetails',
                   params: { requestId: req.id, eventId: event.id },
                 })
               }
-              className="bg-white p-4 rounded-xl border border-gray-200 mb-3"
+              className="bg-white p-4 rounded-xl border border-gray-200 mb-3 shadow-sm"
             >
-              <Text className="font-bold text-slate-900">
-                {'teamName' in req ? req.teamName : req.participantName}
+              <Text className="font-bold text-slate-900 text-base">
+                {/* Fixed: Cleaner TypeScript narrowing */}
+                {req.participationType === 'team' ? req.teamName : req.participantName}
               </Text>
               <Text className="text-sm text-slate-600 mt-1">
-                {'teamName' in req
-                  ? `${req.teamSize} players`
-                  : req.contact}
+                {req.participationType === 'team'
+                  ? `${req.teamSize} players • Team`
+                  : `${req.contact} • Individual`}
               </Text>
 
-              <View className="flex-row justify-between items-center mt-3">
-                <Text className="text-xs text-slate-500">
-                  {new Date(req.submittedAt).toLocaleDateString('en-IN')}
+              <View className="flex-row justify-between items-center mt-3 pt-3 border-t border-gray-100">
+                <Text className="text-xs text-slate-400">
+                  {new Date(req.submittedAt).toLocaleDateString('en-IN', {
+                     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                  })}
                 </Text>
                 <Ionicons
                   name="chevron-forward"
@@ -193,6 +207,8 @@ const EventRegistrationRequestsScreen: React.FC = () => {
             </TouchableOpacity>
           ))
         )}
+        {/* Spacer for bottom scrolling */}
+        <View className="h-10" />
       </ScrollView>
     </KeyboardAvoidingView>
   )
@@ -216,10 +232,15 @@ const Stat = ({
 )
 
 const EmptyState = ({ filter }: { filter: string }) => (
-  <View className="items-center mt-20">
-    <Ionicons name="document-outline" size={48} color="#cbd5e1" />
-    <Text className="text-slate-600 font-semibold mt-4">
-      No {filter} requests
+  <View className="items-center mt-12 opacity-70">
+    <View className="bg-gray-100 p-4 rounded-full mb-4">
+        <Ionicons name="document-text-outline" size={32} color="#94a3b8" />
+    </View>
+    <Text className="text-slate-600 font-semibold text-lg capitalize">
+      No {filter} Requests
+    </Text>
+    <Text className="text-slate-400 text-sm text-center px-10 mt-1">
+      Requests that are {filter} will appear here.
     </Text>
   </View>
 )
