@@ -57,10 +57,10 @@ const VenueTab: React.FC = () => {
         <View className="px-4 py-3 bg-transparent">
           <View className="flex-row items-center space-x-3">
             {/* Search Input */}
-            <View className="flex-1 flex-row items-center bg-slate-900 rounded-lg px-3 py-2 mx-2">
-              <Ionicons name="search" size={20} color="#ffffff" />
+            <View className="flex-1 flex-row items-center bg-white rounded-lg px-3 py-2 mx-2">
+              <Ionicons name="search" size={20} color="#000000" />
               <TextInput
-                className="flex-1 ml-2 text-white text-xl"
+                className="flex-1 ml-2 text-black text-xl"
                 placeholder="Search venues..."
                 placeholderTextColor="#9ca3af"
                 value={searchQuery}

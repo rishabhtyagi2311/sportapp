@@ -7,7 +7,7 @@ import {
   Text,
   TouchableWithoutFeedback,
   Dimensions,
-  Animated, // Standard Animated API
+  Animated,
   StyleSheet,
   Platform,
   FlatList,
@@ -18,10 +18,12 @@ import { router } from "expo-router";
 const { width } = Dimensions.get("window");
 
 // 🔹 CAROUSEL CONFIGURATION
-const ITEM_WIDTH = width * 0.82; 
-const SPACING = 12; 
-const EMPTY_ITEM_SIZE = (width - ITEM_WIDTH) / 2; 
-const CARD_HEIGHT = 240;
+const ITEM_WIDTH = width * 0.82;
+const SPACING = 12;
+const EMPTY_ITEM_SIZE = (width - ITEM_WIDTH) / 2;
+
+// 👇 CHANGED: Increased height from 240 to 340
+const CARD_HEIGHT = 340; 
 
 export default function AcademyMainScreen() {
   const scrollX = useRef(new Animated.Value(0)).current;
@@ -131,50 +133,6 @@ export default function AcademyMainScreen() {
     );
   };
 
-  // 🔹 3) PAGINATION DOTS
-  const Pagination = () => {
-    const actualData = data.filter((item) => item.id);
-    
-    return (
-      <View className="flex-row justify-center items-center mt-5 h-5">
-        {actualData.map((_, idx) => {
-          const realIndex = idx + 1; 
-          
-          const inputRange = [
-            (realIndex - 1) * ITEM_WIDTH,
-            realIndex * ITEM_WIDTH,
-            (realIndex + 1) * ITEM_WIDTH,
-          ];
-
-          // Animating Width and Color requires useNativeDriver: false
-          const dotWidth = scrollX.interpolate({
-            inputRange,
-            outputRange: [8, 20, 8],
-            extrapolate: "clamp",
-          });
-
-          const dotColor = scrollX.interpolate({
-            inputRange,
-            outputRange: ["#334155", "#60a5fa", "#334155"],
-            extrapolate: "clamp",
-          });
-
-          return (
-            <Animated.View
-              key={idx.toString()}
-              style={{
-                height: 8,
-                borderRadius: 4,
-                marginHorizontal: 4,
-                width: dotWidth,
-                backgroundColor: dotColor,
-              }}
-            />
-          );
-        })}
-      </View>
-    );
-  };
 
   // 🔹 4) BUTTON COMPONENT
   const handlePress = (action: string) => {
@@ -225,10 +183,11 @@ export default function AcademyMainScreen() {
           ]}
         >
           <View className="items-center justify-center p-2">
-            <View className="bg-white/10 rounded-full p-3 mb-2">
-              <Ionicons name={icon} size={26} color="white" />
+            <View className="bg-white/10 rounded-full p-2 mb-1">
+              {/* Reduced icon size slightly to fit smaller card */}
+              <Ionicons name={icon} size={22} color="white" />
             </View>
-            <Text className="text-white font-semibold text-center text-sm">
+            <Text className="text-white font-semibold text-center text-xs">
               {label}
             </Text>
           </View>
@@ -258,16 +217,14 @@ export default function AcademyMainScreen() {
             contentContainerStyle={{ alignItems: "center" }}
             onScroll={Animated.event(
               [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-              { useNativeDriver: false } // 👈 FIXED HERE: Must be false for width/color animations
+              { useNativeDriver: false }
             )}
             renderItem={renderItem}
           />
-
-          <Pagination />
         </View>
 
         {/* HEADER TEXT */}
-        <View className="px-6 mt-2 mb-8">
+        <View className="px-6 mt-12 mb-8">
           <Text className="text-white text-3xl font-bold text-center mb-2">
             Academy Connect
           </Text>
@@ -291,13 +248,15 @@ export default function AcademyMainScreen() {
             icon="compass-outline"
             label="Explore"
             onPress={() => handlePress("Explore")}
-            style={{ width: width * 0.38, height: width * 0.32 }}
+            // 👇 CHANGED: Made smaller. Width 0.35 -> 0.35, Height 0.32 -> 0.22
+            style={{ width: width * 0.35, height: width * 0.22 }}
           />
           <ButtonComponent
             icon="trophy-outline"
             label="Manage"
             onPress={() => handlePress("Manage")}
-            style={{ width: width * 0.38, height: width * 0.32 }}
+            // 👇 CHANGED: Made smaller. Width 0.35 -> 0.35, Height 0.32 -> 0.22
+            style={{ width: width * 0.35, height: width * 0.22 }}
           />
         </View>
       </Animated.ScrollView>

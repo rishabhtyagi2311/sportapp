@@ -100,7 +100,7 @@ const EventRegistrationRequestsScreen: React.FC = () => {
 
         <TouchableOpacity
           onPress={() =>
-            router.push(`/eventManager/editEvent/${event.id}`)
+            router.push(`/(EventManagement)/editEvent/${event.id}`)
           }
           className="mr-4"
         >
@@ -176,7 +176,7 @@ const EventRegistrationRequestsScreen: React.FC = () => {
               key={req.id}
               onPress={() =>
                 router.push({
-                  pathname: '/eventManager/requestDetails',
+                  pathname: '/(EventManagement)/requestDetailScreen',
                   params: { requestId: req.id, eventId: event.id },
                 })
               }
