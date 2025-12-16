@@ -10,13 +10,14 @@ import {
   ImageBackground,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
-import { useTournamentStore } from '@/store/footballTournamentStore';
-import { useMatchExecutionStore } from '@/store/footballMatchEventStore';
+// STORES
+import { useKnockoutStore, KnockoutMatchEvent } from '@/store/knockoutTournamentStore';
 import { useFootballStore } from '@/store/footballTeamStore';
 import { FootballPlayer } from '@/types/addingMemberTypes';
 
@@ -69,25 +70,21 @@ const getCardColor = (eventType: string, eventSubType?: string): string => {
   return '#f59e0b';
 };
 
-export default function TournamentMatchScoringScreen() {
+export default function KnockoutMatchScoringScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const tournamentId = params.tournamentId as string;
   const fixtureId = params.fixtureId as string;
 
   // Stores
-  const { getTournament, submitMatchResult } = useTournamentStore();
-  
-  const {
-    activeMatch,
-    addEvent: addLiveEvent,
-    endMatch: endLiveMatch,
-    getCurrentMatchTime,
-    getTeamScore,
-    updateMatchStatus,
-  } = useMatchExecutionStore();
+  const { 
+    activeMatch, 
+    addEvent, 
+    endMatch,
+    startMatch
+  } = useKnockoutStore();
 
-  const { players } = useFootballStore();
+  const { players: allPlayers } = useFootballStore();
 
   // Local UI state
   const [showEventModal, setShowEventModal] = useState(false);
@@ -100,102 +97,91 @@ export default function TournamentMatchScoringScreen() {
   const [eventMinuteInput, setEventMinuteInput] = useState('');
 
   // Timer tick
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setTick((s) => s + 1), 1000); 
-    return () => clearInterval(t);
-  }, []);
+  const [seconds, setSeconds] = useState(0);
+  const [isRunning, setIsRunning] = useState(true);
 
-  const currentTime = useMemo(() => getCurrentMatchTime(), [tick, getCurrentMatchTime]);
-  const formattedTimer = `${String(currentTime.minutes).padStart(2, '0')}:${String(currentTime.seconds).padStart(2, '0')}`;
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isRunning) {
+      interval = setInterval(() => setSeconds(s => s + 1), 1000); 
+    }
+    return () => clearInterval(interval);
+  }, [isRunning]);
+
+  const formattedTimer = useMemo(() => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  }, [seconds]);
 
   const events = useMemo(() => activeMatch?.events ?? [], [activeMatch]);
 
   /* -------------------------------------------------------------------------- */
-  /* ROSTER CALCULATION (FIXED)                         */
+  /* ROSTER CALCULATION                                                       */
   /* -------------------------------------------------------------------------- */
   const calculateRealTimeSquads = useCallback((teamSide: 'home' | 'away') => {
     if (!activeMatch) return { active: [], bench: [] };
 
-    const setup = activeMatch.matchSetup;
-    // 1. Get the list of selected Player IDs directly from match setup
-    //    (This matches the logic in your working Friendly Match screen)
-    const starterIds = teamSide === 'home' 
-      ? setup.myTeam.selectedPlayers 
-      : setup.opponentTeam.selectedPlayers;
+    const isHome = teamSide === 'home';
+    const teamId = isHome ? activeMatch.homeTeamId : activeMatch.awayTeamId;
+    
+    // 1. Get Initial IDs
+    const starterIds = isHome ? activeMatch.homeTeamPlayers : activeMatch.awayTeamPlayers;
+    const subIds = isHome ? activeMatch.homeTeamSubstitutes : activeMatch.awayTeamSubstitutes;
 
-    const teamId = teamSide === 'home' ? setup.myTeam.teamId : setup.opponentTeam.teamId;
-
-    // 2. Resolve these IDs to full Player objects from global store
+    // 2. Resolve IDs to Objects
     const starterPlayers = starterIds
-      .map((id: string) => players.find((p) => p.id === id))
+      .map(id => allPlayers.find(p => p.id === id))
       .filter((p): p is FootballPlayer => !!p);
 
-    // 3. For now, assume "Bench" are players in the team who were NOT selected as starters.
-    //    We find them by looking for players in the global store who belong to this teamId 
-    //    (Note: This assumes your Player object has a teamId, or you maintain a separate team roster list.
-    //     If your Player object doesn't have teamId, the bench might be empty or need to be passed differently).
-    //    For robustness, if we can't find bench players, we just return empty bench.
-    let benchPlayers: FootballPlayer[] = [];
+    const benchPlayers = subIds
+      .map(id => allPlayers.find(p => p.id === id))
+      .filter((p): p is FootballPlayer => !!p);
     
-    // Attempt to find bench players if possible (this part depends on your data structure)
-    // If you don't have a way to know who is on the bench, we'll start with just starters.
-    
-    // 4. Calculate "Current Active" based on events (Substitutions)
+    // 3. Calculate "Current Active" based on events (Substitutions)
     let currentActive = [...starterPlayers];
     let currentBench = [...benchPlayers]; 
 
     // Replay substitutions
     events.forEach(ev => {
        if (ev.teamId === teamId && ev.eventType === 'substitution') {
-         // Player OUT (ev.playerId) moves from Active to Bench (or just leaves)
-         const playerOut = currentActive.find(p => p.id === ev.playerId);
-         if (playerOut) {
-            currentActive = currentActive.filter(p => p.id !== ev.playerId);
-            currentBench.push(playerOut); // Optional: add back to bench
-         }
-
-         // Player IN (ev.assistPlayerId) moves from Bench to Active
-         // In your Friendly screen, you didn't explicitly handle "Player IN" from a bench list,
-         // you just likely assumed they came from somewhere. 
-         // Here, if we have the ID, we try to find them.
-         if (ev.assistPlayerId) {
-            const playerIn = players.find(p => p.id === ev.assistPlayerId);
-            if (playerIn) {
-                // Remove from bench if they were there
-                currentBench = currentBench.filter(p => p.id !== ev.assistPlayerId);
-                // Add to active
-                currentActive.push(playerIn);
-            }
+         // Player OUT
+         currentActive = currentActive.filter(p => p.id !== ev.playerId);
+         // Player IN
+         const playerIn = allPlayers.find(p => p.id === ev.assistPlayerId);
+         if (playerIn) {
+            currentBench = currentBench.filter(p => p.id !== ev.assistPlayerId);
+            currentActive.push(playerIn);
          }
        }
     });
 
     return { active: currentActive, bench: currentBench };
-  }, [activeMatch, players, events]);
+  }, [activeMatch, allPlayers, events]);
 
   const homeSquad = useMemo(() => calculateRealTimeSquads('home'), [calculateRealTimeSquads]);
   const awaySquad = useMemo(() => calculateRealTimeSquads('away'), [calculateRealTimeSquads]);
 
-  // If no bench players are found (common in ad-hoc tournaments), 
-  // we might want to show ALL starters as candidates for being subbed OUT,
-  // and perhaps allow selecting ANY other player as sub IN? 
-  // For now, let's ensure at least the 'active' list is populated.
-
-  const liveHomeScore = useMemo(() => getTeamScore(activeMatch?.matchSetup.myTeam.teamId || ''), [getTeamScore, activeMatch]);
-  const liveAwayScore = useMemo(() => getTeamScore(activeMatch?.matchSetup.opponentTeam.teamId || ''), [getTeamScore, activeMatch]);
+  // Ensure activeMatch exists before rendering
+  if (!activeMatch) {
+    return (
+      <SafeAreaView className="flex-1 bg-slate-100 items-center justify-center">
+        <Text className="text-slate-500 text-lg">Loading match data...</Text>
+      </SafeAreaView>
+    );
+  }
 
   const parseMinuteAndSeconds = (input: string) => {
     const parts = input.split(':').map((p) => p.trim());
     const minute = parseInt(parts[0] || '0', 10);
-    const seconds = parts[1] ? parseInt(parts[1].slice(0, 2), 10) : 0;
+    const secs = parts[1] ? parseInt(parts[1].slice(0, 2), 10) : 0;
     return {
       minute: isNaN(minute) ? 0 : minute,
-      seconds: isNaN(seconds) ? 0 : seconds,
+      seconds: isNaN(secs) ? 0 : secs,
     };
   };
 
-  const handleCreateEvent = async () => {
+  const handleCreateEvent = () => {
     // Validation
     if (!selectedEventType || !selectedPlayer || !selectedTeam) {
       Alert.alert('Error', 'Please select team, event type and player');
@@ -208,23 +194,28 @@ export default function TournamentMatchScoringScreen() {
     }
 
     const minuteSource = eventMinuteInput.trim().length ? eventMinuteInput.trim() : formattedTimer;
-    const { minute, seconds } = parseMinuteAndSeconds(minuteSource);
-    const isExtraTime = minute > (getTournament(tournamentId)?.settings.matchDuration ?? 90);
+    const { minute, seconds: eventSecs } = parseMinuteAndSeconds(minuteSource);
+    
+    // FIX: Explicitly resolve teamId string here
+    const teamId = selectedTeam === 'home' ? activeMatch.homeTeamId : activeMatch.awayTeamId;
 
-    const livePayload: any = {
-      teamId: selectedTeam === 'home' ? activeMatch?.matchSetup.myTeam.teamId : activeMatch?.matchSetup.opponentTeam.teamId,
-      eventType: selectedEventType,
-      eventSubType: selectedSubType,
+    if (!teamId) {
+        Alert.alert("Error", "Team ID not found.");
+        return;
+    }
+
+    addEvent({
+      teamId: teamId, // Now strongly typed as string
+      eventType: selectedEventType as any,
+      eventSubType: selectedSubType || undefined,
       playerId: selectedPlayer.id, 
       playerName: selectedPlayer.name,
       assistPlayerId: selectedAssistPlayer?.id, 
       assistPlayerName: selectedAssistPlayer?.name,
       minute,
-      seconds,
-      isExtraTime,
-    };
-
-    addLiveEvent(livePayload);
+      seconds: eventSecs,
+      isExtraTime: false,
+    });
 
     // Reset modal
     setShowEventModal(false);
@@ -236,31 +227,26 @@ export default function TournamentMatchScoringScreen() {
     setSelectedTeam(null);
   };
 
-  const handleEndMatch = useCallback(() => {
+  const handleEndMatch = () => {
     Alert.alert(
       'End Match',
-      'Are you sure you want to end this match? This will save the result to the tournament.',
+      'Are you sure? This will finalize the result and advance the winner.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'End',
           style: 'destructive',
           onPress: () => {
-            const completed = endLiveMatch();
-            if (completed && activeMatch?.context?.type === 'tournament' && activeMatch.context.fixtureId) {
-                submitMatchResult(
-                    activeMatch.context.fixtureId,
-                    completed.homeTeamScore,
-                    completed.awayTeamScore,
-                    completed.events
-                );
-            }
-            router.push(`/(football)/startTournament/${tournamentId}`);
-          },
+            endMatch();
+            router.push(`/(football)/startKnockOutTournament/${tournamentId}/dashboard`)
+          }
+          
+            
+          
         },
       ]
     );
-  }, [endLiveMatch, activeMatch, submitMatchResult, router, tournamentId]);
+  };
 
   // UI Helpers
   const handleAddEventPress = (team: 'home' | 'away') => {
@@ -269,11 +255,11 @@ export default function TournamentMatchScoringScreen() {
     setShowEventModal(true);
   };
 
-  const getCurrentSquad = useCallback(() => (selectedTeam === 'home' ? homeSquad : awaySquad), [selectedTeam, homeSquad, awaySquad]);
+  const getCurrentSquad = () => (selectedTeam === 'home' ? homeSquad : awaySquad);
 
-  const renderEventCard = (ev: any) => {
+  const renderEventCard = (ev: KnockoutMatchEvent) => {
     const cfg = EVENT_CONFIGS[ev.eventType as keyof typeof EVENT_CONFIGS];
-    const isHome = ev.teamId === activeMatch?.matchSetup.myTeam.teamId;
+    const isHome = ev.teamId === activeMatch.homeTeamId;
     if (!cfg) return null;
 
     let mainText = cfg.name;
@@ -324,16 +310,9 @@ export default function TournamentMatchScoringScreen() {
     );
   };
 
-  if (!activeMatch) {
-    return (
-      <SafeAreaView className="flex-1 bg-slate-100 items-center justify-center">
-        <Text className="text-slate-500 text-lg">Loading match data...</Text>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView className="flex-1 bg-slate-100">
+      <StatusBar barStyle="light-content" />
       <ImageBackground
         source={{ uri: 'https://images.unsplash.com/photo-1459865264687-595d652de67e?auto=format&fit=crop&w=2340&q=80' }}
         className="h-72"
@@ -355,8 +334,8 @@ export default function TournamentMatchScoringScreen() {
                 <View className="w-20 h-20 bg-white/20 rounded-full items-center justify-center mb-2 border-2 border-white/30">
                   <Ionicons name="shield" size={40} color="white" />
                 </View>
-                <Text className="text-white text-sm font-medium text-center mb-1">{activeMatch.matchSetup.myTeam.teamName}</Text>
-                <Text className="text-white text-4xl font-bold">{liveHomeScore ?? 0}</Text>
+                <Text className="text-white text-sm font-medium text-center mb-1">{activeMatch.homeTeamName}</Text>
+                <Text className="text-white text-4xl font-bold">{activeMatch.homeScore}</Text>
               </TouchableOpacity>
 
               <View className="px-8">
@@ -367,8 +346,8 @@ export default function TournamentMatchScoringScreen() {
                 <View className="w-20 h-20 bg-white/20 rounded-full items-center justify-center mb-2 border-2 border-white/30">
                   <Ionicons name="shield-outline" size={40} color="white" />
                 </View>
-                <Text className="text-white text-sm font-medium text-center mb-1">{activeMatch.matchSetup.opponentTeam.teamName}</Text>
-                <Text className="text-white text-4xl font-bold">{liveAwayScore ?? 0}</Text>
+                <Text className="text-white text-sm font-medium text-center mb-1">{activeMatch.awayTeamName}</Text>
+                <Text className="text-white text-4xl font-bold">{activeMatch.awayScore}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -379,20 +358,21 @@ export default function TournamentMatchScoringScreen() {
         {events.length > 0 ? (
           <>
             <Text className="text-lg font-bold text-slate-900 mb-4">Match Timeline ({events.length})</Text>
-            {[...events].sort((a, b) => (b.minute - a.minute) || ((b.seconds ?? 0) - (a.seconds ?? 0))).map((ev) => renderEventCard(ev))}
+            {[...events].reverse().map((ev) => renderEventCard(ev))}
           </>
         ) : (
           <View className="items-center justify-center py-16">
             <Ionicons name="football" size={48} color="#94a3b8" />
             <Text className="text-slate-500 text-lg font-medium mt-4">No events yet</Text>
+            <Text className="text-slate-400 text-sm mt-2">Tap teams to add goals or cards.</Text>
           </View>
         )}
       </ScrollView>
 
       <View className="flex-row items-center p-3 bg-slate-900 border-t border-white">
         <View className="w-16 items-center">
-          <TouchableOpacity onPress={() => updateMatchStatus(activeMatch?.status === 'in_progress' ? 'half_time' : 'in_progress')} className="bg-white/30 p-3 rounded-full">
-            <Ionicons name={activeMatch?.status === 'in_progress' ? 'pause' : 'play'} size={22} color="white" />
+          <TouchableOpacity onPress={() => setIsRunning(!isRunning)} className="bg-white/30 p-3 rounded-full">
+            <Ionicons name={isRunning ? 'pause' : 'play'} size={22} color="white" />
           </TouchableOpacity>
         </View>
 
@@ -422,6 +402,7 @@ export default function TournamentMatchScoringScreen() {
             </View>
 
             <ScrollView className="flex-1 p-4" keyboardShouldPersistTaps="handled">
+              {/* Event Type */}
               <Text className="text-lg font-bold text-slate-900 mb-3">Event Type</Text>
               <View className="flex-row flex-wrap gap-2 mb-6">
                 {Object.entries(EVENT_CONFIGS).map(([key, cfg]) => (
@@ -448,7 +429,7 @@ export default function TournamentMatchScoringScreen() {
                 </>
               )}
 
-              {/* --- DYNAMIC PLAYER SELECTION --- */}
+              {/* DYNAMIC PLAYER SELECTION */}
               <Text className="text-lg font-bold text-slate-900 mb-3">
                 {selectedEventType === 'substitution' ? 'Player OUT (Active)' : 'Player'}
               </Text>
@@ -465,18 +446,21 @@ export default function TournamentMatchScoringScreen() {
                 </View>
               </ScrollView>
 
-              {/* SECONDARY PLAYER (Assist OR Player IN) */}
+              {/* SECONDARY PLAYER SELECTION */}
               {selectedEventType === 'substitution' ? (
                 <>
-                  <Text className="text-lg font-bold text-slate-900 mb-3">Player IN (Bench/Other)</Text>
+                  <Text className="text-lg font-bold text-slate-900 mb-3">Player IN (Bench)</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
                     <View className="flex-row gap-2">
-                        {/* If bench is empty, show all available players who are not currently active */}
-                        {players.filter(p => !getCurrentSquad().active.find(a => a.id === p.id)).slice(0, 15).map((p) => (
+                        {getCurrentSquad().bench.length > 0 ? (
+                          getCurrentSquad().bench.map((p) => (
                             <TouchableOpacity key={p.id} onPress={() => setSelectedAssistPlayer(p)} className={`px-4 py-3 rounded-xl border min-w-[120px] items-center ${selectedAssistPlayer?.id === p.id ? 'border-green-500 bg-green-50' : 'border-slate-200 bg-white'}`}>
                               <Text className={`font-medium ${selectedAssistPlayer?.id === p.id ? 'text-green-700' : 'text-slate-700'}`}>{p.name}</Text>
                             </TouchableOpacity>
-                        ))}
+                          ))
+                        ) : (
+                          <Text className="text-slate-400 p-2 italic">Bench empty. Check setup.</Text>
+                        )}
                     </View>
                   </ScrollView>
                 </>

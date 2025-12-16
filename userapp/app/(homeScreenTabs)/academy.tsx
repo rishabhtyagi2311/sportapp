@@ -7,9 +7,10 @@ import {
   Text,
   TouchableWithoutFeedback,
   Dimensions,
-  Animated,
+  Animated, // Standard Animated API
   StyleSheet,
   Platform,
+  FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -17,9 +18,9 @@ import { router } from "expo-router";
 const { width } = Dimensions.get("window");
 
 // 🔹 CAROUSEL CONFIGURATION
-const ITEM_WIDTH = width * 0.82; // Card width
-const SPACING = 12; // Gap between cards
-const EMPTY_ITEM_SIZE = (width - ITEM_WIDTH) / 2; // To center the first/last item
+const ITEM_WIDTH = width * 0.82; 
+const SPACING = 12; 
+const EMPTY_ITEM_SIZE = (width - ITEM_WIDTH) / 2; 
 const CARD_HEIGHT = 240;
 
 export default function AcademyMainScreen() {
@@ -28,7 +29,7 @@ export default function AcademyMainScreen() {
 
   // 🔹 1) DATA
   const data = [
-    { key: "spacer-left" }, // Spacer for centering
+    { key: "spacer-left" },
     {
       id: "hero",
       type: "image",
@@ -57,7 +58,7 @@ export default function AcademyMainScreen() {
       subtitle: "Parents will scroll through banners like this.",
       icon: "layers-outline",
     },
-    { key: "spacer-right" }, // Spacer for centering
+    { key: "spacer-right" },
   ];
 
   // 🔹 2) CAROUSEL RENDERER
@@ -66,28 +67,21 @@ export default function AcademyMainScreen() {
       return <View style={{ width: EMPTY_ITEM_SIZE }} />;
     }
 
-    // INTERPOLATION: Scale up the center item, scale down side items
     const inputRange = [
       (index - 2) * ITEM_WIDTH,
       (index - 1) * ITEM_WIDTH,
       index * ITEM_WIDTH,
     ];
 
-    const translateY = scrollX.interpolate({
-      inputRange,
-      outputRange: [20, -10, 20], // Parallax vertical move
-      extrapolate: "clamp",
-    });
-
     const scale = scrollX.interpolate({
       inputRange,
-      outputRange: [0.9, 1, 0.9], // Grow center, shrink sides
+      outputRange: [0.9, 1, 0.9],
       extrapolate: "clamp",
     });
 
     const opacity = scrollX.interpolate({
       inputRange,
-      outputRange: [0.6, 1, 0.6], // Fade sides
+      outputRange: [0.6, 1, 0.6],
       extrapolate: "clamp",
     });
 
@@ -111,17 +105,25 @@ export default function AcademyMainScreen() {
               />
               <View style={styles.cardGradientOverlay} />
               <View style={styles.cardTextOverlay}>
-                <Text style={styles.cardTitle}>{item.title}</Text>
-                <Text style={styles.cardSubtitle}>{item.subtitle}</Text>
+                <Text className="text-white text-2xl font-bold mb-1 shadow-sm">
+                  {item.title}
+                </Text>
+                <Text className="text-slate-200 text-sm font-medium">
+                  {item.subtitle}
+                </Text>
               </View>
             </>
           ) : (
-            <View style={styles.placeholderInner}>
-              <View style={styles.placeholderIconCircle}>
-                <Ionicons name={item.icon || "image"} size={32} color="#64748b" />
+            <View className="flex-1 items-center justify-center px-6 bg-slate-800">
+              <View className="w-16 h-16 rounded-full bg-slate-700 items-center justify-center mb-4">
+                <Ionicons name={item.icon as any || "image"} size={32} color="#94a3b8" />
               </View>
-              <Text style={styles.placeholderTitle}>{item.title}</Text>
-              <Text style={styles.placeholderSubtitle}>{item.subtitle}</Text>
+              <Text className="text-lg font-bold text-slate-50 text-center mb-2">
+                {item.title}
+              </Text>
+              <Text className="text-sm text-slate-400 text-center leading-5">
+                {item.subtitle}
+              </Text>
             </View>
           )}
         </Animated.View>
@@ -131,13 +133,11 @@ export default function AcademyMainScreen() {
 
   // 🔹 3) PAGINATION DOTS
   const Pagination = () => {
-    // Filter out spacers
     const actualData = data.filter((item) => item.id);
     
     return (
-      <View style={styles.paginationContainer}>
+      <View className="flex-row justify-center items-center mt-5 h-5">
         {actualData.map((_, idx) => {
-          // Because we added a spacer at index 0, the real items start at index 1
           const realIndex = idx + 1; 
           
           const inputRange = [
@@ -146,25 +146,29 @@ export default function AcademyMainScreen() {
             (realIndex + 1) * ITEM_WIDTH,
           ];
 
+          // Animating Width and Color requires useNativeDriver: false
           const dotWidth = scrollX.interpolate({
             inputRange,
-            outputRange: [8, 20, 8], // Active dot gets wider
+            outputRange: [8, 20, 8],
             extrapolate: "clamp",
           });
 
           const dotColor = scrollX.interpolate({
             inputRange,
-            outputRange: ["#334155", "#60a5fa", "#334155"], // Blue when active
+            outputRange: ["#334155", "#60a5fa", "#334155"],
             extrapolate: "clamp",
           });
 
           return (
             <Animated.View
               key={idx.toString()}
-              style={[
-                styles.dot,
-                { width: dotWidth, backgroundColor: dotColor },
-              ]}
+              style={{
+                height: 8,
+                borderRadius: 4,
+                marginHorizontal: 4,
+                width: dotWidth,
+                backgroundColor: dotColor,
+              }}
             />
           );
         })}
@@ -173,11 +177,11 @@ export default function AcademyMainScreen() {
   };
 
   // 🔹 4) BUTTON COMPONENT
-  const handlePress = (action: string): void => {
+  const handlePress = (action: string) => {
     if (action === "Explore") {
-      router.navigate("./../(academy)/browseAcademy");
+      router.push("/(academy)/browseAcademy");
     } else if (action === "Manage") {
-      router.navigate("./../manageProfile");
+      router.push("/manageProfile");
     }
   };
 
@@ -203,9 +207,21 @@ export default function AcademyMainScreen() {
       >
         <Animated.View
           style={[
-            styles.actionButton,
             style,
-            { transform: [{ scale: scaleAnim }] },
+            { 
+              transform: [{ scale: scaleAnim }],
+              backgroundColor: "#1e293b",
+              borderRadius: 24,
+              borderWidth: 1,
+              borderColor: "#334155",
+              justifyContent: "center",
+              alignItems: "center",
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+              elevation: 5,
+            }
           ]}
         >
           <View className="items-center justify-center p-2">
@@ -223,13 +239,12 @@ export default function AcademyMainScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-900">
-      {/* 🔹 MAIN SCROLL CONTENT */}
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
         {/* CAROUSEL SECTION */}
-        <View style={{ marginTop: 20 }}>
+        <View className="mt-5">
           <Animated.FlatList
             data={data}
             keyExtractor={(item, index) => index.toString()}
@@ -237,18 +252,17 @@ export default function AcademyMainScreen() {
             showsHorizontalScrollIndicator={false}
             snapToInterval={ITEM_WIDTH}
             snapToAlignment="start"
-            decelerationRate="fast" // Ensures crisp snap
+            decelerationRate="fast"
             bounces={false}
-            scrollEventThrottle={16} // 60fps updates
+            scrollEventThrottle={16}
             contentContainerStyle={{ alignItems: "center" }}
             onScroll={Animated.event(
               [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-              { useNativeDriver: true }
+              { useNativeDriver: false } // 👈 FIXED HERE: Must be false for width/color animations
             )}
             renderItem={renderItem}
           />
 
-          {/* Pagination Dots */}
           <Pagination />
         </View>
 
@@ -265,9 +279,9 @@ export default function AcademyMainScreen() {
         {/* STATS SECTION */}
         <View className="flex-row justify-between mb-10 px-6">
           <StatBox value="1.2k+" label="Academies" color="#60a5fa" />
-          <View style={styles.statDivider} />
+          <View className="w-[1px] h-[80%] bg-slate-700 self-center" />
           <StatBox value="50k+" label="Students" color="#4ade80" />
-          <View style={styles.statDivider} />
+          <View className="w-[1px] h-[80%] bg-slate-700 self-center" />
           <StatBox value="98%" label="Success" color="#c084fc" />
         </View>
 
@@ -304,7 +318,7 @@ const StatBox = ({ value, label, color }: any) => (
 const styles = StyleSheet.create({
   cardContainer: {
     height: CARD_HEIGHT,
-    marginHorizontal: SPACING / 2, // Split spacing between items
+    marginHorizontal: SPACING / 2,
     borderRadius: 24,
     backgroundColor: "#1e293b",
     overflow: "hidden",
@@ -330,81 +344,5 @@ const styles = StyleSheet.create({
     left: 20,
     right: 20,
     bottom: 24,
-  },
-  cardTitle: {
-    color: "white",
-    fontSize: 22,
-    fontWeight: "800",
-    marginBottom: 6,
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-  cardSubtitle: {
-    color: "#e2e8f0",
-    fontSize: 14,
-    fontWeight: "500",
-    lineHeight: 20,
-  },
-  placeholderInner: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    backgroundColor: "#1e293b",
-  },
-  placeholderIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#334155",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  placeholderTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#f8fafc",
-    textAlign: "center",
-    marginBottom: 6,
-  },
-  placeholderSubtitle: {
-    fontSize: 13,
-    color: "#94a3b8",
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  paginationContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 20,
-    height: 20,
-  },
-  dot: {
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
-  },
-  actionButton: {
-    backgroundColor: "#1e293b",
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#334155",
-    justifyContent: "center",
-    alignItems: "center",
-    // Shadow
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  statDivider: {
-    width: 1,
-    height: "80%",
-    backgroundColor: "#334155",
-    alignSelf: "center",
   },
 });

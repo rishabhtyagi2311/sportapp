@@ -1,41 +1,57 @@
-// app/(football)/tournaments/index.tsx
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useTournamentStore, Tournament } from '@/store/footballTournamentStore';
+
+// Stores
+import { useTournamentStore, Tournament } from '@/store/footballTournamentStore'; // Leagues
+import { useKnockoutStore, KnockoutTournament } from '@/store/knockoutTournamentStore'; // Knockouts
 
 export default function TournamentsScreen() {
   const router = useRouter();
-  const { tournaments, deleteTournament } = useTournamentStore();
+  
+  // 1. Fetch from BOTH stores
+  const { tournaments: leagueTournaments, deleteTournament: deleteLeague } = useTournamentStore();
+  const { tournaments: knockoutTournaments, deleteKnockoutTournament } = useKnockoutStore(); // Assuming you added delete action to store
+
   console.log('🏆 Tournaments screen is rendering');
   
   const handleCreateTournament = () => {
-    console.log('About to navigate to:', "/(football)/tournaments/create");
-    console.log('Router state:', router);
-    router.navigate("/(football)/startTournament/createTournament");
+    router.push("/(football)/startTournament/formatSelectionScreen"); // Updated path
   };
 
-  const handleViewTournament = (tournamentId: string) => {
-    router.navigate(`/(football)/startTournament/${tournamentId}`);
+  const handleViewTournament = (tournament: Tournament | KnockoutTournament) => {
+    if (tournament.settings.format === 'knockout') {
+        // Navigate to Knockout Dashboard
+        router.push({
+            pathname: `/(football)/startKnockOutTournament/${tournament.id}/dashboard`,
+            params: { tournamentId: tournament.id }
+        });
+    } else {
+        // Navigate to League Dashboard (Existing)
+        router.push(`/(football)/startTournament/${tournament.id}`);
+    }
   };
 
-  const handleDeleteTournament = (tournamentId: string, tournamentName: string) => {
+  const handleDeleteTournament = (tournament: Tournament | KnockoutTournament) => {
     Alert.alert(
       'Delete Tournament',
-      `Are you sure you want to delete "${tournamentName}"? This action cannot be undone.`,
+      `Are you sure you want to delete "${tournament.name}"? This action cannot be undone.`,
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            deleteTournament(tournamentId);
-            console.log(`🗑️ Deleted tournament: ${tournamentName} (${tournamentId})`);
+            if (tournament.settings.format === 'knockout') {
+                // You need to ensure deleteKnockoutTournament exists in your store
+                // If not, add it: deleteKnockoutTournament: (id) => set(state => { state.tournaments = state.tournaments.filter(t => t.id !== id) })
+                useKnockoutStore.getState().deleteKnockoutTournament?.(tournament.id); // Safe call
+            } else {
+                deleteLeague(tournament.id);
+            }
+            console.log(`🗑️ Deleted tournament: ${tournament.name} (${tournament.id})`);
           },
         },
       ],
@@ -43,31 +59,37 @@ export default function TournamentsScreen() {
     );
   };
 
-  // Group tournaments by status
+  // 2. Merge and Group Tournaments
   const groupedTournaments = useMemo(() => {
-    const active = tournaments.filter(t => t.status === 'active');
-    const draft = tournaments.filter(t => t.status === 'draft');
-    const completed = tournaments.filter(t => t.status === 'completed');
+    // Combine lists
+    // Note: We cast to 'any' here for simple merging if types slightly differ, 
+    // but logically they share common fields (id, name, status, format).
+    const allTournaments = [...leagueTournaments, ...knockoutTournaments];
+
+    const active = allTournaments.filter(t => t.status === 'active');
+    const draft = allTournaments.filter(t => t.status === 'draft');
+    const completed = allTournaments.filter(t => t.status === 'completed');
     
     return { active, draft, completed };
-  }, [tournaments]);
+  }, [leagueTournaments, knockoutTournaments]);
 
-  const getProgressPercentage = (tournament: Tournament) => {
-    if (tournament.fixtures.length === 0) return 0;
-    const completed = tournament.fixtures.filter(f => f.status === 'completed').length;
+  const getProgressPercentage = (tournament: any) => {
+    if (!tournament.fixtures || tournament.fixtures.length === 0) return 0;
+    const completed = tournament.fixtures.filter((f: any) => f.status === 'completed').length;
     return Math.round((completed / tournament.fixtures.length) * 100);
   };
 
-  const renderTournamentCard = (tournament: Tournament) => {
+  const renderTournamentCard = (tournament: any) => {
     const progress = getProgressPercentage(tournament);
-    const completedMatches = tournament.fixtures.filter(f => f.status === 'completed').length;
+    const completedMatches = tournament.fixtures.filter((f: any) => f.status === 'completed').length;
     const isDraft = tournament.status === 'draft';
+    const isKnockout = tournament.settings.format === 'knockout';
 
     return (
       <TouchableOpacity
         key={tournament.id}
-        onPress={() => handleViewTournament(tournament.id)}
-        className="bg-white rounded-xl p-4 mb-3 border border-slate-100"
+        onPress={() => handleViewTournament(tournament)}
+        className="bg-white rounded-xl p-4 mb-3 border border-slate-100 shadow-sm"
         activeOpacity={0.7}
       >
         <View className="flex-row items-start justify-between mb-3">
@@ -89,22 +111,26 @@ export default function TournamentsScreen() {
                   {tournament.status.toUpperCase()}
                 </Text>
               </View>
-              <View className="bg-amber-50 px-2 py-1 rounded">
-                <Text className="text-xs font-semibold text-amber-700">
-                  {tournament.format === 'league' ? 'LEAGUE' : 'KNOCKOUT'}
+              <View className={`px-2 py-1 rounded ${isKnockout ? 'bg-orange-50' : 'bg-blue-50'}`}>
+                <Text className={`text-xs font-semibold ${isKnockout ? 'text-orange-700' : 'text-blue-700'}`}>
+                  {isKnockout ? 'KNOCKOUT' : 'LEAGUE'}
                 </Text>
               </View>
             </View>
           </View>
           <View className="flex-row items-center">
-            <View className="w-12 h-12 bg-amber-100 rounded-lg items-center justify-center">
-              <Ionicons name="trophy" size={20} color="#f59e0b" />
+            <View className={`w-12 h-12 rounded-lg items-center justify-center ${isKnockout ? 'bg-orange-100' : 'bg-blue-100'}`}>
+              <Ionicons 
+                name={isKnockout ? "git-network-outline" : "list"} 
+                size={20} 
+                color={isKnockout ? "#ea580c" : "#2563eb"} 
+              />
             </View>
             {isDraft && (
               <TouchableOpacity
                 onPress={(e) => {
                   e.stopPropagation();
-                  handleDeleteTournament(tournament.id, tournament.name);
+                  handleDeleteTournament(tournament);
                 }}
                 className="ml-2 w-12 h-12 bg-red-100 rounded-lg items-center justify-center"
                 activeOpacity={0.7}
@@ -130,7 +156,7 @@ export default function TournamentsScreen() {
           <View className="flex-1 flex-row items-center">
             <Ionicons name="location" size={14} color="#64748b" />
             <Text className="text-xs text-slate-600 ml-1 font-medium" numberOfLines={1}>
-              {tournament.settings.venue}
+              {tournament.settings.venue || 'TBD'}
             </Text>
           </View>
         </View>
@@ -153,11 +179,14 @@ export default function TournamentsScreen() {
           </View>
         )}
 
-        {tournament.status === 'completed' && tournament.winner && (
+        {tournament.status === 'completed' && tournament.winnerId && (
           <View className="mt-3 bg-amber-50 rounded-lg p-2 flex-row items-center">
             <Ionicons name="trophy" size={14} color="#f59e0b" />
             <Text className="text-xs font-semibold text-amber-900 ml-2">
-              Winner: {tournament.winner}
+              Winner: {isKnockout 
+                ? tournament.teams.find((t: any) => t.id === tournament.winnerId)?.teamName 
+                : tournament.winner 
+              }
             </Text>
           </View>
         )}
@@ -167,7 +196,7 @@ export default function TournamentsScreen() {
   
   // Empty State Component
   const renderEmptyState = () => (
-    <View className="flex-1 justify-center items-center p-6">
+    <View className="flex-1 justify-center items-center p-6 mt-20">
       <View className="items-center">
         <View className="w-24 h-24 bg-slate-100 rounded-full justify-center items-center mb-6">
           <Ionicons name="trophy-outline" size={40} color="#64748b" />
@@ -177,7 +206,7 @@ export default function TournamentsScreen() {
           No Tournaments Yet
         </Text>
         <Text className="text-slate-600 text-center leading-6 max-w-sm mb-8">
-          You haven't created any tournaments yet. Start by organizing your first competition with multiple teams.
+          You haven't created any tournaments yet. Start by organizing your first competition.
         </Text>
       </View>
     </View>
@@ -185,8 +214,20 @@ export default function TournamentsScreen() {
   
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
-      {tournaments.length === 0 ? (
-        renderEmptyState()
+      {groupedTournaments.active.length === 0 && 
+       groupedTournaments.draft.length === 0 && 
+       groupedTournaments.completed.length === 0 ? (
+        <>
+            {renderEmptyState()}
+            {/* Floating Create Button */}
+            <TouchableOpacity
+                onPress={handleCreateTournament}
+                className="absolute bottom-6 right-6 w-14 h-14 bg-slate-900 rounded-full justify-center items-center shadow-lg"
+                activeOpacity={0.8}
+            >
+                <Ionicons name="add" size={28} color="white" />
+            </TouchableOpacity>
+        </>
       ) : (
         <ScrollView className="flex-1 px-4 pt-4" showsVerticalScrollIndicator={false}>
           {/* Active Tournaments */}
@@ -226,21 +267,16 @@ export default function TournamentsScreen() {
         </ScrollView>
       )}
 
-      {/* Floating Create Button */}
-      <TouchableOpacity
-        onPress={handleCreateTournament}
-        className="absolute bottom-6 right-6 w-14 h-14 bg-slate-900 rounded-full justify-center items-center shadow-lg"
-        activeOpacity={0.8}
-        style={{
-          elevation: 8,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3,
-          shadowRadius: 6,
-        }}
-      >
-        <Ionicons name="add" size={28} color="white" />
-      </TouchableOpacity>
+      {/* Floating Create Button (Visible even with content) */}
+      {(groupedTournaments.active.length > 0 || groupedTournaments.draft.length > 0 || groupedTournaments.completed.length > 0) && (
+          <TouchableOpacity
+            onPress={handleCreateTournament}
+            className="absolute bottom-6 right-6 w-14 h-14 bg-slate-900 rounded-full justify-center items-center shadow-lg"
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add" size={28} color="white" />
+          </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
