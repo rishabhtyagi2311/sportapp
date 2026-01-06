@@ -13,25 +13,21 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import signUpStore from '@/store/signUpStore'
-
 export default function ProfileScreen() {
   const router = useRouter()
   const { width } = useWindowDimensions()
-
   const {
-    firstName,
-    lastName,
+    name,
+    nickName,
     email,
     contact,
     city,
     profileImage,
     setProfileImage,
   } = signUpStore()
-
   const isSmallScreen = width < 380
   const profilePicSize = isSmallScreen ? 110 : 140
   const profileIconSize = isSmallScreen ? 50 : 70
-
   /* ---------------- Image Picker ---------------- */
   const handlePickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -39,19 +35,16 @@ export default function ProfileScreen() {
       Alert.alert('Permission required', 'Please allow gallery access')
       return
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.85,
     })
-
     if (!result.canceled) {
       setProfileImage(result.assets[0].uri)
     }
   }
-
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
@@ -60,8 +53,8 @@ export default function ProfileScreen() {
         style: 'destructive',
         onPress: () => {
           signUpStore.setState({
-            firstName: '',
-            lastName: '',
+            name: '',
+            nickName: '',
             email: '',
             contact: '',
             city: '',
@@ -72,7 +65,6 @@ export default function ProfileScreen() {
       },
     ])
   }
-
   /* ---------------- UI helpers ---------------- */
   const ProfileSection = ({
     title,
@@ -90,7 +82,6 @@ export default function ProfileScreen() {
       </View>
     </View>
   )
-
   const ActionItem = ({
     icon,
     label,
@@ -117,7 +108,6 @@ export default function ProfileScreen() {
         >
           {icon}
         </View>
-
         <View className="ml-4 flex-1">
           <Text
             className={`font-semibold ${
@@ -133,7 +123,6 @@ export default function ProfileScreen() {
           )}
         </View>
       </View>
-
       <MaterialIcons
         name="chevron-right"
         size={24}
@@ -141,12 +130,10 @@ export default function ProfileScreen() {
       />
     </TouchableOpacity>
   )
-
-  const fullName = `${firstName} ${lastName}`.trim() || 'User Profile'
+  const fullName = `${name} ${nickName}`.trim() || 'User Profile'
   const displayCity = city || 'City not set'
   const displayEmail = email || 'email@example.com'
   const displayContact = contact || 'Not provided'
-
   return (
     <SafeAreaView className="flex-1 bg-slate-900">
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -172,12 +159,10 @@ export default function ProfileScreen() {
                   />
                 )}
               </View>
-
               <View className="absolute bottom-1 right-1 bg-green-600 p-2 rounded-full">
                 <MaterialIcons name="edit" size={16} color="#fff" />
               </View>
             </TouchableOpacity>
-
             <Text className="text-white text-3xl font-bold mt-4">
               {fullName}
             </Text>
@@ -186,7 +171,6 @@ export default function ProfileScreen() {
             </Text>
           </View>
         </View>
-
         {/* ---------------- Quick Access ---------------- */}
         <View className="px-5 mt-4 mb-6 flex-row gap-3">
           <TouchableOpacity
@@ -196,7 +180,6 @@ export default function ProfileScreen() {
             <MaterialIcons name="card-membership" size={26} color="#22c55e" />
             <Text className="text-white text-sm mt-2">Subscriptions</Text>
           </TouchableOpacity>
-
           <TouchableOpacity
             onPress={() => router.push('/(EventManagement)/roleSelectionScreen')}
             className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-4 items-center"
@@ -204,7 +187,6 @@ export default function ProfileScreen() {
             <MaterialIcons name="event" size={26} color="#22c55e" />
             <Text className="text-white text-sm mt-2">Events</Text>
           </TouchableOpacity>
-
           <TouchableOpacity
             onPress={() => Alert.alert('Stats', 'Coming soon')}
             className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-4 items-center"
@@ -213,7 +195,6 @@ export default function ProfileScreen() {
             <Text className="text-white text-sm mt-2">Stats</Text>
           </TouchableOpacity>
         </View>
-
         {/* ---------------- Contact ---------------- */}
         <ProfileSection title="Contact Information">
           <View className="p-4 space-y-4">
@@ -228,7 +209,6 @@ export default function ProfileScreen() {
             </View>
           </View>
         </ProfileSection>
-
         {/* ---------------- Profile ---------------- */}
         <ProfileSection title="Profile">
           <ActionItem
@@ -240,7 +220,6 @@ export default function ProfileScreen() {
             }
           />
         </ProfileSection>
-
         {/* ---------------- Account ---------------- */}
         <ProfileSection title="Account">
           <ActionItem
@@ -251,7 +230,6 @@ export default function ProfileScreen() {
             }
           />
         </ProfileSection>
-
         {/* ---------------- Support ---------------- */}
         <ProfileSection title="Support">
           <ActionItem
@@ -265,7 +243,6 @@ export default function ProfileScreen() {
             onPress={() => Alert.alert('About', 'App version 1.0.0')}
           />
         </ProfileSection>
-
         {/* ---------------- Danger Zone ---------------- */}
         <ProfileSection title="Danger Zone">
           <ActionItem

@@ -72,8 +72,8 @@ export default function KnockoutSelectPlayersScreen() {
       updateMatchRoster(homeSelected, awaySelected, [], []); 
       
       router.push({
-        pathname: '/(football)/startKnockOutTournament/selectSubstitution',
-        params: { tournamentId, fixtureId }
+        pathname: `/(football)/startKnockOutTournament/${tournamentId}/selectSubstitution`,
+        params: { fixtureId }
       });
     }
   };

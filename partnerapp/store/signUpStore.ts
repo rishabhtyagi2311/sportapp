@@ -1,44 +1,36 @@
-
-import {create} from "zustand"
-
-
+import { create } from 'zustand'
 interface SignUpState {
-
-  // State properties
+  // State
   firstName: string
   lastName: string
   email: string
   contact: string
   city: string
   dob: string
-  
-  // Action methods
-  setFirstName: (name: string) => void
-  setLastName: (name: string) => void
+  profileImage: string
+  // Actions
+  setfirstName: (name: string) => void
+  setlastName: (name: string) => void
   setEmail: (email: string) => void
   setContact: (contact: string) => void
   setCity: (city: string) => void
   setDob: (dob: string) => void
-  
-
- 
+  setProfileImage: (uri: string) => void
 }
 const signUpStore = create<SignUpState>((set) => ({
-
   firstName: '',
   lastName: '',
   email: '',
   contact: '',
   city: '',
   dob: '',
- 
-  setFirstName: (name: string) => set({ firstName: name }),
-  setLastName: (name: string) => set({ lastName: name }),
-  setEmail: (email: string) => set({ email: email }),
-  setContact: (contact: string) => set({ contact: contact }),
-  setCity: (city: string) => set({ city: city }),
-  setDob: (dob: string) => set({ dob: dob }),
-   
+  profileImage: '',
+  setfirstName: (name) => set({ firstName :name }),
+  setlastName: (name) => set({ lastName:name  }),
+  setEmail: (email) => set({ email }),
+  setContact: (contact) => set({ contact }),
+  setCity: (city) => set({ city }),
+  setDob: (dob) => set({ dob }),
+  setProfileImage: (uri) => set({ profileImage: uri }),
 }))
-
 export default signUpStore

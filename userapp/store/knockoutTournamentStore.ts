@@ -92,17 +92,16 @@ export interface KnockoutFixture {
   nextFixtureId?: string; // ID of the match the winner goes to
 }
 
-// 1. FIXED: Added 'format' property
 export interface KnockoutSettings {
   name: string;
-  format: 'knockout'; // This fixes the TypeScript union error
+  format: 'knockout';
   teamCount: 2 | 4 | 8 | 16 | 32;
   matchDuration: number;
   numberOfPlayers: number;
   numberOfSubstitutes: number;
   numberOfReferees: number;
   extraTime: boolean;
-  penalties: boolean;
+  // REMOVED: penalties: boolean; 
   venue?: string;
 }
 
@@ -141,7 +140,7 @@ interface KnockoutState {
   updateDraft: (updates: Partial<KnockoutState['draft']>) => void;
   addTeamToDraft: (teamId: string) => void;
   removeTeamFromDraft: (teamId: string) => void;
-  createTournament: () => string | null; // Returns ID on success
+  createTournament: () => string | null;
   cancelDraft: () => void;
 
   // Management
@@ -156,11 +155,15 @@ interface KnockoutState {
   setMatchReferees: (referees: string[]) => void;
   startMatch: () => void;
   addEvent: (event: Omit<KnockoutMatchEvent, 'id' | 'timestamp'>) => void;
-  endMatch: () => void; // Finalizes result and updates bracket
+  endMatch: () => void;
 
   // Getters
   getTournament: (id: string) => KnockoutTournament | undefined;
   getFixture: (tournamentId: string, fixtureId: string) => KnockoutFixture | undefined;
+  
+  // NEW: UI Helper Getters
+  getFixturesByRound: (tournamentId: string, round: number) => KnockoutFixture[];
+  getTournamentProgress: (tournamentId: string) => number;
 }
 
 // --- Helpers ---
@@ -192,12 +195,11 @@ export const useKnockoutStore = create<KnockoutState>()(
             name,
             teamCount: 8,
             selectedTeamIds: [],
-            // 2. FIXED: Initialize with format: 'knockout'
             settings: { 
                 format: 'knockout',
                 matchDuration: 90, 
                 extraTime: true, 
-                penalties: true,
+                // REMOVED: penalties: true,
                 numberOfPlayers: 11,
                 numberOfSubstitutes: 7,
                 numberOfReferees: 1
@@ -252,11 +254,11 @@ export const useKnockoutStore = create<KnockoutState>()(
             status: 'active',
             settings: {
                 name: draft.name,
-                format: 'knockout', // 3. FIXED: Ensure format is set in final object
+                format: 'knockout',
                 teamCount: draft.teamCount as any,
                 matchDuration: draft.settings.matchDuration || 90,
                 extraTime: draft.settings.extraTime ?? true,
-                penalties: draft.settings.penalties ?? true,
+                // REMOVED: penalties assignment
                 venue: draft.settings.venue,
                 numberOfPlayers: draft.settings.numberOfPlayers || 11,
                 numberOfSubstitutes: draft.settings.numberOfSubstitutes || 7,
@@ -444,26 +446,38 @@ export const useKnockoutStore = create<KnockoutState>()(
 
             fixture.winnerId = winnerId;
 
-            // Promote Winner
-            const currentRoundFixtures = tournament.fixtures.filter(f => f.round === fixture.round);
+            // 1. Promote Winner to Next Round
             const nextRoundFixtures = tournament.fixtures.filter(f => f.round === fixture.round + 1);
             
-            const matchIndexInRound = currentRoundFixtures.findIndex(f => f.id === fixture.id);
-            const nextMatchIndex = Math.floor(matchIndexInRound / 2);
-            const isHomeInNext = matchIndexInRound % 2 === 0;
+            if (nextRoundFixtures.length > 0) {
+                const currentRoundFixtures = tournament.fixtures.filter(f => f.round === fixture.round);
+                currentRoundFixtures.sort((a,b) => a.matchNumber - b.matchNumber);
+                
+                const matchIndexInRound = currentRoundFixtures.findIndex(f => f.id === fixture.id);
+                const nextMatchIndex = Math.floor(matchIndexInRound / 2);
+                const isHomeInNext = matchIndexInRound % 2 === 0;
 
-            if (nextRoundFixtures[nextMatchIndex]) {
-              const nextFixture = nextRoundFixtures[nextMatchIndex];
-              if (isHomeInNext) {
-                nextFixture.homeTeamId = winnerId;
-                nextFixture.homeTeamName = winnerName;
-              } else {
-                nextFixture.awayTeamId = winnerId;
-                nextFixture.awayTeamName = winnerName;
-              }
+                const nextFixture = nextRoundFixtures[nextMatchIndex];
+                if (nextFixture) {
+                    if (isHomeInNext) {
+                        nextFixture.homeTeamId = winnerId;
+                        nextFixture.homeTeamName = winnerName;
+                    } else {
+                        nextFixture.awayTeamId = winnerId;
+                        nextFixture.awayTeamName = winnerName;
+                    }
+                }
             } else {
-              tournament.winnerId = winnerId;
-              tournament.status = 'completed';
+                tournament.winnerId = winnerId;
+                tournament.status = 'completed';
+            }
+
+            // 2. CHECK ROUND COMPLETION
+            const roundsMatches = tournament.fixtures.filter(f => f.round === tournament.currentRound);
+            const allComplete = roundsMatches.every(f => f.status === 'completed');
+            
+            if (allComplete && tournament.currentRound < tournament.totalRounds) {
+                tournament.currentRound += 1;
             }
 
             state.activeMatch = null;
@@ -472,6 +486,20 @@ export const useKnockoutStore = create<KnockoutState>()(
 
         getTournament: (id) => get().tournaments.find(t => t.id === id),
         getFixture: (tid, fid) => get().tournaments.find(t => t.id === tid)?.fixtures.find(f => f.id === fid),
+
+        // --- NEW GETTERS ---
+        getFixturesByRound: (tournamentId, round) => {
+            const t = get().tournaments.find(t => t.id === tournamentId);
+            if (!t) return [];
+            return t.fixtures.filter(f => f.round === round).sort((a,b) => a.matchNumber - b.matchNumber);
+        },
+
+        getTournamentProgress: (tournamentId) => {
+             const t = get().tournaments.find(t => t.id === tournamentId);
+             if (!t || t.fixtures.length === 0) return 0;
+             const completed = t.fixtures.filter(f => f.status === 'completed').length;
+             return Math.round((completed / t.fixtures.length) * 100);
+        }
 
       })),
       { name: 'knockout-store' }

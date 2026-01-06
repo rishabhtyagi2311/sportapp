@@ -28,8 +28,8 @@ import signUpStore from "./../../store/signUpStore"
 
 
 type FormData = {
-  firstName: string;
-  lastName: string;
+  name: string;
+  nickName: string;
   email: string;
 };
 
@@ -38,7 +38,7 @@ type FormData = {
 
 export default function InfoRegisterScreen() {
   
-  const { setFirstName, setLastName, setEmail} = signUpStore();
+  const { setName, setNickName, setEmail} = signUpStore();
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.5);
   const router = useRouter()
@@ -50,8 +50,8 @@ export default function InfoRegisterScreen() {
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: {
-      firstName: "",
-      lastName: "",
+      name: "",
+      nickName: "",
       email: "",
     },
   });
@@ -88,8 +88,8 @@ export default function InfoRegisterScreen() {
   const onSubmit = async (data: FormData) => {
 
   
-  setFirstName(data.firstName)
-  setLastName(data.lastName)
+  setName(data.name)
+  setNickName(data.nickName)
   setEmail(data.email)
   
   router.push("./basicInfoRegisterTwo")
@@ -168,11 +168,11 @@ export default function InfoRegisterScreen() {
 
                   <View className="px-2 flex ">
                     
-                    {renderInput("firstName", "First Name", <User size={20} color="#64748B" />, {
-                      required: "First name is required",
+                    {renderInput("name", "Name", <User size={20} color="#64748B" />, {
+                      required: "Name is required",
                     })}
-                    {renderInput("lastName", "Last Name", <User size={20} color="#64748B" />, {
-                      required: "Last name is required",
+                    {renderInput("nickName", "Nickname", <User size={20} color="#64748B" />, {
+                      required: "Nickname is required",
                     })}
                     {renderInput(
                       "email",

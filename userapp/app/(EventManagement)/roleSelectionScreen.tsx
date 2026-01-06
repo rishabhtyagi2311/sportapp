@@ -22,7 +22,7 @@ const RoleSelectionScreen: React.FC = () => {
     if (!selectedRole) return
 
     if (selectedRole === 'user') {
-      router.replace('/(tabs)/explore')
+      router.replace('/(EventManagement)/myRequests')
     } else {
       router.push('/(EventManagement)/organizerDashboard')
     }

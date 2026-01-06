@@ -63,8 +63,8 @@ export default function KnockoutSelectSubstitutesScreen() {
       }
       
       router.push({
-        pathname: '/(football)/startKnockOutTournament/enterReferee',
-        params: { tournamentId, fixtureId }
+        pathname: `/(football)/startKnockOutTournament/${tournamentId}/enterReferee`,
+        params: { fixtureId }
       });
     }
   };

@@ -1,5 +1,5 @@
 // app/(academy)/academyMainScreen.tsx
-import React, { useRef } from "react";
+import React, { useRef, useMemo } from "react";
 import {
   SafeAreaView,
   View,
@@ -10,7 +10,6 @@ import {
   Animated,
   StyleSheet,
   Platform,
-  FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -18,20 +17,17 @@ import { router } from "expo-router";
 const { width } = Dimensions.get("window");
 
 // 🔹 CAROUSEL CONFIGURATION
-const ITEM_WIDTH = width * 0.82;
-const SPACING = 12;
-const EMPTY_ITEM_SIZE = (width - ITEM_WIDTH) / 2;
-
-// 👇 CHANGED: Increased height from 240 to 340
-const CARD_HEIGHT = 340; 
+// 👇 CHANGED: Increased width ratio from 0.82 to 0.88
+const ITEM_WIDTH = width * 0.88;
+// 👇 CHANGED: Increased height from 340 to 380
+const CARD_HEIGHT = 380;
 
 export default function AcademyMainScreen() {
   const scrollX = useRef(new Animated.Value(0)).current;
   const mainBanner = require("@/assets/images/heroBannerAcademy.png");
 
-  // 🔹 1) DATA
-  const data = [
-    { key: "spacer-left" },
+  // 🔹 1) CORE DATA
+  const baseData = [
     {
       id: "hero",
       type: "image",
@@ -60,19 +56,22 @@ export default function AcademyMainScreen() {
       subtitle: "Parents will scroll through banners like this.",
       icon: "layers-outline",
     },
-    { key: "spacer-right" },
   ];
 
-  // 🔹 2) CAROUSEL RENDERER
-  const renderItem = ({ item, index }: { item: any; index: number }) => {
-    if (!item.id) {
-      return <View style={{ width: EMPTY_ITEM_SIZE }} />;
-    }
+  // 🔹 2) CREATE INFINITE LOOP DATA
+  const LOOPS = 1000;
+  const infiniteData = useMemo(() => {
+    return Array(LOOPS).fill(baseData).flat();
+  }, [baseData]);
 
+  const START_INDEX = (infiniteData.length / 2) - ((infiniteData.length / 2) % baseData.length);
+
+  // 🔹 3) CAROUSEL RENDERER
+  const renderItem = ({ item, index }: { item: any; index: number }) => {
     const inputRange = [
-      (index - 2) * ITEM_WIDTH,
       (index - 1) * ITEM_WIDTH,
       index * ITEM_WIDTH,
+      (index + 1) * ITEM_WIDTH,
     ];
 
     const scale = scrollX.interpolate({
@@ -88,7 +87,7 @@ export default function AcademyMainScreen() {
     });
 
     return (
-      <View style={{ width: ITEM_WIDTH }}>
+      <View style={{ width: ITEM_WIDTH, alignItems: 'center' }}>
         <Animated.View
           style={[
             styles.cardContainer,
@@ -132,7 +131,6 @@ export default function AcademyMainScreen() {
       </View>
     );
   };
-
 
   // 🔹 4) BUTTON COMPONENT
   const handlePress = (action: string) => {
@@ -184,7 +182,6 @@ export default function AcademyMainScreen() {
         >
           <View className="items-center justify-center p-2">
             <View className="bg-white/10 rounded-full p-2 mb-1">
-              {/* Reduced icon size slightly to fit smaller card */}
               <Ionicons name={icon} size={22} color="white" />
             </View>
             <Text className="text-white font-semibold text-center text-xs">
@@ -205,20 +202,32 @@ export default function AcademyMainScreen() {
         {/* CAROUSEL SECTION */}
         <View className="mt-5">
           <Animated.FlatList
-            data={data}
+            data={infiniteData}
             keyExtractor={(item, index) => index.toString()}
             horizontal
             showsHorizontalScrollIndicator={false}
+            
             snapToInterval={ITEM_WIDTH}
-            snapToAlignment="start"
+            snapToAlignment="center" 
             decelerationRate="fast"
             bounces={false}
+            
+            initialScrollIndex={START_INDEX}
+            getItemLayout={(data, index) => ({
+              length: ITEM_WIDTH,
+              offset: ITEM_WIDTH * index,
+              index,
+            })}
+
             scrollEventThrottle={16}
-            contentContainerStyle={{ alignItems: "center" }}
             onScroll={Animated.event(
               [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-              { useNativeDriver: false }
+              { useNativeDriver: true }
             )}
+            
+            contentContainerStyle={{ 
+                paddingHorizontal: (width - ITEM_WIDTH) / 2 
+            }}
             renderItem={renderItem}
           />
         </View>
@@ -233,29 +242,19 @@ export default function AcademyMainScreen() {
           </Text>
         </View>
 
-        {/* STATS SECTION */}
-        <View className="flex-row justify-between mb-10 px-6">
-          <StatBox value="1.2k+" label="Academies" color="#60a5fa" />
-          <View className="w-[1px] h-[80%] bg-slate-700 self-center" />
-          <StatBox value="50k+" label="Students" color="#4ade80" />
-          <View className="w-[1px] h-[80%] bg-slate-700 self-center" />
-          <StatBox value="98%" label="Success" color="#c084fc" />
-        </View>
-
+   
         {/* ACTION BUTTONS */}
         <View className="flex-row justify-center gap-6 px-4">
           <ButtonComponent
             icon="compass-outline"
             label="Explore"
             onPress={() => handlePress("Explore")}
-            // 👇 CHANGED: Made smaller. Width 0.35 -> 0.35, Height 0.32 -> 0.22
             style={{ width: width * 0.35, height: width * 0.22 }}
           />
           <ButtonComponent
             icon="trophy-outline"
             label="Manage"
             onPress={() => handlePress("Manage")}
-            // 👇 CHANGED: Made smaller. Width 0.35 -> 0.35, Height 0.32 -> 0.22
             style={{ width: width * 0.35, height: width * 0.22 }}
           />
         </View>
@@ -264,7 +263,6 @@ export default function AcademyMainScreen() {
   );
 }
 
-// Helper Component for Stats
 const StatBox = ({ value, label, color }: any) => (
   <View className="items-center flex-1">
     <Text style={{ color, fontSize: 22, fontWeight: "bold" }}>{value}</Text>
@@ -276,14 +274,14 @@ const StatBox = ({ value, label, color }: any) => (
 
 const styles = StyleSheet.create({
   cardContainer: {
+    width: ITEM_WIDTH, 
     height: CARD_HEIGHT,
-    marginHorizontal: SPACING / 2,
     borderRadius: 24,
     backgroundColor: "#1e293b",
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#334155",
-    // Shadows
+    marginHorizontal: 0, 
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,

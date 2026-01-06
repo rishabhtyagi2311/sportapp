@@ -43,8 +43,8 @@ export default function KnockoutSelectOfficialsScreen() {
     // Redirect to Scoring Dashboard
     // Important: The `KnockoutMatchScoring` screen we built previously uses this data.
     router.replace({
-      pathname: '/(football)/startKnockOutTournament/scoringScreen',
-      params: { tournamentId, fixtureId }
+      pathname: `/(football)/startKnockOutTournament/${tournamentId}/scoringScreen`,
+      params: { fixtureId }
     });
   };
 

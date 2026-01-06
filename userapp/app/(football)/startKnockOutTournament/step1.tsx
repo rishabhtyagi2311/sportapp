@@ -17,10 +17,10 @@ import { useKnockoutStore } from '@/store/knockoutTournamentStore';
 export default function KnockoutStep1() {
   const router = useRouter();
   const { startDraft, updateDraft } = useKnockoutStore();
-  
+   
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  
+   
   // Team Count State
   const [teamCount, setTeamCount] = useState<number>(8); 
   const [customTeamInput, setCustomTeamInput] = useState('');
@@ -63,8 +63,6 @@ export default function KnockoutStep1() {
     }
 
     // 4. Enforce Power of 2 (System Requirement for Brackets)
-    // Note: If you want to support non-power-of-2 (e.g. 6 teams), you would need 
-    // to implement "Bye" logic in the store. For now, we enforce this to prevent crashes.
     if (!isPowerOfTwo(teamCount)) {
       Alert.alert(
         'Bracket Requirement', 
@@ -72,10 +70,10 @@ export default function KnockoutStep1() {
       );
       return;
     }
-    
+     
     // Initialize draft
     startDraft(name);
-    
+     
     // Save configurations
     updateDraft({
       teamCount,
@@ -83,10 +81,10 @@ export default function KnockoutStep1() {
         venue: '', 
         matchDuration: 90,
         extraTime: true,
-        penalties: true,
+        // Removed penalties: true
       }
     });
-    
+     
     router.push('./step2');
   };
 
@@ -162,7 +160,7 @@ export default function KnockoutStep1() {
           <View className="mb-6">
             <Text className="text-sm font-semibold text-slate-700 mb-2">Number of Teams *</Text>
             <Text className="text-xs text-slate-500 mb-4">Choose a standard size or enter a custom number.</Text>
-            
+             
             {/* Presets */}
             <View className="flex-row flex-wrap gap-3 mb-4">
               {[4, 8, 16, 32].map((count) => (
@@ -205,7 +203,7 @@ export default function KnockoutStep1() {
                 />
               )}
             </TouchableOpacity>
-            
+             
             {isCustomMode && (
               <Text className="text-xs text-orange-600 mt-2 ml-2">
                 * Must be a power of 2 (e.g. 64, 128)

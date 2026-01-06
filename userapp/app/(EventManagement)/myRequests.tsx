@@ -22,25 +22,28 @@ const CURRENT_USER_ID = 'user-123';
 export default function UserRegistrationsScreen() {
   const router = useRouter();
 
-  // 1. Fetch Data
+  // 1. Fetch Data Helpers
   const { getRequestsByUser } = useRegistrationRequestStore();
   const { getEventById } = useBookingStore();
 
-  // 2. Get requests for current user
-  // We use useMemo to ensure it updates when store changes
-  const myRequests = useRegistrationRequestStore((state) => 
-    state.requests.filter(r => r.userId === CURRENT_USER_ID)
-  );
+  // 2. Get ALL requests first (Stable Selector)
+  // FIX: We select the raw array to prevent infinite re-renders
+  const allRequests = useRegistrationRequestStore((state) => state.requests);
 
-  // 3. Sort by submission date (newest first)
+  // 3. Filter and Sort
+  // We do the filtering inside useMemo so it only recalculates when 'allRequests' changes
   const sortedRequests = useMemo(() => {
-    return [...myRequests].sort((a, b) => 
+    // A. Filter for current user
+    const myRequests = allRequests.filter(r => r.userId === CURRENT_USER_ID);
+
+    // B. Sort by submission date (newest first)
+    return myRequests.sort((a, b) => 
       new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
     );
-  }, [myRequests]);
+  }, [allRequests]);
 
   /* ---------------- HELPERS ---------------- */
-  
+   
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'accepted': 
@@ -95,7 +98,7 @@ export default function UserRegistrationsScreen() {
 
         {/* Status Badge Area */}
         <View className="flex-row items-center justify-between mt-2 pt-3 border-t border-gray-100">
-          
+           
           {/* Status Pill */}
           <View className={`flex-row items-center px-2.5 py-1 rounded-full ${statusStyle.bg}`}>
             <Ionicons name={statusStyle.icon as any} size={14} color={statusStyle.text === 'text-green-700' ? '#15803d' : statusStyle.text === 'text-red-700' ? '#b91c1c' : '#a16207'} />
@@ -128,7 +131,7 @@ export default function UserRegistrationsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
+       
       {/* Header */}
       <View className="bg-white px-6 py-4 border-b border-gray-200">
         <View className="flex-row items-center justify-between">
@@ -159,7 +162,7 @@ export default function UserRegistrationsScreen() {
               You haven't registered for any events yet.
             </Text>
             <TouchableOpacity 
-              onPress={() => router.push('/(tabs)/explore')} 
+              onPress={() => router.push('/(homeScreenTabs)')} 
               className="mt-6 bg-blue-600 px-6 py-3 rounded-full"
             >
               <Text className="text-white font-bold">Explore Events</Text>
