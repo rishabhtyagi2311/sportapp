@@ -6,14 +6,14 @@ import {
   Dimensions,
   ScrollView,
   TouchableOpacity,
-  Image, // <--- 1. Imported Image
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
-// ✅ Move helper function OUTSIDE component to avoid re-creation
+// Helper function remains exactly the same
 const renderActionButton = (
   icon: keyof typeof Ionicons.glyphMap,
   label: string,
@@ -50,10 +50,7 @@ const renderActionButton = (
 
 export default function AcademyMainScreen() {
   
-  // 2. Logic for Image Logic
-  // Set this to the URL string if the user has a logo, or null if they don't.
   const academyLogo = null; 
-  
   const fallbackImage = require("@/assets/images/academyPartnerBanner.png"); 
 
   const handlePress = (action: string): void => {
@@ -62,26 +59,27 @@ export default function AcademyMainScreen() {
       router.navigate("./../(academy)/registerAcademy");
     } else if (action === "Manage") {
       router.navigate("./../manageAcademy");
+    } else if (action === "Announcements") {
+      router.navigate("./../(academy)/announcements");
+      console.log("Navigate to Announcements Feed");
     }
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      {/* Content Area */}
       <View className="flex-1 bg-slate-900">
         <ScrollView
           className="flex-1"
           contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 20 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* 3. Top Image Section (Conditional Rendering) */}
-          <View className="w-full h-8/12 mb-8 rounded-2xl overflow-hidden bg-slate-800 shadow-lg">
+          {/* Top Image Section */}
+          <View className="w-full h-64 mb-8 rounded-2xl overflow-hidden bg-slate-800 shadow-lg">
              <Image 
                 source={academyLogo ? { uri: academyLogo } : fallbackImage}
                 className="w-full h-full"
                 resizeMode="cover"
              />
-             {/* Optional: Add an overlay if you want text on top later */}
              <View className="absolute inset-0 bg-black/20" />
           </View>
 
@@ -90,11 +88,10 @@ export default function AcademyMainScreen() {
             <Text className="text-white text-2xl font-bold text-center mb-2">
               Welcome to your Academy Center 
             </Text>
-            
           </View>
 
           {/* Stats Section */}
-          <View className="flex-row justify-between mb-14 px-2">
+          <View className="flex-row justify-between mb-4 px-2">
             <View className="items-center">
               <Text className="text-blue-400 text-xl font-bold">12</Text>
               <Text className="text-slate-400 text-xs">Academies</Text>
@@ -105,14 +102,20 @@ export default function AcademyMainScreen() {
             </View>
             <View className="items-center">
               <Text className="text-purple-400 text-xl font-bold">4.1</Text>
-              <Text className="text-slate-400 text-xs">Average Review</Text>
+              <Text className="text-slate-400 text-xs">Avg Review</Text>
             </View>
           </View>
 
-          {/* Action Buttons */}
-          <View className="items-center mb-4 mt-8">
-            <View className="flex-row justify-center mb-8">
-              <View className="items-center mx-6">
+          {/* Action Buttons Grid */}
+          <View className="items-center mb-4 mt-32">
+            {/* UPDATED LAYOUT: 
+                Changed to flex-wrap with gap-y-8 to handle multiple rows gracefully. 
+                Using margin-horizontal (mx-4) to space items.
+            */}
+            <View className="flex-row  justify-center gap-y-8 w-full">
+              
+              {/* Button 1: Register */}
+              <View className="items-center mx-4">
                 {renderActionButton(
                   "compass-outline",
                   "Register Academy",
@@ -121,7 +124,8 @@ export default function AcademyMainScreen() {
                 )}
               </View>
 
-              <View className="items-center mx-6">
+              {/* Button 2: Manage */}
+              <View className="items-center mx-4">
                 {renderActionButton(
                   "trophy-outline",
                   "Manage Academy",
@@ -129,8 +133,20 @@ export default function AcademyMainScreen() {
                   handlePress
                 )}
               </View>
+
+              {/* Button 3: Announcements (NEW) */}
+              <View className="items-center mx-4">
+                {renderActionButton(
+                  "megaphone-outline", 
+                  "Info- Channel ",
+                  "Announcements",
+                  handlePress
+                )}
+              </View>
+
             </View>
           </View>
+
         </ScrollView>
       </View>
     </SafeAreaView>
