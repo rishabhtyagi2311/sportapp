@@ -88,38 +88,49 @@ export interface Venue {
   createdAt: string;
   updatedAt: string;
 }
-
 export interface Event {
   id: string;
-  creatorId: string;  // Added field to identify who created the event
+  creatorId: string;
   venueId: string;
   name: string;
   description?: string;
+
   eventType: 'tournament' | 'practice' | 'friendly' | 'training' | 'league';
+
+  // 🔹 TOURNAMENT-ONLY FIELDS
+  tournamentFormat?: 'league' | 'knockout';
+  maxRegistrations?: number;
+
   sport: Sport;
   sportVarietyId?: string;
+
   participationType: 'individual' | 'team';
   teamSize?: number;
-  maxParticipants: number;
+
+  maxParticipants: number;        // FINAL teams
   currentParticipants: number;
+
   dateTime: string;
   duration: number;
+
   fees: {
     amount: number;
     currency: 'INR';
     type: 'per_person' | 'per_team' | 'total';
   };
+
   organizer: {
     name: string;
     contact: string;
   };
-  requirements?: string[];
+
   status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
   isPublic: boolean;
   registrationDeadline: string;
   createdAt: string;
   updatedAt: string;
 }
+
 
 export interface Booking {
   id: string;

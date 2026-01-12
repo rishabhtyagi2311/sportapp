@@ -74,7 +74,7 @@ export default function AcademyMainScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Top Image Section */}
-          <View className="w-full h-64 mb-8 rounded-2xl overflow-hidden bg-slate-800 shadow-lg">
+          <View className="w-full h-90 mb-8 rounded-2xl overflow-hidden bg-slate-800 shadow-lg">
              <Image 
                 source={academyLogo ? { uri: academyLogo } : fallbackImage}
                 className="w-full h-full"
@@ -91,7 +91,7 @@ export default function AcademyMainScreen() {
           </View>
 
           {/* Stats Section */}
-          <View className="flex-row justify-between mb-4 px-2">
+          <View className="flex-row justify-between px-2">
             <View className="items-center">
               <Text className="text-blue-400 text-xl font-bold">12</Text>
               <Text className="text-slate-400 text-xs">Academies</Text>
@@ -107,7 +107,7 @@ export default function AcademyMainScreen() {
           </View>
 
           {/* Action Buttons Grid */}
-          <View className="items-center mb-4 mt-32">
+          <View className="items-center mb-4 mt-24">
             {/* UPDATED LAYOUT: 
                 Changed to flex-wrap with gap-y-8 to handle multiple rows gracefully. 
                 Using margin-horizontal (mx-4) to space items.

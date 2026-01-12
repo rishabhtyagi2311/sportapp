@@ -9,7 +9,7 @@ import {
   Dimensions,
   Animated,
   StyleSheet,
-  Platform,
+  FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -17,117 +17,151 @@ import { router } from "expo-router";
 const { width } = Dimensions.get("window");
 
 // 🔹 CAROUSEL CONFIGURATION
-// 👇 CHANGED: Increased width ratio from 0.82 to 0.88
-const ITEM_WIDTH = width * 0.88;
-// 👇 CHANGED: Increased height from 340 to 380
-const CARD_HEIGHT = 380;
+const ITEM_WIDTH = width * 0.85;
+const CARD_HEIGHT = 200;
+const SPACING = 12;
+
+// 🔹 CREATE ANIMATED FLATLIST
+const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as any;
 
 export default function AcademyMainScreen() {
   const scrollX = useRef(new Animated.Value(0)).current;
   const mainBanner = require("@/assets/images/heroBannerAcademy.png");
 
-  // 🔹 1) CORE DATA
-  const baseData = [
+  // 🔹 1) CORE DATA - Removed infinite loop complexity
+  const carouselData = [
     {
       id: "hero",
       type: "image",
-      title: "Discover top academies\nfor your child",
-      subtitle: "Browse, compare and track progress.",
+      title: "Discover top academies",
+      subtitle: "for your child",
       source: mainBanner,
     },
     {
       id: "placeholder-1",
       type: "placeholder",
-      title: "Academy banner spot",
-      subtitle: "Registered academy’s cover image will appear here.",
-      icon: "easel-outline",
+      title: "Academy Spotlight",
+      subtitle: "Premium training programs",
+      icon: "star-outline",
+      color: "#06b6d4",
     },
     {
       id: "placeholder-2",
       type: "placeholder",
-      title: "Showcase your academy",
-      subtitle: "Highlight facilities, coaches and training style.",
-      icon: "ribbon-outline",
+      title: "Expert Coaches",
+      subtitle: "Certified professionals",
+      icon: "person-circle-outline",
+      color: "#8b5cf6",
     },
     {
       id: "placeholder-3",
       type: "placeholder",
-      title: "More coming soon",
-      subtitle: "Parents will scroll through banners like this.",
-      icon: "layers-outline",
+      title: "Track Progress",
+      subtitle: "Monitor your child's growth",
+      icon: "trending-up-outline",
+      color: "#10b981",
     },
   ];
 
-  // 🔹 2) CREATE INFINITE LOOP DATA
-  const LOOPS = 1000;
-  const infiniteData = useMemo(() => {
-    return Array(LOOPS).fill(baseData).flat();
-  }, [baseData]);
-
-  const START_INDEX = (infiniteData.length / 2) - ((infiniteData.length / 2) % baseData.length);
-
-  // 🔹 3) CAROUSEL RENDERER
-  const renderItem = ({ item, index }: { item: any; index: number }) => {
+  // 🔹 2) CAROUSEL RENDERER
+  const renderCarouselItem = ({ item, index }: { item: (typeof carouselData)[number]; index: number }) => {
     const inputRange = [
-      (index - 1) * ITEM_WIDTH,
-      index * ITEM_WIDTH,
-      (index + 1) * ITEM_WIDTH,
+      (index - 1) * (ITEM_WIDTH + SPACING),
+      index * (ITEM_WIDTH + SPACING),
+      (index + 1) * (ITEM_WIDTH + SPACING),
     ];
 
     const scale = scrollX.interpolate({
       inputRange,
-      outputRange: [0.9, 1, 0.9],
+      outputRange: [0.92, 1, 0.92],
       extrapolate: "clamp",
     });
 
     const opacity = scrollX.interpolate({
       inputRange,
-      outputRange: [0.6, 1, 0.6],
+      outputRange: [0.7, 1, 0.7],
       extrapolate: "clamp",
     });
 
     return (
-      <View style={{ width: ITEM_WIDTH, alignItems: 'center' }}>
-        <Animated.View
-          style={[
-            styles.cardContainer,
-            {
-              transform: [{ scale }],
-              opacity,
-            },
-          ]}
-        >
-          {item.type === "image" ? (
-            <>
-              <RNImage
-                source={item.source}
-                style={styles.cardImage}
-                resizeMode="cover"
-              />
-              <View style={styles.cardGradientOverlay} />
-              <View style={styles.cardTextOverlay}>
-                <Text className="text-white text-2xl font-bold mb-1 shadow-sm">
-                  {item.title}
-                </Text>
-                <Text className="text-slate-200 text-sm font-medium">
-                  {item.subtitle}
-                </Text>
-              </View>
-            </>
-          ) : (
-            <View className="flex-1 items-center justify-center px-6 bg-slate-800">
-              <View className="w-16 h-16 rounded-full bg-slate-700 items-center justify-center mb-4">
-                <Ionicons name={item.icon as any || "image"} size={32} color="#94a3b8" />
-              </View>
-              <Text className="text-lg font-bold text-slate-50 text-center mb-2">
+      <Animated.View
+        style={[
+          styles.itemWrapper,
+          {
+            transform: [{ scale }],
+            opacity,
+          },
+        ]}
+      >
+        {item.type === "image" ? (
+          <>
+            <RNImage
+              source={item.source}
+              style={styles.cardImage}
+              resizeMode="cover"
+            />
+            <View style={styles.cardGradientOverlay} />
+            <View style={styles.cardTextOverlay}>
+              <Text className="text-white text-xl font-bold leading-6">
                 {item.title}
               </Text>
-              <Text className="text-sm text-slate-400 text-center leading-5">
+              <Text className="text-slate-200 text-sm font-medium mt-1">
                 {item.subtitle}
               </Text>
             </View>
-          )}
-        </Animated.View>
+          </>
+        ) : (
+          <View
+            style={[
+              styles.placeholderCard,
+              { backgroundColor: (item.color || "#3b82f6") + "15", borderColor: (item.color || "#3b82f6") + "30" },
+            ]}
+          >
+            <View
+              style={[
+                styles.iconContainer,
+                { backgroundColor: (item.color || "#3b82f6") + "20" },
+              ]}
+            >
+              <Ionicons name={item.icon as any} size={28} color={item.color || "#3b82f6"} />
+            </View>
+            <Text style={styles.placeholderTitle}>{item.title}</Text>
+            <Text style={styles.placeholderSubtitle}>{item.subtitle}</Text>
+          </View>
+        )}
+      </Animated.View>
+    );
+  };
+
+  // 🔹 3) CAROUSEL PAGINATION DOTS
+  const renderDots = () => {
+    return (
+      <View style={styles.dotsContainer}>
+        {carouselData.map((_, index) => {
+          const inputRange = [
+            (index - 1) * (ITEM_WIDTH + SPACING),
+            index * (ITEM_WIDTH + SPACING),
+            (index + 1) * (ITEM_WIDTH + SPACING),
+          ];
+
+          const opacity = scrollX.interpolate({
+            inputRange,
+            outputRange: [0.4, 1, 0.4],
+            extrapolate: "clamp",
+          });
+
+          return (
+            <Animated.View
+              key={index}
+              style={[
+                styles.dot,
+                {
+                  opacity,
+                },
+              ]}
+            />
+          );
+        })}
       </View>
     );
   };
@@ -164,7 +198,7 @@ export default function AcademyMainScreen() {
         <Animated.View
           style={[
             style,
-            { 
+            {
               transform: [{ scale: scaleAnim }],
               backgroundColor: "#1e293b",
               borderRadius: 24,
@@ -177,7 +211,7 @@ export default function AcademyMainScreen() {
               shadowOpacity: 0.3,
               shadowRadius: 4,
               elevation: 5,
-            }
+            },
           ]}
         >
           <View className="items-center justify-center p-2">
@@ -200,49 +234,42 @@ export default function AcademyMainScreen() {
         contentContainerStyle={{ paddingBottom: 40 }}
       >
         {/* CAROUSEL SECTION */}
-        <View className="mt-5">
-          <Animated.FlatList
-            data={infiniteData}
-            keyExtractor={(item, index) => index.toString()}
+        <View style={styles.carouselContainer}>
+          <AnimatedFlatList
+            data={carouselData}
+            keyExtractor={(item :any) => item.id}
+            renderItem={renderCarouselItem}
             horizontal
             showsHorizontalScrollIndicator={false}
-            
-            snapToInterval={ITEM_WIDTH}
-            snapToAlignment="center" 
+            snapToInterval={ITEM_WIDTH + SPACING}
+            snapToAlignment="center"
             decelerationRate="fast"
             bounces={false}
-            
-            initialScrollIndex={START_INDEX}
-            getItemLayout={(data, index) => ({
-              length: ITEM_WIDTH,
-              offset: ITEM_WIDTH * index,
-              index,
-            })}
-
             scrollEventThrottle={16}
             onScroll={Animated.event(
               [{ nativeEvent: { contentOffset: { x: scrollX } } }],
               { useNativeDriver: true }
             )}
-            
-            contentContainerStyle={{ 
-                paddingHorizontal: (width - ITEM_WIDTH) / 2 
+            contentContainerStyle={{
+              paddingHorizontal: (width - ITEM_WIDTH) / 2,
+              gap: SPACING,
             }}
-            renderItem={renderItem}
           />
         </View>
 
+        {/* PAGINATION DOTS */}
+        {renderDots()}
+
         {/* HEADER TEXT */}
-        <View className="px-6 mt-12 mb-8">
+        <View className="px-6 mt-10 mb-8">
           <Text className="text-white text-3xl font-bold text-center mb-2">
             Academy Connect
           </Text>
           <Text className="text-slate-400 text-center text-base leading-6">
-            Empowering sports academies with{'\n'}discovery and management tools.
+            Empowering sports academies with{"\n"}discovery and management tools.
           </Text>
         </View>
 
-   
         {/* ACTION BUTTONS */}
         <View className="flex-row justify-center gap-6 px-4">
           <ButtonComponent
@@ -263,30 +290,16 @@ export default function AcademyMainScreen() {
   );
 }
 
-const StatBox = ({ value, label, color }: any) => (
-  <View className="items-center flex-1">
-    <Text style={{ color, fontSize: 22, fontWeight: "bold" }}>{value}</Text>
-    <Text className="text-slate-500 text-xs font-medium uppercase tracking-wider mt-1">
-      {label}
-    </Text>
-  </View>
-);
-
 const styles = StyleSheet.create({
-  cardContainer: {
-    width: ITEM_WIDTH, 
+  carouselContainer: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  itemWrapper: {
+    width: ITEM_WIDTH,
     height: CARD_HEIGHT,
-    borderRadius: 24,
-    backgroundColor: "#1e293b",
+    borderRadius: 20,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#334155",
-    marginHorizontal: 0, 
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
   },
   cardImage: {
     width: "100%",
@@ -294,12 +307,54 @@ const styles = StyleSheet.create({
   },
   cardGradientOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.3)",
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
   },
   cardTextOverlay: {
     position: "absolute",
-    left: 20,
-    right: 20,
-    bottom: 24,
+    left: 16,
+    right: 16,
+    bottom: 16,
+  },
+  placeholderCard: {
+    flex: 1,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+  },
+  iconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  placeholderTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#f1f5f9",
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  placeholderSubtitle: {
+    fontSize: 12,
+    color: "#94a3b8",
+    textAlign: "center",
+    lineHeight: 16,
+  },
+  dotsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginVertical: 12,
+  },
+  dot: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#3b82f6",
   },
 });

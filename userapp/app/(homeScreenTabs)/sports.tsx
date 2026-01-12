@@ -44,9 +44,9 @@ export default function SportsScreen() {
         {/* Overlay for better visibility of icons */}
         <View className="absolute inset-0 bg-black/20" />
 
-        {/* Sports Icons Container - Left Middle - Horizontal */}
-        <View className="flex-1 justify-center pl-6">
-          <View className="flex-row gap-8">
+        {/* Sports Icons Container - Center - Vertical */}
+        <View className="flex-1 justify-center items-center">
+          <View className="gap-10">
             {sportIcons.map((sport) => (
               <TouchableOpacity
                 key={sport.id}

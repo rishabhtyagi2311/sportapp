@@ -370,50 +370,9 @@ const WelcomeScreen: FC = () => {
         <HeroSection />
         <CreateAccountSection onSignUp={handleSignUp} />
 
-        <View className="my-4">
-          <Text className="text-2xl font-black text-black">Everything You Need</Text>
-        </View>
+        
 
-        <FeatureBlob
-          title="Academies"
-          description="Find elite training centers, book demos, track progress, and build champions."
-          icon="school"
-          gradientStart={COLORS.logoGreen}
-          gradientEnd={COLORS.logoGreen}
-          rotation={-2}
-        />
-
-        <View className="flex-row gap-3 my-4">
-          <View className="flex-1">
-            <FeatureBlob
-              title="Venues"
-              description="Book grounds, check slots instantly"
-              icon="map-marker-multiple"
-              gradientStart={COLORS.skyBlue400}
-              gradientEnd={COLORS.skyBlue400}
-              rotation={2}
-            />
-          </View>
-          <View className="flex-1">
-            <FeatureBlob
-              title="Tournaments"
-              description="Create leagues and compete"
-              icon="trophy-outline"
-              gradientStart={COLORS.logoRed}
-              gradientEnd={COLORS.logoRed}
-              rotation={-2}
-            />
-          </View>
-        </View>
-
-        <FeatureBlob
-          title="Live Scoring"
-          description="Real-time match updates with live scoring boards and instant standings"
-          icon="scoreboard"
-          gradientStart={COLORS.brown300}
-          gradientEnd={COLORS.brown300}
-          rotation={1}
-        />
+     
       </ScrollView>
 
       <NavigationSection onSignIn={handleSignIn} />

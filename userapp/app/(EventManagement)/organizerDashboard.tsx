@@ -167,7 +167,7 @@ export default function EventManagerDashboard() {
 
       {/* ---------- FAB (Restored to Bottom Right) ---------- */}
       <TouchableOpacity
-        onPress={() => router.push('/(EventManagement)/createEvent')}
+        onPress={() => router.push('/(EventManagement)/selectEventType')}
         className="absolute right-6 bottom-6 bg-green-600 w-14 h-14 rounded-full items-center justify-center shadow-lg"
         activeOpacity={0.9}
       >

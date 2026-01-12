@@ -20,18 +20,15 @@ export default function ChildAcademiesScreen() {
     childId: string;
     childName: string;
   }>();
-
   // Stores
   const childProfiles = usechildStore((state) => state.childProfiles);
   const getEnrollmentsByChild = useEnrollmentStore(
     (state) => state.getEnrollmentsByChild
   );
   const getAcademyById = useAcademyStore((state) => state.getAcademyById);
-
   // Child profile
   const childProfile = childProfiles.find((profile) => profile.id === childId);
   const resolvedChildName = childProfile?.childName || childName || "Child";
-
   // Enrollments for this child
   const childEnrollments = getEnrollmentsByChild(childId);
   const childAcademyIds = [...new Set(childEnrollments.map((e) => e.academyId))];
@@ -47,6 +44,23 @@ export default function ChildAcademiesScreen() {
         childId,
         academyId,
         academyName,
+      },
+    });
+  };
+
+  // Navigate to announcements screen
+  const navigateToAnnouncements = (
+    academyId: string,
+    academyName: string,
+    e: GestureResponderEvent
+  ) => {
+    e.stopPropagation();
+    router.push({
+      pathname: "/(academy)/manageProfile/announcements",
+      params: {
+        academyId,
+        academyName,
+        childId,
       },
     });
   };
@@ -74,7 +88,6 @@ export default function ChildAcademiesScreen() {
     return (
       <SafeAreaView className="flex-1 bg-white">
         <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
-
         <View className="bg-slate-900 shadow-lg">
           <View className="flex-row items-center px-4 py-3 border-b border-slate-800">
             <TouchableOpacity
@@ -93,7 +106,6 @@ export default function ChildAcademiesScreen() {
             </View>
           </View>
         </View>
-
         <View className="flex-1 bg-white items-center justify-center px-6">
           <Ionicons name="school-outline" size={80} color="#e2e8f0" />
           <Text className="text-slate-900 text-2xl font-bold text-center mt-4">
@@ -118,7 +130,6 @@ export default function ChildAcademiesScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
-
       {/* Header */}
       <View className="bg-slate-900 shadow-lg">
         <View className="flex-row items-center px-4 py-3 border-b border-slate-800">
@@ -139,7 +150,6 @@ export default function ChildAcademiesScreen() {
           </View>
         </View>
       </View>
-
       {/* List */}
       <ScrollView
         className="flex-1"
@@ -149,7 +159,6 @@ export default function ChildAcademiesScreen() {
         {childAcademyIds.map((academyId) => {
           const academy = getAcademyById(academyId);
           if (!academy) return null;
-
           return (
             <TouchableOpacity
               key={academyId}
@@ -188,7 +197,6 @@ export default function ChildAcademiesScreen() {
                   />
                 </View>
               </View>
-
               {/* Card Body */}
               <View className="px-5 py-4">
                 <View className="space-y-3">
@@ -203,7 +211,6 @@ export default function ChildAcademiesScreen() {
                       </Text>
                     </View>
                   </View>
-
                   <View className="flex-row items-center">
                     <View className="w-10 h-10 bg-green-50 rounded-xl items-center justify-center mr-3">
                       <Ionicons name="location" size={20} color="#10b981" />
@@ -215,7 +222,6 @@ export default function ChildAcademiesScreen() {
                       </Text>
                     </View>
                   </View>
-
                   <View className="flex-row items-center">
                     <View className="w-10 h-10 bg-blue-50 rounded-xl items-center justify-center mr-3">
                       <Ionicons name="call" size={20} color="#3b82f6" />
@@ -229,15 +235,34 @@ export default function ChildAcademiesScreen() {
                   </View>
                 </View>
               </View>
-
               {/* Card Footer */}
               <View className="px-5 py-3 bg-gray-50 border-t border-gray-100">
-                <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center justify-between gap-2">
                   <View className="flex-1">
                     <Text className="text-slate-500 text-xs">
                       Tap to view attendance
                     </Text>
                   </View>
+                  <TouchableOpacity
+                    onPress={(e) =>
+                      navigateToAnnouncements(
+                        academyId,
+                        academy.academyName,
+                        e
+                      )
+                    }
+                    className="bg-amber-500 py-2 px-3 rounded-full flex-row items-center"
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="notifications-outline"
+                      size={14}
+                      color="#ffffff"
+                    />
+                    <Text className="text-white text-xs font-medium ml-1">
+                      Announcements
+                    </Text>
+                  </TouchableOpacity>
                   <TouchableOpacity
                     onPress={(e) =>
                       navigateToWriteReview(
@@ -246,7 +271,7 @@ export default function ChildAcademiesScreen() {
                         e
                       )
                     }
-                    className="bg-blue-500 py-2 px-4 rounded-full flex-row items-center"
+                    className="bg-blue-500 py-2 px-3 rounded-full flex-row items-center"
                     activeOpacity={0.7}
                   >
                     <Ionicons
@@ -255,7 +280,7 @@ export default function ChildAcademiesScreen() {
                       color="#ffffff"
                     />
                     <Text className="text-white text-xs font-medium ml-1">
-                      Review Academy
+                      Review
                     </Text>
                   </TouchableOpacity>
                 </View>

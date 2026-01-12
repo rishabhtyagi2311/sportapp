@@ -43,25 +43,19 @@ export default function ManageAnnouncementsScreen() {
 
   const renderItem = ({ item }: { item: Announcement }) => (
     // List items remain slightly transparent to let the background shine through nicely
-    <View className="bg-slate-800/90 rounded-2xl p-5 mb-4 border border-slate-700/50 shadow-sm">
+    <View className="bg-white rounded-2xl p-5 mb-4 border border-solid border-slate-900 shadow-sm">
       <View className="flex-row items-start justify-between mb-3">
         <View className="flex-row items-center space-x-3">
-          <LinearGradient
-            colors={['#3b82f6', '#8b5cf6']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            className="p-2 rounded-xl"
-          >
-             <Ionicons name="megaphone" size={18} color="white" />
-          </LinearGradient>
-          <Text className="text-white font-bold text-base tracking-wide">
-            Announcement
+         
+          <Text className="text-black font-bold text-base tracking-wide">
+            Message from the Academy
           </Text>
         </View>
-        <Text className="text-slate-400 text-xs font-medium mt-1">
+        <Text className="text-black text-xs font-medium mt-1">
           {formatDate(item.createdAt)}
         </Text>
       </View>
-      <Text className="text-slate-200 text-[15px] leading-7 pl-1">
+      <Text className="text-black text-[15px] leading-7 pl-1">
         {item.content}
       </Text>
     </View>

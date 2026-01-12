@@ -268,8 +268,8 @@ const NavigationSection: FC<{
 const WelcomeScreen: FC = () => {
   const router = useRouter();
   const handleSignUp = () => {
-    router.push('/(onboardingStack)/basicInfoRegisterOne');
-    // router.push('/(homeScreenTabs)');    
+    // router.push('/(onboardingStack)/basicInfoRegisterOne');
+    router.push('/(homeScreenTabs)');    
   };
   const handleSignIn = () => {
     router.push('/(homeScreenTabs)');
