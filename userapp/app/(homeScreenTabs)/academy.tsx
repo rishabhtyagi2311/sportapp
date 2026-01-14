@@ -18,7 +18,7 @@ const { width } = Dimensions.get("window");
 
 // 🔹 CAROUSEL CONFIGURATION
 const ITEM_WIDTH = width * 0.85;
-const CARD_HEIGHT = 200;
+const CARD_HEIGHT = 350;
 const SPACING = 12;
 
 // 🔹 CREATE ANIMATED FLATLIST
