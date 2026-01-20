@@ -4,9 +4,10 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
+  
   StatusBar,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAcademyStore } from "@/store/academyStore";
@@ -78,35 +79,11 @@ export default function ReviewsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-100">
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
-
-      {/* Header */}
-      <View className="bg-slate-900 shadow-lg">
-        <View className="flex-row items-center px-4 py-3 border-b border-slate-800">
-          <TouchableOpacity
-            onPress={handleBack}
-            className="mr-3 p-2 rounded-lg"
-          >
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </TouchableOpacity>
-
-          <View className="flex-1">
-            <Text className="text-white font-bold text-lg" numberOfLines={1}>
-              Parent Reviews
-            </Text>
-            <Text
-              className="text-slate-400 text-xs mt-0.5"
-              numberOfLines={1}
-            >
-              {academy.academyName}
-            </Text>
-          </View>
-        </View>
-      </View>
-
+     
+     
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        contentContainerStyle={{ padding: 12 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Overall Rating Section */}

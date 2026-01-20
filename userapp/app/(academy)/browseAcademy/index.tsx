@@ -155,14 +155,9 @@ export default function BrowseAcademies() {
             </Text>
           </View>
 
-          <View className="flex-row items-center mb-3">
-            <Ionicons name="person-outline" size={16} color="#6b7280" />
-            <Text className="text-gray-600 text-sm ml-1">
-              Coach: {academy.coachName}
-            </Text>
-          </View>
+         
 
-          <View className="flex-row items-start">
+          <View className="flex-row items-center">
             <Ionicons name="checkmark-circle-outline" size={16} color="#10b981" style={{ marginTop: 2 }} />
             <Text className="text-gray-500 text-xs ml-1 flex-1 leading-4" numberOfLines={2}>
               {academy.facilities.split(',').slice(0, 3).join(', ')}

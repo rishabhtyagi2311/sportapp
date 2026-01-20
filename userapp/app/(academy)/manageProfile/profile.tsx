@@ -5,9 +5,10 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  SafeAreaView,
+
   StatusBar
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { usechildStore } from "@/store/academyChildProfile";
@@ -74,15 +75,15 @@ export default function ProfileScreen() {
     // Get enrollments for this child to show count
     const childEnrollments = getEnrollmentsByChild(profile.id);
     const enrollmentCount = childEnrollments.length;
-    
+
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         key={profile.id}
         onPress={() => navigateToChildAcademies(profile.id, profile.childName)}
         activeOpacity={0.7}
       >
-        <View 
-          className="mx-4 mt-4 bg-white rounded-3xl p-6 shadow-lg" 
+        <View
+          className="mx-4 mt-4 bg-white rounded-3xl p-6 shadow-lg"
           style={{
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 2 },
@@ -152,7 +153,7 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             </View>
-            
+
             {/* Academy Badge */}
             {enrollmentCount > 0 && (
               <View className="flex-row items-center py-2">
@@ -180,7 +181,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView className="flex-1 bg-gray-100">
       <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
-      
+
       {/* Header Section */}
       <View className="bg-slate-900 shadow-lg">
         <View className="flex-row items-center justify-between px-4 py-3 border-b border-slate-800">
@@ -203,7 +204,7 @@ export default function ProfileScreen() {
               </Text>
             </View>
           </View>
-          
+
           {/* Right side: Calendar Icon */}
           <TouchableOpacity
             onPress={navigateToDemoBookings}
@@ -222,7 +223,7 @@ export default function ProfileScreen() {
           </>
         ) : (
           <View className="flex-1 items-center justify-center px-6" style={{ minHeight: 500 }}>
-            <View className="bg-white rounded-full p-6 mb-4" 
+            <View className="bg-white rounded-full p-6 mb-4"
               style={{
                 shadowColor: "#000",
                 shadowOffset: { width: 0, height: 2 },
@@ -246,25 +247,11 @@ export default function ProfileScreen() {
       {/* Floating Action Button */}
       <TouchableOpacity
         onPress={() => navigateToForm(false)}
-        style={{
-          position: "absolute",
-          bottom: 24,
-          right: 24,
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          backgroundColor: "#3b82f6",
-          justifyContent: "center",
-          alignItems: "center",
-          elevation: 8,
-          shadowColor: "#3b82f6",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
-        }}
         activeOpacity={0.8}
+        className="absolute bottom-14 right-6 w-14 h-14 rounded-full bg-slate-900 justify-center items-center"
+        
       >
-        <Ionicons name="add" size={28} color="#ffffff" />
+        <Ionicons name="add" size={32} color="#ffffff" />
       </TouchableOpacity>
     </SafeAreaView>
   );

@@ -321,7 +321,7 @@ export default function DetailsScreen() {
                         ? "bg-blue-50 border-blue-500"
                         : "bg-white border-gray-200"
                     }`}
-                    activeOpacity={0.7}
+                    activeOpacity={0.9}
                   >
                     <View className="flex-row items-center justify-between">
                       <View className="flex-1">
@@ -378,7 +378,7 @@ export default function DetailsScreen() {
                   setShowEnrollModal(false);
                   setSelectedChildId(null);
                 }}
-                className="flex-1 bg-gray-200 rounded-xl py-4"
+                className="flex-1 bg-gray-200 rounded-xl py-4 mr-2"
                 activeOpacity={0.8}
               >
                 <Text className="text-slate-900 font-bold text-center text-base">
@@ -465,14 +465,14 @@ export default function DetailsScreen() {
                     key={child.id}
                     onPress={() => !alreadyBooked && handleSelectChild(child.id)}
                     disabled={alreadyBooked}
-                    className={`rounded-2xl p-4 mb-3 border-2 ${
+                    className={`rounded-2xl p-4 mb-3 border-2  ${
                       alreadyBooked
                         ? "bg-gray-100 border-gray-300"
                         : isSelected
                         ? "bg-green-50 border-green-500"
                         : "bg-white border-gray-200"
                     }`}
-                    activeOpacity={0.7}
+                    activeOpacity={0.9}
                   >
                     <View className="flex-row items-center justify-between">
                       <View className="flex-1">
@@ -523,13 +523,13 @@ export default function DetailsScreen() {
             </ScrollView>
 
             {/* Action Buttons */}
-            <View className="flex-row space-x-3">
+            <View className="flex-row">
               <TouchableOpacity
                 onPress={() => {
                   setShowDemoModal(false);
                   setSelectedChildId(null);
                 }}
-                className="flex-1 bg-gray-200 rounded-xl py-4"
+                className="flex-1 bg-gray-200 rounded-xl py-4 mr-2"
                 activeOpacity={0.8}
               >
                 <Text className="text-slate-900 font-bold text-center text-base">

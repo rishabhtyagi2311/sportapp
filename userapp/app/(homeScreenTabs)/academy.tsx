@@ -1,28 +1,32 @@
 // app/(academy)/academyMainScreen.tsx
 import React, { useRef, useMemo } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  SafeAreaView,
   View,
   Image as RNImage,
   Text,
   TouchableWithoutFeedback,
   Dimensions,
   Animated,
-  StyleSheet,
   FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+
 const { width } = Dimensions.get("window");
+
 // 🔹 CAROUSEL CONFIGURATION
 const ITEM_WIDTH = width * 0.85;
 const CARD_HEIGHT = 350;
 const SPACING = 12;
+
 // 🔹 CREATE ANIMATED FLATLIST
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as any;
+
 export default function AcademyMainScreen() {
   const scrollX = useRef(new Animated.Value(0)).current;
   const mainBanner = require("@/assets/images/heroBannerAcademy.png");
+
   // 🔹 1) CORE DATA - Removed infinite loop complexity
   const carouselData = [
     {
@@ -89,21 +93,27 @@ export default function AcademyMainScreen() {
       index * (ITEM_WIDTH + SPACING),
       (index + 1) * (ITEM_WIDTH + SPACING),
     ];
+
     const scale = scrollX.interpolate({
       inputRange,
       outputRange: [0.92, 1, 0.92],
       extrapolate: "clamp",
     });
+
     const opacity = scrollX.interpolate({
       inputRange,
       outputRange: [0.7, 1, 0.7],
       extrapolate: "clamp",
     });
+
     return (
       <Animated.View
         style={[
-          styles.itemWrapper,
           {
+            width: ITEM_WIDTH,
+            height: CARD_HEIGHT,
+            borderRadius: 20,
+            overflow: "hidden",
             transform: [{ scale }],
             opacity,
           },
@@ -113,11 +123,11 @@ export default function AcademyMainScreen() {
           <>
             <RNImage
               source={item.source}
-              style={styles.cardImage}
+              style={{ width: "100%", height: "100%" }}
               resizeMode="cover"
             />
-            <View style={styles.cardGradientOverlay} />
-            <View style={styles.cardTextOverlay}>
+            <View className="absolute inset-0 bg-black/35" />
+            <View className="absolute left-4 right-4 bottom-4">
               <Text className="text-white text-xl font-bold leading-6">
                 {item.title}
               </Text>
@@ -128,56 +138,63 @@ export default function AcademyMainScreen() {
           </>
         ) : (
           <View
-            style={[
-              styles.placeholderCard,
-              { backgroundColor: (item.color || "#3b82f6") + "15", borderColor: (item.color || "#3b82f6") + "30" },
-            ]}
+            className="flex-1 rounded-2xl border-1.5 items-center justify-center px-4 py-5"
+            style={{
+              backgroundColor: (item.color || "#3b82f6") + "15",
+              borderColor: (item.color || "#3b82f6") + "30",
+            }}
           >
             <View
-              style={[
-                styles.iconContainer,
-                { backgroundColor: (item.color || "#3b82f6") + "20" },
-              ]}
+              className="w-14 h-14 rounded-base items-center justify-center mb-3"
+              style={{
+                backgroundColor: (item.color || "#3b82f6") + "20",
+              }}
             >
               <Ionicons name={item.icon as any} size={28} color={item.color || "#3b82f6"} />
             </View>
-            <Text style={styles.placeholderTitle}>{item.title}</Text>
-            <Text style={styles.placeholderSubtitle}>{item.subtitle}</Text>
+            <Text className="text-slate-100 text-base font-bold text-center mb-1">
+              {item.title}
+            </Text>
+            <Text className="text-slate-400 text-xs text-center leading-4">
+              {item.subtitle}
+            </Text>
           </View>
         )}
       </Animated.View>
     );
   };
+
   // 🔹 3) CAROUSEL PAGINATION DOTS
   const renderDots = () => {
     return (
-      <View style={styles.dotsContainer}>
+      <View className="flex-row items-center justify-center gap-1.5 my-3">
         {carouselData.map((_, index) => {
           const inputRange = [
             (index - 1) * (ITEM_WIDTH + SPACING),
             index * (ITEM_WIDTH + SPACING),
             (index + 1) * (ITEM_WIDTH + SPACING),
           ];
+
           const opacity = scrollX.interpolate({
             inputRange,
             outputRange: [0.4, 1, 0.4],
             extrapolate: "clamp",
           });
+
           return (
             <Animated.View
               key={index}
-              style={[
-                styles.dot,
-                {
-                  opacity,
-                },
-              ]}
+              className="h-2 w-1 rounded-full bg-blue-500"
+              style={{
+                opacity,
+              }}
             />
           );
         })}
       </View>
     );
   };
+
   // 🔹 4) BUTTON COMPONENT
   const handlePress = (action: string) => {
     if (action === "Explore") {
@@ -186,8 +203,10 @@ export default function AcademyMainScreen() {
       router.push("/manageProfile");
     }
   };
+
   const SmallButton = ({ icon, label, onPress, color }: any) => {
     const scaleAnim = useRef(new Animated.Value(1)).current;
+
     return (
       <TouchableWithoutFeedback
         onPressIn={() => {
@@ -206,16 +225,22 @@ export default function AcademyMainScreen() {
         onPress={onPress}
       >
         <Animated.View
-          style={[
-            styles.smallButton,
-            {
-              transform: [{ scale: scaleAnim }],
-              borderColor: color,
-            },
-          ]}
+          className="flex-row items-center gap-1.5 py-2.5 px-3.5 rounded-lg bg-slate-950 border flex-1 justify-center shadow-md"
+          style={{
+            transform: [{ scale: scaleAnim }],
+            borderColor: color,
+            borderWidth: 1.5,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.15,
+            shadowRadius: 3,
+            elevation: 3,
+          }}
         >
           <Ionicons name={icon} size={18} color={color} />
-          <Text style={[styles.smallButtonText, { color }]}>{label}</Text>
+          <Text className="text-xs font-bold" style={{ color }}>
+            {label}
+          </Text>
         </Animated.View>
       </TouchableWithoutFeedback>
     );
@@ -223,12 +248,21 @@ export default function AcademyMainScreen() {
 
   const FeatureCard = ({ feature }: any) => {
     return (
-      <View style={styles.featureCard}>
-        <View style={[styles.featureIconBg, { backgroundColor: feature.color + "15" }]}>
+      <View className="bg-slate-800 rounded-xl p-3 border border-slate-700 mb-4">
+        <View
+          className="w-10 h-10 rounded-lg items-center justify-center mb-2"
+          style={{
+            backgroundColor: feature.color + "15",
+          }}
+        >
           <Ionicons name={feature.icon} size={24} color={feature.color} />
         </View>
-        <Text style={styles.featureTitle}>{feature.title}</Text>
-        <Text style={styles.featureDesc}>{feature.description}</Text>
+        <Text className="text-slate-100 text-sm font-bold mb-1">
+          {feature.title}
+        </Text>
+        <Text className="text-slate-400 text-xs leading-4">
+          {feature.description}
+        </Text>
       </View>
     );
   };
@@ -240,10 +274,10 @@ export default function AcademyMainScreen() {
         contentContainerStyle={{ paddingBottom: 40 }}
       >
         {/* CAROUSEL SECTION */}
-        <View style={styles.carouselContainer}>
+        <View className="mt-4 mb-2">
           <AnimatedFlatList
             data={carouselData}
-            keyExtractor={(item :any) => item.id}
+            keyExtractor={(item: any) => item.id}
             renderItem={renderCarouselItem}
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -262,39 +296,34 @@ export default function AcademyMainScreen() {
             }}
           />
         </View>
-        {/* PAGINATION DOTS */}
-        {renderDots()}
 
         {/* NEW CREATIVE SECTION */}
-        <View style={styles.contentSection}>
+        <View className="px-5 mt-6">
           {/* Main Heading */}
-          <View style={styles.headingBlock}>
-            <View style={styles.headingBadge}>
+          <View className="mb-8">
+            <View className="flex-row items-center gap-1.5 mb-3 self-start bg-blue-500/10 py-1.5 px-2.5 rounded-full border border-blue-500/30">
               <Ionicons name="flash-outline" size={14} color="#3b82f6" />
-              <Text style={styles.badgeText}>Your Sports Journey</Text>
+              <Text className="text-xs font-semibold text-blue-500">
+                Your Sports Journey
+              </Text>
             </View>
-            <Text style={styles.mainHeading}>Academy Connect</Text>
-            <Text style={styles.subHeading}>
-              Discover premium academies and track your child's athletic growth
+            <Text className="text-3xl font-black text-slate-100 mb-2">
+              Academy Connect
             </Text>
-          </View>
-
-          {/* Features Grid */}
-          <View style={styles.featuresGrid}>
-            {features.map((feature) => (
-              <FeatureCard key={feature.id} feature={feature} />
-            ))}
+           
           </View>
 
           {/* CTA Section */}
-          <View style={styles.ctaSection}>
-            <View style={styles.ctaContent}>
-              <Text style={styles.ctaTitle}>Ready to explore?</Text>
-              <Text style={styles.ctaText}>
+          <View className="bg-transparent rounded-2xl p-4 border border-slate-500 mt-1">
+            <View className="mb-3.5">
+              <Text className="text-base font-bold text-slate-100 mb-1">
+                Ready to explore?
+              </Text>
+              <Text className="text-sm text-slate-400 leading-tight">
                 Browse thousands of academies and find the perfect fit
               </Text>
             </View>
-            <View style={styles.actionButtons}>
+            <View className="flex-row gap-2.5">
               <SmallButton
                 icon="compass-outline"
                 label="Explore"
@@ -309,192 +338,15 @@ export default function AcademyMainScreen() {
               />
             </View>
           </View>
+
+          {/* Features Grid */}
+          <View className="mb-7 mt-6">
+            {features.map((feature) => (
+              <FeatureCard key={feature.id} feature={feature} />
+            ))}
+          </View>
         </View>
       </Animated.ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  carouselContainer: {
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  itemWrapper: {
-    width: ITEM_WIDTH,
-    height: CARD_HEIGHT,
-    borderRadius: 20,
-    overflow: "hidden",
-  },
-  cardImage: {
-    width: "100%",
-    height: "100%",
-  },
-  cardGradientOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.35)",
-  },
-  cardTextOverlay: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 16,
-  },
-  placeholderCard: {
-    flex: 1,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-  },
-  iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  placeholderTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#f1f5f9",
-    textAlign: "center",
-    marginBottom: 4,
-  },
-  placeholderSubtitle: {
-    fontSize: 12,
-    color: "#94a3b8",
-    textAlign: "center",
-    lineHeight: 16,
-  },
-  dotsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    marginVertical: 12,
-  },
-  dot: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#3b82f6",
-  },
-  contentSection: {
-    paddingHorizontal: 20,
-    marginTop: 24,
-  },
-  headingBlock: {
-    marginBottom: 32,
-  },
-  headingBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 12,
-    alignSelf: "flex-start",
-    backgroundColor: "#3b82f6" + "15",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#3b82f6" + "30",
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#3b82f6",
-  },
-  mainHeading: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#f1f5f9",
-    marginBottom: 8,
-  },
-  subHeading: {
-    fontSize: 14,
-    color: "#cbd5e1",
-    lineHeight: 21,
-    fontWeight: "500",
-  },
-  featuresGrid: {
-    marginBottom: 28,
-    gap: 12,
-  },
-  featureCard: {
-    backgroundColor: "#1e293b",
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#334155",
-    marginBottom: 8,
-  },
-  featureIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  featureTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#f1f5f9",
-    marginBottom: 4,
-  },
-  featureDesc: {
-    fontSize: 12,
-    color: "#94a3b8",
-    lineHeight: 16,
-  },
-  ctaSection: {
-    backgroundColor: "#1e293b",
-    borderRadius: 14,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "#334155",
-    marginTop: 8,
-  },
-  ctaContent: {
-    marginBottom: 14,
-  },
-  ctaTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#f1f5f9",
-    marginBottom: 4,
-  },
-  ctaText: {
-    fontSize: 13,
-    color: "#94a3b8",
-    lineHeight: 18,
-  },
-  actionButtons: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  smallButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: "#0f172a",
-    borderWidth: 1.5,
-    flex: 1,
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  smallButtonText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-});
