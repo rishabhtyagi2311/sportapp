@@ -6,8 +6,9 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  SafeAreaView,
+  
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useEventManagerStore } from '@/store/eventManagerStore'
@@ -96,23 +97,18 @@ export default function EventManagerDashboard() {
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
       {/* ---------- HEADER (Settings Button Restored) ---------- */}
-      <View className="bg-white px-6 py-4 border-b border-gray-200">
+      <View className="bg-slate-900 px-6 py-4 border-b border-gray-200">
         <View className="flex-row justify-between items-center">
           <View>
-            <Text className="text-2xl font-bold text-slate-900">
+            <Text className="text-2xl font-bold text-white">
               Event Manager
             </Text>
-            <Text className="text-sm text-slate-600">
+            <Text className="text-sm text-white">
               Manage your created events
             </Text>
           </View>
 
-          <TouchableOpacity
-            onPress={() => router.push('/eventManager/settings')}
-            className="bg-gray-100 p-3 rounded-lg"
-          >
-            <Ionicons name="settings-outline" size={22} color="#475569" />
-          </TouchableOpacity>
+         
         </View>
       </View>
 
@@ -168,10 +164,10 @@ export default function EventManagerDashboard() {
       {/* ---------- FAB (Restored to Bottom Right) ---------- */}
       <TouchableOpacity
         onPress={() => router.push('/(EventManagement)/selectEventType')}
-        className="absolute right-6 bottom-6 bg-green-600 w-14 h-14 rounded-full items-center justify-center shadow-lg"
+        className="absolute right-6 bottom-12 bg-slate-900 w-14 h-14 rounded-full items-center justify-center shadow-lg"
         activeOpacity={0.9}
       >
-        <Ionicons name="add" size={28} color="white" />
+        <Ionicons name="add" size={32} color="white" />
       </TouchableOpacity>
     </SafeAreaView>
   )

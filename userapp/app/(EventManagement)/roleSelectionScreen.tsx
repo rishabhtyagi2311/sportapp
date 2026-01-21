@@ -5,10 +5,11 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
+  
   StatusBar,
   ImageBackground,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 
@@ -40,29 +41,27 @@ const RoleSelectionScreen: React.FC = () => {
         {/* ---------- Dark Overlay ---------- */}
         <View className="flex-1 bg-black/60">
           {/* ---------- Top Header ---------- */}
-          <View className="px-4 pt-2 pb-4 bg-white">
+          /*7<View className="px-4 pt-2 pb-4 bg-white">
             <View className="flex-row items-center justify-between">
               {/* Back */}
               <TouchableOpacity
                 onPress={() => router.back()}
                 activeOpacity={0.8}
-                className="p-2 rounded-full bg-black"
+                className="p-2 rounded-full bg-white"
               >
                 <Ionicons
                   name="arrow-back"
                   size={24}
-                  color="#fff"
+                  color="black"
                 />
               </TouchableOpacity>
 
               {/* Title */}
               <View className='flex flex-col'>
-                <Text className="text-black text-2xl font-semibold">
-                  Choose your Role
+                <Text className="text-black text-2xl font-semibold mr-24">
+                  Select your Role
                 </Text>
-                <Text className="text-black text-sm font-semibold">
-                  Continue with the role that fits you best
-                </Text>
+                
               </View>
 
               {/* Spacer for symmetry */}
