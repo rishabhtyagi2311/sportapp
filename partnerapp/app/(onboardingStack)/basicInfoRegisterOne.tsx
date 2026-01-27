@@ -38,7 +38,7 @@ type FormData = {
 
 export default function InfoRegisterScreen() {
   
-  const { setFirstName, setLastName, setEmail} = signUpStore();
+  const { setfirstName, setlastName, setEmail} = signUpStore();
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.5);
   const router = useRouter()
@@ -88,8 +88,8 @@ export default function InfoRegisterScreen() {
   const onSubmit = async (data: FormData) => {
 
   
-  setFirstName(data.firstName)
-  setLastName(data.lastName)
+  setfirstName(data.firstName)
+  setlastName(data.lastName)
   setEmail(data.email)
   
   router.push("./basicInfoRegisterTwo")
@@ -145,7 +145,7 @@ export default function InfoRegisterScreen() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View className="flex-1 bg-white">
           <ImageBackground
-            source={require('../../assets/images/onBoardingCoverImage.jpg')}
+            source={require('../../assets/images/coverImageNew.png')}
             resizeMode="cover"
             className="flex-1"
           >

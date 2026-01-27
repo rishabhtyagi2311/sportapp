@@ -335,11 +335,11 @@ const WelcomeScreen: FC = () => {
   const router = useRouter();
 
   const handleSignUp = () => {
-    router.push('/(homeScreenTabs)');
+    router.push('/(onboardingStack)/basicInfoRegisterOne');
   };
 
   const handleSignIn = () => {
-    router.push('./(homeScreenTabs)');
+    router.push('/(homeScreenTabs)');
   };
 
   return (

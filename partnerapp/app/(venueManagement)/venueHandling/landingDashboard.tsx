@@ -116,7 +116,7 @@ export default function ManageVenuesScreen() {
       {/* Header */}
       <View className="px-6 py-4 bg-slate-900 border-b border-slate-100 flex-row items-center  sticky top-0 z-10">
         <TouchableOpacity 
-          onPress={() => router.back()}
+          onPress={() => router.navigate("/(homeScreenTabs)")}
           className="w-10 h-10 rounded-full bg-slate-50 items-center justify-center -ml-2"
         >
           <Ionicons name="arrow-back" size={24} color="#1e293b" />

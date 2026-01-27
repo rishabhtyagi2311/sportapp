@@ -197,13 +197,7 @@ export default function ProfileScreen() {
             <Text className="text-white text-sm mt-2">Subscriptions</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => router.push('./')}
-            className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-4 items-center"
-          >
-            <MaterialIcons name="event" size={26} color="#22c55e" />
-            <Text className="text-white text-sm mt-2">Events</Text>
-          </TouchableOpacity>
+        
 
           <TouchableOpacity
             onPress={() => Alert.alert('Stats', 'Coming soon')}

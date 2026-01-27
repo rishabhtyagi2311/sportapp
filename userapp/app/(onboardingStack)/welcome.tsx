@@ -247,7 +247,7 @@ const NavigationSection: FC<{
             elevation: 15,
           }}
         >
-          <View className="flex-row items-center gap-3 justify-center">
+          <View className="flex-row items-center gap-3 justify-center ">
             <MaterialCommunityIcons name="login-variant" size={22} color={COLORS.logoGreen} />
             <View>
               <Text className="text-xs font-semibold" style={{ color: COLORS.skyBlue400 }}>
@@ -272,7 +272,7 @@ const WelcomeScreen: FC = () => {
     // router.push('/(homeScreenTabs)');    
   };
   const handleSignIn = () => {
-    router.push('/(homeScreenTabs)');
+    router.push('/(onboardingStack)/basicInfoRegisterOne');
   };
   return (
     <SafeAreaView className="flex-1">
