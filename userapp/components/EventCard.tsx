@@ -22,16 +22,24 @@ const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
   const spotsLeft = event.maxParticipants - event.currentParticipants;
   const progressPercentage = (event.currentParticipants / event.maxParticipants) * 100;
   
-  const handlePress = () => {
-    if (onPress) {
-      onPress();
-    } else {
-       router.push({
-        pathname: '/(venue)/EventBooking/eventDetails/[eventId]',
-        params: { eventId: event.id }
-      });
-    }
-  };
+ const handlePress = () => {
+  if (onPress) {
+    onPress();
+    return;
+  }
+
+  if (event.eventType === 'footballtournament') {
+    router.push({
+      pathname: '/(venue)/footballEvent/eventDetails/[eventId]',
+      params: { eventId: event.id },
+    });
+  } else {
+    router.push({
+      pathname: '/(venue)/EventBooking/eventDetails/[eventId]',
+      params: { eventId: event.id },
+    });
+  }
+};
 
   const getStatusColor = (status: string) => {
     switch (status) {

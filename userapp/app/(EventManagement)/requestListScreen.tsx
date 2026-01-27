@@ -11,9 +11,12 @@ import { KeyboardAvoidingView } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 
-// 1. UPDATED IMPORTS: Removed BookingStore dependency for fetching the event
+// STORES
 import { useRegistrationRequestStore } from '@/store/eventRegistrationRequestStore'
 import { useEventManagerStore } from '@/store/eventManagerStore'
+
+// TYPES
+import { RegistrationRequest } from '@/store/eventRegistrationRequestStore'
 
 type FilterKey = 'pending' | 'accepted' | 'rejected'
 
@@ -21,20 +24,16 @@ const EventRegistrationRequestsScreen: React.FC = () => {
   const router = useRouter()
   const { eventId } = useLocalSearchParams<{ eventId: string }>()
 
-  // 2. FIXED: Fetch event from Manager Store instead of Booking Store
   const { deleteEvent, managedEvents } = useEventManagerStore()
-  
-  const { 
-    getRequestsByEvent, 
-    getEventStats, 
-    deleteRequestsByEvent
+  const {
+    getRequestsByEvent,
+    getEventStats,
+    deleteRequestsByEvent,
   } = useRegistrationRequestStore()
 
   const [activeFilter, setActiveFilter] = useState<FilterKey>('pending')
 
-  // 3. FIXED: Find the event in the managedEvents array
   const event = managedEvents.find((e) => e.id === eventId)
-  
   const requests = getRequestsByEvent(eventId!)
   const stats = getEventStats(eventId!)
 
@@ -53,7 +52,7 @@ const EventRegistrationRequestsScreen: React.FC = () => {
     (r) => r.status === activeFilter
   )
 
-  /* ---------------------------- ACTIONS ---------------------------- */
+  /* ---------------- ACTIONS ---------------- */
 
   const handleDeleteEvent = () => {
     Alert.alert(
@@ -65,11 +64,8 @@ const EventRegistrationRequestsScreen: React.FC = () => {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            // 1. Cleanup Requests first
             deleteRequestsByEvent(event.id)
-            // 2. Delete Event (Syncs Manager & Venue Stores)
             deleteEvent(event.id)
-            // 3. Navigate back
             router.back()
           },
         },
@@ -77,7 +73,30 @@ const EventRegistrationRequestsScreen: React.FC = () => {
     )
   }
 
-  /* ---------------------------- UI ---------------------------- */
+  /* ---------------- HELPERS ---------------- */
+
+  const getRequestTitle = (req: RegistrationRequest) => {
+    if (req.domain === 'football_tournament') {
+      return req.teamName
+    }
+    return req.participationType === 'team'
+      ? req.teamName
+      : req.participantName
+  }
+
+  const getRequestSubtitle = (req: RegistrationRequest) => {
+    if (req.domain === 'football_tournament') {
+      return `Team • Captain: ${req.captainName}`
+    }
+
+    if (req.participationType === 'team') {
+      return `${req.teamSize} players • Team`
+    }
+
+    return `${req.contact} • Individual`
+  }
+
+  /* ---------------- UI ---------------- */
 
   return (
     <KeyboardAvoidingView className="flex-1 bg-gray-50" behavior="padding">
@@ -93,9 +112,7 @@ const EventRegistrationRequestsScreen: React.FC = () => {
           <Text className="text-lg font-bold text-slate-900" numberOfLines={1}>
             {event.name}
           </Text>
-          <Text className="text-sm text-slate-600">
-            Event Management
-          </Text>
+          <Text className="text-sm text-slate-600">Event Management</Text>
         </View>
 
         <TouchableOpacity
@@ -125,8 +142,7 @@ const EventRegistrationRequestsScreen: React.FC = () => {
 
         <View className="flex-row justify-between">
           <Text className="text-slate-600 text-sm">
-            {event.currentParticipants}/{event.maxParticipants}{' '}
-            participants
+            {event.currentParticipants}/{event.maxParticipants} participants
           </Text>
           <Text className="text-green-700 font-semibold">
             ₹{event.fees.amount}
@@ -183,18 +199,19 @@ const EventRegistrationRequestsScreen: React.FC = () => {
               className="bg-white p-4 rounded-xl border border-gray-200 mb-3 shadow-sm"
             >
               <Text className="font-bold text-slate-900 text-base">
-                {req.participationType === 'team' ? req.teamName : req.participantName}
+                {getRequestTitle(req)}
               </Text>
               <Text className="text-sm text-slate-600 mt-1">
-                {req.participationType === 'team'
-                  ? `${req.teamSize} players • Team`
-                  : `${req.contact} • Individual`}
+                {getRequestSubtitle(req)}
               </Text>
 
               <View className="flex-row justify-between items-center mt-3 pt-3 border-t border-gray-100">
                 <Text className="text-xs text-slate-400">
                   {new Date(req.submittedAt).toLocaleDateString('en-IN', {
-                     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
                   })}
                 </Text>
                 <Ionicons
@@ -212,7 +229,7 @@ const EventRegistrationRequestsScreen: React.FC = () => {
   )
 }
 
-/* ---------------------------- SMALL COMPONENTS ---------------------------- */
+/* ---------------- SMALL COMPONENTS ---------------- */
 
 const Stat = ({
   label,
@@ -232,7 +249,7 @@ const Stat = ({
 const EmptyState = ({ filter }: { filter: string }) => (
   <View className="items-center mt-12 opacity-70">
     <View className="bg-gray-100 p-4 rounded-full mb-4">
-        <Ionicons name="document-text-outline" size={32} color="#94a3b8" />
+      <Ionicons name="document-text-outline" size={32} color="#94a3b8" />
     </View>
     <Text className="text-slate-600 font-semibold text-lg capitalize">
       No {filter} Requests

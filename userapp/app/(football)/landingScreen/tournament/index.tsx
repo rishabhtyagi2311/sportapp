@@ -196,7 +196,7 @@ export default function TournamentsScreen() {
   
   // Empty State Component
   const renderEmptyState = () => (
-    <View className="flex-1 justify-center items-center p-6 mt-20">
+    <View className="flex-1 justify-center items-center p-6 mt-12">
       <View className="items-center">
         <View className="w-24 h-24 bg-slate-100 rounded-full justify-center items-center mb-6">
           <Ionicons name="trophy-outline" size={40} color="#64748b" />

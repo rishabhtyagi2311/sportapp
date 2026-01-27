@@ -1,18 +1,38 @@
 // app/(homeScreenTabs)/sports.tsx
+
 import { View, Text, TouchableOpacity, Image, ImageBackground } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
+// ✅ Football store
+import { useFootballStore } from '@/store/footballTeamStore';
+
 export default function SportsScreen() {
-  
+  // 🔑 single source of truth
+  const currentPlayer = useFootballStore((state) => state.currentPlayer);
+
   const navigateToSport = (sport: string) => {
     console.log(`🎯 Navigating to ${sport}...`);
+
     if (sport === 'football') {
-      router.push('/(football)/createFootballProfile');
-    } else if (sport === 'cricket') {
+      if (currentPlayer) {
+        // ✅ Player already has football profile
+        router.push('/(football)/landingScreen/matches');
+      } else {
+        // ❌ No profile yet → create one
+        router.push('/(football)/createFootballProfile');
+      }
+      return;
+    }
+
+    if (sport === 'cricket') {
       router.push('/(cricket)/createCricketProfile');
-    } else if (sport === 'tennis') {
+      return;
+    }
+
+    if (sport === 'tennis') {
       router.push('/(tennis)/createTennisProfile');
+      return;
     }
   };
 
@@ -41,10 +61,10 @@ export default function SportsScreen() {
         className="flex-1"
         resizeMode="cover"
       >
-        {/* Overlay for better visibility of icons */}
+        {/* Overlay */}
         <View className="absolute inset-0 bg-black/20" />
 
-        {/* Sports Icons Container - Center - Vertical */}
+        {/* Sports Icons */}
         <View className="flex-1 justify-center items-center">
           <View className="gap-10">
             {sportIcons.map((sport) => (
@@ -54,7 +74,6 @@ export default function SportsScreen() {
                 className="items-center"
                 activeOpacity={0.7}
               >
-                {/* Icon with shadow and background */}
                 <View className="rounded-full bg-white p-4 shadow-lg">
                   <Image
                     source={sport.icon}
@@ -62,9 +81,8 @@ export default function SportsScreen() {
                     resizeMode="contain"
                   />
                 </View>
-                
-                {/* Sport Name */}
-                <Text className="text-white font-bold text-lg mt-3 text-center font-sans">
+
+                <Text className="text-white font-bold text-lg mt-3 text-center">
                   {sport.name}
                 </Text>
               </TouchableOpacity>

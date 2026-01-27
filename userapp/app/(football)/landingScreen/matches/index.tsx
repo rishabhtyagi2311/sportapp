@@ -199,7 +199,7 @@ export default function MatchesScreen() {
 
   // Create empty state when no matches
   const renderEmptyState = () => (
-    <View className="flex-1 justify-center items-center p-6">
+    <View className="flex-1 justify-center items-center p-6 mb-12">
       <View className="items-center">
         <View className="w-28 h-28 bg-slate-100 rounded-full justify-center items-center mb-8">
           <Ionicons name="football-outline" size={48} color="#64748b" />
@@ -229,12 +229,7 @@ export default function MatchesScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
-      {/* Header */}
-      <View className="px-4 pt-2 pb-4">
-        <Text className="text-2xl font-bold text-slate-900">Match History</Text>
-        <Text className="text-slate-600">View your completed matches</Text>
-      </View>
-      
+    
       {!hasCompletedMatches ? (
         renderEmptyState()
       ) : (

@@ -1,67 +1,147 @@
+// stores/eventRegistrationRequestStore.ts
+
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
+/* -------------------------------------------------------------------------- */
+/* ENUMS & COMMON TYPES */
+/* -------------------------------------------------------------------------- */
+
 export type RequestStatus = 'pending' | 'accepted' | 'rejected';
 export type ParticipationType = 'individual' | 'team';
 
-export interface IndividualRequest {
+export type RegistrationDomain =
+  | 'regular'
+  | 'football_tournament';
+
+/* -------------------------------------------------------------------------- */
+/* REGULAR EVENT REQUESTS */
+/* -------------------------------------------------------------------------- */
+
+export interface RegularIndividualRequest {
   id: string;
+  domain: 'regular';
+
   eventId: string;
   userId: string;
+
+  participationType: 'individual';
   participantName: string;
   contact: string;
   email: string;
-  participationType: 'individual';
+
   status: RequestStatus;
   submittedAt: string;
   processedAt?: string;
-  processedBy?: string; // Manager ID
+  processedBy?: string; // manager / organizer id
   notes?: string;
 }
 
-export interface TeamRequest {
+export interface RegularTeamRequest {
   id: string;
+  domain: 'regular';
+
   eventId: string;
   userId: string;
+
+  participationType: 'team';
   teamName: string;
   captainName?: string;
   captainContact: string;
   captainEmail: string;
+
   teamMembers: {
     id: string;
     name: string;
     contact: string;
   }[];
-  participationType: 'team';
+
   teamSize: number;
+
   status: RequestStatus;
   submittedAt: string;
   processedAt?: string;
-  processedBy?: string; // Manager ID
+  processedBy?: string;
   notes?: string;
 }
 
-export type RegistrationRequest = IndividualRequest | TeamRequest;
+/* -------------------------------------------------------------------------- */
+/* FOOTBALL TOURNAMENT REQUEST */
+/* -------------------------------------------------------------------------- */
+
+export interface FootballTournamentRequest {
+  id: string;
+  domain: 'football_tournament';
+
+  eventId: string;
+
+  teamId: string;
+  teamName: string;
+
+  captainPlayerId: string;
+  captainName: string;
+
+  status: RequestStatus;
+  submittedAt: string;
+  processedAt?: string;
+  processedBy?: string;
+  notes?: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* UNION TYPE */
+/* -------------------------------------------------------------------------- */
+
+export type RegistrationRequest =
+  | RegularIndividualRequest
+  | RegularTeamRequest
+  | FootballTournamentRequest;
+
+/* -------------------------------------------------------------------------- */
+/* STORE STATE */
+/* -------------------------------------------------------------------------- */
 
 export interface RegistrationRequestState {
   requests: RegistrationRequest[];
   isLoading: boolean;
   error: string | null;
 
-  // Actions
+  /* ------------------ ACTIONS ------------------ */
+
   addRequest: (request: RegistrationRequest) => void;
-  updateRequestStatus: (requestId: string, status: RequestStatus, managerId: string, notes?: string) => void;
+
+  updateRequestStatus: (
+    requestId: string,
+    status: RequestStatus,
+    managerId: string,
+    notes?: string
+  ) => void;
+
   deleteRequest: (requestId: string) => void;
-  // NEW: cleanup action
-  deleteRequestsByEvent: (eventId: string) => void; 
+
+  deleteRequestsByEvent: (eventId: string) => void;
+
   setRequests: (requests: RegistrationRequest[]) => void;
 
-  // Getters
+  /* ------------------ GETTERS ------------------ */
+
   getRequestsByEvent: (eventId: string) => RegistrationRequest[];
+
   getRequestById: (requestId: string) => RegistrationRequest | undefined;
+
   getRequestsByUser: (userId: string) => RegistrationRequest[];
-  getRequestsByStatus: (eventId: string, status: RequestStatus) => RegistrationRequest[];
+
+  getRequestsByDomain: (
+    eventId: string,
+    domain: RegistrationDomain
+  ) => RegistrationRequest[];
+
+  getRequestsByStatus: (
+    eventId: string,
+    status: RequestStatus
+  ) => RegistrationRequest[];
+
   getEventStats: (eventId: string) => {
     pending: number;
     accepted: number;
@@ -70,78 +150,129 @@ export interface RegistrationRequestState {
   };
 }
 
-export const useRegistrationRequestStore = create<RegistrationRequestState>()(
-  devtools(
-    immer((set, get) => ({
-      requests: [],
-      isLoading: false,
-      error: null,
+/* -------------------------------------------------------------------------- */
+/* STORE IMPLEMENTATION */
+/* -------------------------------------------------------------------------- */
 
-      addRequest: (request: RegistrationRequest) =>
-        set((state) => {
-          state.requests.push(request);
-          state.error = null;
-        }),
+export const useRegistrationRequestStore =
+  create<RegistrationRequestState>()(
+    devtools(
+      immer((set, get) => ({
+        requests: [],
+        isLoading: false,
+        error: null,
 
-      updateRequestStatus: (requestId: string, status: RequestStatus, managerId: string, notes?: string) =>
-        set((state) => {
-          const index = state.requests.findIndex((r) => r.id === requestId);
-          if (index !== -1) {
-            state.requests[index].status = status;
-            state.requests[index].processedAt = new Date().toISOString();
-            state.requests[index].processedBy = managerId;
+        /* ------------------ ACTIONS ------------------ */
+
+        addRequest: (request) =>
+          set((state) => {
+            state.requests.push(request);
+            state.error = null;
+          }),
+
+        updateRequestStatus: (
+          requestId,
+          status,
+          managerId,
+          notes
+        ) =>
+          set((state) => {
+            const req = state.requests.find(
+              (r) => r.id === requestId
+            );
+
+            if (!req) return;
+
+            req.status = status;
+            req.processedAt = new Date().toISOString();
+            req.processedBy = managerId;
+
             if (notes) {
-              state.requests[index].notes = notes;
+              req.notes = notes;
             }
-          }
-        }),
+          }),
 
-      deleteRequest: (requestId: string) =>
-        set((state) => {
-          state.requests = state.requests.filter((r) => r.id !== requestId);
-        }),
+        deleteRequest: (requestId) =>
+          set((state) => {
+            state.requests = state.requests.filter(
+              (r) => r.id !== requestId
+            );
+          }),
 
-      // NEW: Action to prevent orphan requests when an Event is deleted
-      deleteRequestsByEvent: (eventId: string) =>
-        set((state) => {
-          state.requests = state.requests.filter((r) => r.eventId !== eventId);
-        }),
+        deleteRequestsByEvent: (eventId) =>
+          set((state) => {
+            state.requests = state.requests.filter(
+              (r) => r.eventId !== eventId
+            );
+          }),
 
-      setRequests: (requests: RegistrationRequest[]) =>
-        set((state) => {
-          state.requests = requests;
-          state.isLoading = false;
-          state.error = null;
-        }),
+        setRequests: (requests) =>
+          set((state) => {
+            state.requests = requests;
+            state.isLoading = false;
+            state.error = null;
+          }),
 
-      getRequestsByEvent: (eventId: string) => {
-        return get().requests.filter((r) => r.eventId === eventId);
-      },
+        /* ------------------ GETTERS ------------------ */
 
-      getRequestById: (requestId: string) => {
-        return get().requests.find((r) => r.id === requestId);
-      },
+        getRequestsByEvent: (eventId) => {
+          return get().requests.filter(
+            (r) => r.eventId === eventId
+          );
+        },
 
-      getRequestsByUser: (userId: string) => {
-        return get().requests.filter((r) => r.userId === userId);
-      },
+        getRequestById: (requestId) => {
+          return get().requests.find(
+            (r) => r.id === requestId
+          );
+        },
 
-      getRequestsByStatus: (eventId: string, status: RequestStatus) => {
-        return get().requests.filter((r) => r.eventId === eventId && r.status === status);
-      },
+        getRequestsByUser: (userId) => {
+          return get().requests.filter(
+            (r) =>
+              r.domain === 'regular' &&
+              'userId' in r &&
+              r.userId === userId
+          );
+        },
 
-      getEventStats: (eventId: string) => {
-        const eventRequests = get().requests.filter((r) => r.eventId === eventId);
-        return {
-          pending: eventRequests.filter((r) => r.status === 'pending').length,
-          accepted: eventRequests.filter((r) => r.status === 'accepted').length,
-          rejected: eventRequests.filter((r) => r.status === 'rejected').length,
-          total: eventRequests.length,
-        };
-      },
-    })),
-    {
-      name: 'registration-request-store',
-    }
-  )
-);
+        getRequestsByDomain: (eventId, domain) => {
+          return get().requests.filter(
+            (r) =>
+              r.eventId === eventId &&
+              r.domain === domain
+          );
+        },
+
+        getRequestsByStatus: (eventId, status) => {
+          return get().requests.filter(
+            (r) =>
+              r.eventId === eventId &&
+              r.status === status
+          );
+        },
+
+        getEventStats: (eventId) => {
+          const eventRequests = get().requests.filter(
+            (r) => r.eventId === eventId
+          );
+
+          return {
+            pending: eventRequests.filter(
+              (r) => r.status === 'pending'
+            ).length,
+            accepted: eventRequests.filter(
+              (r) => r.status === 'accepted'
+            ).length,
+            rejected: eventRequests.filter(
+              (r) => r.status === 'rejected'
+            ).length,
+            total: eventRequests.length,
+          };
+        },
+      })),
+      {
+        name: 'registration-request-store',
+      }
+    )
+  );

@@ -6,7 +6,7 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  
+
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -57,18 +57,16 @@ export default function EventManagerDashboard() {
         </View>
 
         <View
-          className={`px-3 py-1 rounded-full ${
-            item.status === 'upcoming'
+          className={`px-3 py-1 rounded-full ${item.status === 'upcoming'
               ? 'bg-green-100'
               : 'bg-gray-200'
-          }`}
+            }`}
         >
           <Text
-            className={`text-xs font-semibold ${
-              item.status === 'upcoming'
+            className={`text-xs font-semibold ${item.status === 'upcoming'
                 ? 'text-green-700'
                 : 'text-gray-700'
-            }`}
+              }`}
           >
             {item.status.toUpperCase()}
           </Text>
@@ -98,17 +96,23 @@ export default function EventManagerDashboard() {
     <SafeAreaView className="flex-1 bg-gray-50">
       {/* ---------- HEADER (Settings Button Restored) ---------- */}
       <View className="bg-slate-900 px-6 py-4 border-b border-gray-200">
-        <View className="flex-row justify-between items-center">
-          <View>
+        <View className="flex-row  items-center">
+          <TouchableOpacity
+            className="mr-4"
+            onPress={() => router.navigate("/(homeScreenTabs)/profile")}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
+          <View >
+
             <Text className="text-2xl font-bold text-white">
               Event Manager
             </Text>
-            <Text className="text-sm text-white">
-              Manage your created events
-            </Text>
+            
           </View>
 
-         
+
         </View>
       </View>
 
@@ -118,18 +122,16 @@ export default function EventManagerDashboard() {
           <TouchableOpacity
             key={tab.key}
             onPress={() => setActiveTab(tab.key)}
-            className={`flex-1 py-4 items-center border-b-2 ${
-              activeTab === tab.key
+            className={`flex-1 py-4 items-center border-b-2 ${activeTab === tab.key
                 ? 'border-green-600'
                 : 'border-transparent'
-            }`}
+              }`}
           >
             <Text
-              className={`font-semibold ${
-                activeTab === tab.key
+              className={`font-semibold ${activeTab === tab.key
                   ? 'text-green-700'
                   : 'text-slate-500'
-              }`}
+                }`}
             >
               {tab.label}
             </Text>

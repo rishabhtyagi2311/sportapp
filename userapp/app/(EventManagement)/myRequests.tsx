@@ -16,64 +16,86 @@ import { useRegistrationRequestStore } from '@/store/eventRegistrationRequestSto
 import { useBookingStore } from '@/store/venueStore';
 import { RegistrationRequest } from '@/store/eventRegistrationRequestStore';
 
-// MOCK USER ID (Replace with actual auth ID)
+// MOCK USER ID (Replace with actual auth / player mapping)
 const CURRENT_USER_ID = 'user-123';
 
 export default function UserRegistrationsScreen() {
   const router = useRouter();
 
-  // 1. Fetch Data Helpers
-  const { getRequestsByUser } = useRegistrationRequestStore();
-  const { getEventById } = useBookingStore();
+  /* ---------------- STORE ACCESS ---------------- */
 
-  // 2. Get ALL requests first (Stable Selector)
-  // FIX: We select the raw array to prevent infinite re-renders
+  const { getEventById } = useBookingStore();
   const allRequests = useRegistrationRequestStore((state) => state.requests);
 
-  // 3. Filter and Sort
-  // We do the filtering inside useMemo so it only recalculates when 'allRequests' changes
-  const sortedRequests = useMemo(() => {
-    // A. Filter for current user
-    const myRequests = allRequests.filter(r => r.userId === CURRENT_USER_ID);
+  /* ---------------- FILTER + SORT ---------------- */
 
-    // B. Sort by submission date (newest first)
-    return myRequests.sort((a, b) => 
-      new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+  const sortedRequests = useMemo(() => {
+    const myRequests = allRequests.filter((r) => {
+      // Regular events → owned by userId
+      if (r.domain === 'regular') {
+        return 'userId' in r && r.userId === CURRENT_USER_ID;
+      }
+
+      // Football tournaments → owned by captain
+      if (r.domain === 'football_tournament') {
+        return r.captainPlayerId === CURRENT_USER_ID;
+      }
+
+      return false;
+    });
+
+    return myRequests.sort(
+      (a, b) =>
+        new Date(b.submittedAt).getTime() -
+        new Date(a.submittedAt).getTime()
     );
   }, [allRequests]);
 
   /* ---------------- HELPERS ---------------- */
-   
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'accepted': 
-        return { bg: 'bg-green-100', text: 'text-green-700', icon: 'checkmark-circle' };
-      case 'rejected': 
-        return { bg: 'bg-red-100', text: 'text-red-700', icon: 'close-circle' };
-      default: 
-        return { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: 'time' };
+      case 'accepted':
+        return {
+          bg: 'bg-green-100',
+          text: 'text-green-700',
+          icon: 'checkmark-circle',
+        };
+      case 'rejected':
+        return {
+          bg: 'bg-red-100',
+          text: 'text-red-700',
+          icon: 'close-circle',
+        };
+      default:
+        return {
+          bg: 'bg-yellow-100',
+          text: 'text-yellow-700',
+          icon: 'time',
+        };
     }
   };
 
   const handlePressRequest = (req: RegistrationRequest) => {
     if (req.notes) {
-      Alert.alert(
-        'Manager Notes',
-        req.notes,
-        [{ text: 'Close' }]
-      );
+      Alert.alert('Manager Notes', req.notes, [{ text: 'Close' }]);
     }
   };
 
-  /* ---------------- RENDER ITEM ---------------- */
+  /* ---------------- RENDER CARD ---------------- */
 
   const renderRequestCard = ({ item }: { item: RegistrationRequest }) => {
-    // Cross-reference Event Data
     const event = getEventById(item.eventId);
+    if (!event) return null;
+
     const statusStyle = getStatusColor(item.status);
 
-    // If event was deleted, handle gracefully
-    if (!event) return null; 
+    const participationLabel =
+      item.domain === 'football_tournament'
+        ? 'Football Tournament'
+        : item.participationType === 'team'
+          ? 'Team Entry'
+          : 'Individual';
 
     return (
       <TouchableOpacity
@@ -81,43 +103,71 @@ export default function UserRegistrationsScreen() {
         onPress={() => handlePressRequest(item)}
         className="bg-white rounded-xl p-4 mb-4 border border-gray-200 shadow-sm"
       >
-        {/* Header: Event Name & Price */}
+        {/* Header */}
         <View className="flex-row justify-between items-start mb-3">
           <View className="flex-1 mr-2">
-            <Text className="text-lg font-bold text-slate-900" numberOfLines={1}>
+            <Text
+              className="text-lg font-bold text-slate-900"
+              numberOfLines={1}
+            >
               {event.name}
             </Text>
             <Text className="text-xs text-slate-500 uppercase tracking-wider font-semibold mt-1">
-              {event.sport.name} • {item.participationType === 'team' ? 'Team Entry' : 'Individual'}
+              {event.sport.name} • {participationLabel}
             </Text>
           </View>
+
           <View className="bg-slate-100 px-2 py-1 rounded">
-             <Text className="text-slate-700 font-bold text-xs">₹{event.fees.amount}</Text>
+            <Text className="text-slate-700 font-bold text-xs">
+              ₹{event.fees.amount}
+            </Text>
           </View>
         </View>
 
-        {/* Status Badge Area */}
+        {/* Status */}
         <View className="flex-row items-center justify-between mt-2 pt-3 border-t border-gray-100">
-           
-          {/* Status Pill */}
-          <View className={`flex-row items-center px-2.5 py-1 rounded-full ${statusStyle.bg}`}>
-            <Ionicons name={statusStyle.icon as any} size={14} color={statusStyle.text === 'text-green-700' ? '#15803d' : statusStyle.text === 'text-red-700' ? '#b91c1c' : '#a16207'} />
-            <Text className={`text-xs font-bold ml-1.5 capitalize ${statusStyle.text}`}>
+          <View
+            className={`flex-row items-center px-2.5 py-1 rounded-full ${statusStyle.bg}`}
+          >
+            <Ionicons
+              name={statusStyle.icon as any}
+              size={14}
+              color={
+                statusStyle.text === 'text-green-700'
+                  ? '#15803d'
+                  : statusStyle.text === 'text-red-700'
+                    ? '#b91c1c'
+                    : '#a16207'
+              }
+            />
+            <Text
+              className={`text-xs font-bold ml-1.5 capitalize ${statusStyle.text}`}
+            >
               {item.status}
             </Text>
           </View>
 
-          {/* Date Submitted */}
           <Text className="text-xs text-slate-400">
-            Applied: {new Date(item.submittedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+            Applied:{' '}
+            {new Date(item.submittedAt).toLocaleDateString('en-IN', {
+              day: 'numeric',
+              month: 'short',
+            })}
           </Text>
         </View>
 
-        {/* Manager Notes Indicator */}
+        {/* Notes */}
         {item.notes && (
           <View className="mt-3 bg-gray-50 p-2 rounded-lg flex-row items-start">
-            <Ionicons name="chatbox-ellipses-outline" size={14} color="#64748b" className="mt-0.5" />
-            <Text className="text-xs text-slate-600 ml-2 flex-1" numberOfLines={1}>
+            <Ionicons
+              name="chatbox-ellipses-outline"
+              size={14}
+              color="#64748b"
+            />
+            <Text
+              className="text-xs text-slate-600 ml-2 flex-1"
+              numberOfLines={1}
+            >
               Manager note: "{item.notes}"
             </Text>
           </View>
@@ -126,22 +176,28 @@ export default function UserRegistrationsScreen() {
     );
   };
 
-  /* ---------------- MAIN UI ---------------- */
+  /* ---------------- UI ---------------- */
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-       
+
       {/* Header */}
-      <View className="bg-white px-6 py-4 border-b border-gray-200">
-        <View className="flex-row items-center justify-between">
+      <View className="bg-slate-900 px-6 py-4 border-b border-gray-200 mt-2">
+        <View className="flex-row items-center ">
+          <TouchableOpacity
+            className="mr-4"
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          > <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
           <View>
-            <Text className="text-2xl font-bold text-slate-900">My Requests</Text>
-            <Text className="text-sm text-slate-500">Track your event applications</Text>
+            <Text className="text-xl font-bold text-white">
+              My Requests
+            </Text>
+
           </View>
-          <View className="bg-blue-50 w-10 h-10 rounded-full items-center justify-center">
-            <Ionicons name="person" size={20} color="#2563eb" />
-          </View>
+
         </View>
       </View>
 
@@ -161,8 +217,8 @@ export default function UserRegistrationsScreen() {
             <Text className="text-slate-400 text-sm text-center px-10">
               You haven't registered for any events yet.
             </Text>
-            <TouchableOpacity 
-              onPress={() => router.push('/(homeScreenTabs)')} 
+            <TouchableOpacity
+              onPress={() => router.push('/(homeScreenTabs)')}
               className="mt-6 bg-blue-600 px-6 py-3 rounded-full"
             >
               <Text className="text-white font-bold">Explore Events</Text>

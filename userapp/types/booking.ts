@@ -95,7 +95,7 @@ export interface Event {
   name: string;
   description?: string;
 
-  eventType: 'tournament' | 'practice' | 'friendly' | 'training' | 'league';
+  eventType: 'footballtournament' | 'regular'  ;
 
   // 🔹 TOURNAMENT-ONLY FIELDS
   tournamentFormat?: 'league' | 'knockout';

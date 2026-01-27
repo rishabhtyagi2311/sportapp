@@ -172,7 +172,7 @@ export default function CreateFootballTournamentEventScreen() {
 
       // Calculate registration deadline (7 days before)
       const deadline = new Date(dateTime);
-      deadline.setDate(deadline.getDate() - 7);
+      deadline.setDate(deadline.getDate() - 1);
 
       // Create event object
       const event: Event = {
@@ -181,7 +181,7 @@ export default function CreateFootballTournamentEventScreen() {
         venueId: formData.venueId,
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
-        eventType: 'tournament',
+        eventType: 'footballtournament',
         tournamentFormat: formData.tournamentFormat as TournamentFormat,
         sport: {
           id: 'football',
@@ -214,7 +214,7 @@ export default function CreateFootballTournamentEventScreen() {
 
       // Create event (uses Manager store logic which auto-syncs to booking store)
       createEvent(event);
-      router.navigate("/(EventManagement/organizerDashboard)");
+      router.navigate("/(EventManagement)/organizerDashboard)");
     } catch (error) {
       console.error('Error creating tournament event:', error);
       Alert.alert(
@@ -436,7 +436,7 @@ export default function CreateFootballTournamentEventScreen() {
             {/* Duration */}
             <View className="mb-6">
               <Text className="text-white font-semibold mb-2 text-base">
-                Duration (hours) *
+                Duration (Days) *
               </Text>
               <View className="bg-sky-100 rounded-xl border border-gray-200 flex-row items-center px-4">
                 <Ionicons name="hourglass-outline" size={20} color="#374151" />
