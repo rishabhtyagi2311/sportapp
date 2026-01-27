@@ -41,7 +41,7 @@ const RoleSelectionScreen: React.FC = () => {
         {/* ---------- Dark Overlay ---------- */}
         <View className="flex-1 bg-black/60">
           {/* ---------- Top Header ---------- */}
-          /*7<View className="px-4 pt-2 pb-4 bg-white">
+          <View className="px-4 pt-2 pb-4 bg-white">
             <View className="flex-row items-center justify-between">
               {/* Back */}
               <TouchableOpacity

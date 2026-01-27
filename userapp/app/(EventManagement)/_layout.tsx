@@ -27,6 +27,12 @@ export default function EventManagerLayout() {
           title: 'Edit Event',
         }}
       />
+      <Stack.Screen
+        name="organizerDashboard"
+        options={{
+          title: 'Organizer Dashboard',
+        }}
+      />
     </Stack>
   );
 }

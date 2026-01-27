@@ -340,11 +340,7 @@ export default function MatchDetailScreen() {
                         Assist: {event.assistPlayerName}
                       </Text>
                     )}
-                    {event.description && (
-                      <Text className="text-slate-500 text-xs mt-1 italic">
-                        {event.description}
-                      </Text>
-                    )}
+                   
                   </View>
                 </View>
               ))}

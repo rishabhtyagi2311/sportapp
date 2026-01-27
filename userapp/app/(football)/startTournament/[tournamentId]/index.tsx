@@ -32,7 +32,7 @@ export default function TournamentDashboardScreen() {
   const upcomingFixtures = useMemo(() => getUpcomingFixtures(tournamentId), [tournamentId, getUpcomingFixtures, refreshKey]);
   const completedFixtures = useMemo(() => getCompletedFixtures(tournamentId), [tournamentId, getCompletedFixtures, refreshKey]);
   console.log(upcomingFixtures);
-  
+
   // Set initial active table when tournament loads
   useEffect(() => {
     if (tournament?.tables && tournament.tables.length > 0 && !activeTableId) {
@@ -46,26 +46,16 @@ export default function TournamentDashboardScreen() {
     return getTournamentTable(tournamentId, activeTableId);
   }, [getTournamentTable, tournamentId, activeTableId, refreshKey]);
 
-  // Compute NGR for a team safely
-  const computeNGR = (team: any) => {
-    const played = team.played || 0;
-    const gf = team.goalsFor || 0;
-    const ga = team.goalsAgainst || 0;
-    if (played === 0) return 0;
-    return (gf - ga) / played;
-  };
+
 
   // Sort standings by points desc, then NGR desc (tie-breaker)
   const standingsSorted = useMemo(() => {
     return [...tableStandings].sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
-      const ngrA = computeNGR(a);
-      const ngrB = computeNGR(b);
-      if (ngrB !== ngrA) return ngrB - ngrA;
-      // final fallback: goalsFor
-      const gfA = a.goalsFor || 0;
-      const gfB = b.goalsFor || 0;
-      return gfB - gfA;
+      if (b.goalDifference !== a.goalDifference)
+        return b.goalDifference - a.goalDifference;
+      if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+      return 0;
     });
   }, [tableStandings]);
 
@@ -221,12 +211,12 @@ export default function TournamentDashboardScreen() {
               </Text>
               <View className="flex-row items-center mt-1">
                 <View className={`px-2 py-1 rounded ${tournament.status === 'active' ? 'bg-green-100' :
-                    tournament.status === 'completed' ? 'bg-blue-100' :
-                      'bg-slate-100'
+                  tournament.status === 'completed' ? 'bg-blue-100' :
+                    'bg-slate-100'
                   }`}>
                   <Text className={`text-xs font-semibold ${tournament.status === 'active' ? 'text-green-700' :
-                      tournament.status === 'completed' ? 'text-blue-700' :
-                        'text-slate-600'
+                    tournament.status === 'completed' ? 'text-blue-700' :
+                      'text-slate-600'
                     }`}>
                     {tournament.status.toUpperCase()}
                   </Text>
@@ -391,48 +381,89 @@ export default function TournamentDashboardScreen() {
                 <Text className="text-slate-500">No standings available yet</Text>
               </View>
             ) : (
-              <View className="bg-white rounded-xl border border-slate-100 overflow-hidden mb-6">
-                {/* Header */}
-                <View className="flex-row items-center bg-slate-50 px-4 py-3 border-b border-slate-100">
-                  <Text className="w-10 text-xs font-bold text-slate-600">#</Text>
-                  <Text className="flex-1 text-xs font-bold text-slate-600">Team</Text>
-                  <Text className="w-10 text-xs font-bold text-slate-600 text-center">P</Text>
-                  <Text className="w-10 text-xs font-bold text-slate-600 text-center">W</Text>
-                  <Text className="w-10 text-xs font-bold text-slate-600 text-center">D</Text>
-                  <Text className="w-10 text-xs font-bold text-slate-600 text-center">L</Text>
-                  <Text className="w-16 text-xs font-bold text-slate-600 text-center">NGR</Text>
-                  <Text className="w-12 text-xs font-bold text-slate-600 text-center">Pts</Text>
-                </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View className="bg-white rounded-xl border border-slate-100 overflow-hidden mb-6 min-w-[720px]">
 
-                {/* Rows */}
-                {standingsSorted.map((team, index) => {
-                  const ngr = computeNGR(team);
-                  const ngrDisplay = `${ngr > 0 ? '+' : ''}${ngr.toFixed(2)}`;
-                  return (
-                    <View
-                      key={team.id}
-                      className={`flex-row items-center px-4 py-3 ${index < standingsSorted.length - 1 ? 'border-b border-slate-50' : ''}`}
-                    >
-                      <Text className="w-10 text-sm font-bold text-slate-900">{index + 1}</Text>
+                  {/* Header */}
+                  <View className="flex-row items-center bg-slate-50 px-4 py-3 border-b border-slate-100">
+                    <Text className="w-10 text-xs font-bold text-slate-600">#</Text>
+                    <Text className="w-40 text-xs font-bold text-slate-600">Team</Text>
+                    <Text className="w-10 text-xs font-bold text-slate-600 text-center">P</Text>
+                    <Text className="w-10 text-xs font-bold text-slate-600 text-center">W</Text>
+                    <Text className="w-10 text-xs font-bold text-slate-600 text-center">D</Text>
+                    <Text className="w-10 text-xs font-bold text-slate-600 text-center">L</Text>
+                    <Text className="w-14 text-xs font-bold text-slate-600 text-center">+/-</Text>
+                    <Text className="w-12 text-xs font-bold text-slate-600 text-center">GD</Text>
+                    <Text className="w-12 text-xs font-bold text-slate-600 text-center">Pts</Text>
+                  </View>
 
-                      {/* Team name area: more space and truncate */}
-                      <View className="flex-1 mr-3">
-                        <Text className="text-sm font-semibold text-slate-900" numberOfLines={1} ellipsizeMode="tail">
-                          {team.teamName}
+                  {/* Rows */}
+                  {standingsSorted.map((team, index) => {
+                    const gf = team.goalsFor ?? 0;
+                    const ga = team.goalsAgainst ?? 0;
+                    const gd = team.goalDifference ?? 0;
+
+                    return (
+                      <View
+                        key={team.id}
+                        className={`flex-row items-center px-4 py-3 ${index < standingsSorted.length - 1
+                          ? 'border-b border-slate-50'
+                          : ''
+                          }`}
+                      >
+                        <Text className="w-10 text-sm font-bold text-slate-900">
+                          {index + 1}
+                        </Text>
+
+                        {/* Team name – 2 lines */}
+                        <View className="w-40 pr-2">
+                          <Text
+                            className="text-sm font-semibold text-slate-900"
+                            numberOfLines={2}
+                          >
+                            {team.teamName}
+                          </Text>
+                        </View>
+
+                        <Text className="w-10 text-sm text-slate-600 text-center">
+                          {team.played}
+                        </Text>
+                        <Text className="w-10 text-sm text-slate-600 text-center">
+                          {team.won}
+                        </Text>
+                        <Text className="w-10 text-sm text-slate-600 text-center">
+                          {team.drawn}
+                        </Text>
+                        <Text className="w-10 text-sm text-slate-600 text-center">
+                          {team.lost}
+                        </Text>
+
+                        {/* +/- */}
+                        <Text className="w-14 text-sm text-slate-700 text-center">
+                          {gf}/{ga}
+                        </Text>
+
+                        {/* GD */}
+                        <Text
+                          className={`w-12 text-sm font-semibold text-center ${gd > 0
+                            ? 'text-green-600'
+                            : gd < 0
+                              ? 'text-red-600'
+                              : 'text-slate-600'
+                            }`}
+                        >
+                          {gd > 0 ? `+${gd}` : gd}
+                        </Text>
+
+                        {/* Points */}
+                        <Text className="w-12 text-sm font-bold text-slate-900 text-center">
+                          {team.points}
                         </Text>
                       </View>
-
-                      {/* Fixed width numeric columns */}
-                      <Text className="w-10 text-sm text-slate-600 text-center">{team.played}</Text>
-                      <Text className="w-10 text-sm text-slate-600 text-center">{team.won}</Text>
-                      <Text className="w-10 text-sm text-slate-600 text-center">{team.drawn}</Text>
-                      <Text className="w-10 text-sm text-slate-600 text-center">{team.lost}</Text>
-                      <Text className="w-16 text-sm font-semibold text-center text-slate-800">{ngrDisplay}</Text>
-                      <Text className="w-12 text-sm font-bold text-slate-900 text-center">{team.points}</Text>
-                    </View>
-                  );
-                })}
-              </View>
+                    );
+                  })}
+                </View>
+              </ScrollView>
             )}
           </View>
         )}
@@ -462,7 +493,11 @@ export default function TournamentDashboardScreen() {
                     className="bg-white rounded-xl p-4 mb-3 border border-slate-100"
                     onPress={() => {
                       if (fixture.id) {
-                        router.push(`/(football)/landingScreen/matchDetails?matchId=${fixture.id}`);
+                        router.push({
+                          pathname: '/(football)/matchDetails/[matchId]',
+                          params: { matchId: fixture.id },
+                        });
+
                       }
                     }}
                   >

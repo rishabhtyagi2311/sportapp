@@ -214,7 +214,7 @@ export default function CreateFootballTournamentEventScreen() {
 
       // Create event (uses Manager store logic which auto-syncs to booking store)
       createEvent(event);
-      router.navigate("/(EventManagement)/organizerDashboard)");
+      router.push("/(EventManagement)/organizerDashboard");
     } catch (error) {
       console.error('Error creating tournament event:', error);
       Alert.alert(
