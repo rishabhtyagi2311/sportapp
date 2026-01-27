@@ -30,17 +30,17 @@ export interface ActiveKnockoutMatch {
   awayTeamId: string;
   homeTeamName: string;
   awayTeamName: string;
-  
+
   // Roster
   homeTeamPlayers: string[]; // Starter IDs
   awayTeamPlayers: string[]; // Starter IDs
   homeTeamSubstitutes: string[]; // Bench IDs
   awayTeamSubstitutes: string[]; // Bench IDs
-  
+
   homeCaptain?: string;
   awayCaptain?: string;
   referees: string[];
-  
+
   // Live State
   events: KnockoutMatchEvent[];
   homeScore: number;
@@ -48,7 +48,7 @@ export interface ActiveKnockoutMatch {
   startTime: Date;
   currentMinute: number;
   status: 'setup' | 'playing' | 'finished';
-  
+
   // Knockout Specifics
   isExtraTime: boolean;
   extraTimeScore?: { home: number; away: number };
@@ -74,22 +74,24 @@ export interface KnockoutFixture {
   matchNumber: number;
   round: number; // 1 = Ro16, 2 = QF, etc.
   stage: KnockoutStage;
-  
+
   homeTeamId?: string; // Can be null if TBD
   awayTeamId?: string; // Can be null if TBD
   homeTeamName: string; // "TBD" if null
   awayTeamName: string; // "TBD" if null
-  
+
   homeScore?: number;
   awayScore?: number;
-  
+
   // Tie-breakers
   extraTimeScore?: { home: number; away: number };
   penaltyScore?: { home: number; away: number };
-  
+
   winnerId?: string;
   status: 'upcoming' | 'in_progress' | 'completed';
   nextFixtureId?: string; // ID of the match the winner goes to
+
+  matchEvents?: KnockoutMatchEvent[];
 }
 
 export interface KnockoutSettings {
@@ -115,7 +117,7 @@ export interface KnockoutTournament {
   currentRound: number;
   totalRounds: number;
   winnerId?: string;
-  createdAt: string; 
+  createdAt: string;
 }
 
 // --- Store State ---
@@ -124,7 +126,7 @@ interface KnockoutState {
   tournaments: KnockoutTournament[];
   activeTournamentId: string | null;
   activeMatch: ActiveKnockoutMatch | null;
-  
+
   // Draft State (for creation flow)
   draft: {
     name: string;
@@ -147,7 +149,7 @@ interface KnockoutState {
   setActiveTournament: (id: string) => void;
   generateBracket: (tournamentId: string) => void;
   deleteKnockoutTournament: (id: string) => void;
-  
+
   // Match Execution
   initializeMatch: (tournamentId: string, fixtureId: string) => void;
   updateMatchRoster: (homeStarters: string[], awayStarters: string[], homeSubs: string[], awaySubs: string[]) => void;
@@ -160,7 +162,7 @@ interface KnockoutState {
   // Getters
   getTournament: (id: string) => KnockoutTournament | undefined;
   getFixture: (tournamentId: string, fixtureId: string) => KnockoutFixture | undefined;
-  
+
   // NEW: UI Helper Getters
   getFixturesByRound: (tournamentId: string, round: number) => KnockoutFixture[];
   getTournamentProgress: (tournamentId: string) => number;
@@ -195,14 +197,14 @@ export const useKnockoutStore = create<KnockoutState>()(
             name,
             teamCount: 8,
             selectedTeamIds: [],
-            settings: { 
-                format: 'knockout',
-                matchDuration: 90, 
-                extraTime: true, 
-                // REMOVED: penalties: true,
-                numberOfPlayers: 11,
-                numberOfSubstitutes: 7,
-                numberOfReferees: 1
+            settings: {
+              format: 'knockout',
+              matchDuration: 90,
+              extraTime: true,
+              // REMOVED: penalties: true,
+              numberOfPlayers: 11,
+              numberOfSubstitutes: 7,
+              numberOfReferees: 1
             }
           };
         }),
@@ -230,11 +232,11 @@ export const useKnockoutStore = create<KnockoutState>()(
         createTournament: () => {
           const { draft } = get();
           const footballStore = useFootballStore.getState();
-          
+
           if (!draft || draft.selectedTeamIds.length !== draft.teamCount) return null;
 
           const tournamentId = `kt_${Date.now()}`;
-          
+
           // Hydrate Teams
           const teams: KnockoutTeam[] = draft.selectedTeamIds.map((tid, idx) => {
             const teamData = footballStore.getTeamById(tid);
@@ -253,19 +255,19 @@ export const useKnockoutStore = create<KnockoutState>()(
             name: draft.name,
             status: 'active',
             settings: {
-                name: draft.name,
-                format: 'knockout',
-                teamCount: draft.teamCount as any,
-                matchDuration: draft.settings.matchDuration || 90,
-                extraTime: draft.settings.extraTime ?? true,
-                // REMOVED: penalties assignment
-                venue: draft.settings.venue,
-                numberOfPlayers: draft.settings.numberOfPlayers || 11,
-                numberOfSubstitutes: draft.settings.numberOfSubstitutes || 7,
-                numberOfReferees: draft.settings.numberOfReferees || 1
+              name: draft.name,
+              format: 'knockout',
+              teamCount: draft.teamCount as any,
+              matchDuration: draft.settings.matchDuration || 90,
+              extraTime: draft.settings.extraTime ?? true,
+              // REMOVED: penalties assignment
+              venue: draft.settings.venue,
+              numberOfPlayers: draft.settings.numberOfPlayers || 11,
+              numberOfSubstitutes: draft.settings.numberOfSubstitutes || 7,
+              numberOfReferees: draft.settings.numberOfReferees || 1
             },
             teams,
-            fixtures: [], 
+            fixtures: [],
             currentRound: 1,
             totalRounds: calculateRounds(draft.teamCount),
             createdAt: new Date().toISOString()
@@ -292,8 +294,8 @@ export const useKnockoutStore = create<KnockoutState>()(
           // Round 1 (Populated with teams)
           for (let i = 0; i < tournament.teams.length; i += 2) {
             const home = tournament.teams[i];
-            const away = tournament.teams[i+1];
-            
+            const away = tournament.teams[i + 1];
+
             fixtures.push({
               id: `kf_${matchIdCounter}`,
               matchNumber: matchIdCounter,
@@ -331,16 +333,16 @@ export const useKnockoutStore = create<KnockoutState>()(
         setActiveTournament: (id) => set(state => { state.activeTournamentId = id; }),
 
         deleteKnockoutTournament: (id) => set(state => {
-            state.tournaments = state.tournaments.filter(t => t.id !== id);
-            if (state.activeTournamentId === id) state.activeTournamentId = null;
-            if (state.activeMatch?.tournamentId === id) state.activeMatch = null;
+          state.tournaments = state.tournaments.filter(t => t.id !== id);
+          if (state.activeTournamentId === id) state.activeTournamentId = null;
+          if (state.activeMatch?.tournamentId === id) state.activeMatch = null;
         }),
 
         // 3. MATCH EXECUTION
         initializeMatch: (tournamentId, fixtureId) => set(state => {
           const tournament = state.tournaments.find(t => t.id === tournamentId);
           const fixture = tournament?.fixtures.find(f => f.id === fixtureId);
-          
+
           if (fixture && fixture.homeTeamId && fixture.awayTeamId) {
             state.activeMatch = {
               fixtureId,
@@ -393,26 +395,26 @@ export const useKnockoutStore = create<KnockoutState>()(
 
         addEvent: (eventData) => set(state => {
           if (!state.activeMatch) return;
-          
+
           const newEvent: KnockoutMatchEvent = {
             ...eventData,
             id: `ke_${Date.now()}`,
             timestamp: new Date()
           };
-          
+
           state.activeMatch.events.push(newEvent);
 
           // Score Update
           if (eventData.eventType === 'goal') {
             const isHome = eventData.teamId === state.activeMatch.homeTeamId;
             const isOwnGoal = eventData.eventSubType === 'own_goal';
-            
+
             if (isOwnGoal) {
-               if (isHome) state.activeMatch.awayScore++;
-               else state.activeMatch.homeScore++;
+              if (isHome) state.activeMatch.awayScore++;
+              else state.activeMatch.homeScore++;
             } else {
-               if (isHome) state.activeMatch.homeScore++;
-               else state.activeMatch.awayScore++;
+              if (isHome) state.activeMatch.homeScore++;
+              else state.activeMatch.awayScore++;
             }
           }
         }),
@@ -428,6 +430,8 @@ export const useKnockoutStore = create<KnockoutState>()(
             fixture.status = 'completed';
             fixture.homeScore = match.homeScore;
             fixture.awayScore = match.awayScore;
+            fixture.matchEvents = match.events;
+
 
             let winnerId = '';
             let winnerName = '';
@@ -440,44 +444,44 @@ export const useKnockoutStore = create<KnockoutState>()(
               winnerName = match.awayTeamName;
             } else {
               // Tie breaker (Assume Home for now, add Penalty logic later if needed)
-              winnerId = match.homeTeamId; 
-              winnerName = match.homeTeamName; 
+              winnerId = match.homeTeamId;
+              winnerName = match.homeTeamName;
             }
 
             fixture.winnerId = winnerId;
 
             // 1. Promote Winner to Next Round
             const nextRoundFixtures = tournament.fixtures.filter(f => f.round === fixture.round + 1);
-            
-            if (nextRoundFixtures.length > 0) {
-                const currentRoundFixtures = tournament.fixtures.filter(f => f.round === fixture.round);
-                currentRoundFixtures.sort((a,b) => a.matchNumber - b.matchNumber);
-                
-                const matchIndexInRound = currentRoundFixtures.findIndex(f => f.id === fixture.id);
-                const nextMatchIndex = Math.floor(matchIndexInRound / 2);
-                const isHomeInNext = matchIndexInRound % 2 === 0;
 
-                const nextFixture = nextRoundFixtures[nextMatchIndex];
-                if (nextFixture) {
-                    if (isHomeInNext) {
-                        nextFixture.homeTeamId = winnerId;
-                        nextFixture.homeTeamName = winnerName;
-                    } else {
-                        nextFixture.awayTeamId = winnerId;
-                        nextFixture.awayTeamName = winnerName;
-                    }
+            if (nextRoundFixtures.length > 0) {
+              const currentRoundFixtures = tournament.fixtures.filter(f => f.round === fixture.round);
+              currentRoundFixtures.sort((a, b) => a.matchNumber - b.matchNumber);
+
+              const matchIndexInRound = currentRoundFixtures.findIndex(f => f.id === fixture.id);
+              const nextMatchIndex = Math.floor(matchIndexInRound / 2);
+              const isHomeInNext = matchIndexInRound % 2 === 0;
+
+              const nextFixture = nextRoundFixtures[nextMatchIndex];
+              if (nextFixture) {
+                if (isHomeInNext) {
+                  nextFixture.homeTeamId = winnerId;
+                  nextFixture.homeTeamName = winnerName;
+                } else {
+                  nextFixture.awayTeamId = winnerId;
+                  nextFixture.awayTeamName = winnerName;
                 }
+              }
             } else {
-                tournament.winnerId = winnerId;
-                tournament.status = 'completed';
+              tournament.winnerId = winnerId;
+              tournament.status = 'completed';
             }
 
             // 2. CHECK ROUND COMPLETION
             const roundsMatches = tournament.fixtures.filter(f => f.round === tournament.currentRound);
             const allComplete = roundsMatches.every(f => f.status === 'completed');
-            
+
             if (allComplete && tournament.currentRound < tournament.totalRounds) {
-                tournament.currentRound += 1;
+              tournament.currentRound += 1;
             }
 
             state.activeMatch = null;
@@ -489,16 +493,16 @@ export const useKnockoutStore = create<KnockoutState>()(
 
         // --- NEW GETTERS ---
         getFixturesByRound: (tournamentId, round) => {
-            const t = get().tournaments.find(t => t.id === tournamentId);
-            if (!t) return [];
-            return t.fixtures.filter(f => f.round === round).sort((a,b) => a.matchNumber - b.matchNumber);
+          const t = get().tournaments.find(t => t.id === tournamentId);
+          if (!t) return [];
+          return t.fixtures.filter(f => f.round === round).sort((a, b) => a.matchNumber - b.matchNumber);
         },
 
         getTournamentProgress: (tournamentId) => {
-             const t = get().tournaments.find(t => t.id === tournamentId);
-             if (!t || t.fixtures.length === 0) return 0;
-             const completed = t.fixtures.filter(f => f.status === 'completed').length;
-             return Math.round((completed / t.fixtures.length) * 100);
+          const t = get().tournaments.find(t => t.id === tournamentId);
+          if (!t || t.fixtures.length === 0) return 0;
+          const completed = t.fixtures.filter(f => f.status === 'completed').length;
+          return Math.round((completed / t.fixtures.length) * 100);
         }
 
       })),

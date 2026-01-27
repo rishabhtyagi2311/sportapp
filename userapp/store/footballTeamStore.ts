@@ -113,7 +113,7 @@ const generateId = (prefix: string): string => {
 
 // Dummy data generation
 const generateDummyPlayers = (): FootballPlayer[] => {
-  const players: FootballPlayer[] = [
+  return [
     {
       id: 'player_1',
       name: 'Marcus Silva',
@@ -123,7 +123,7 @@ const generateDummyPlayers = (): FootballPlayer[] => {
       updatedAt: '2024-01-15T10:00:00Z',
       preferredFoot: 'Right',
       experience: 'Advanced',
-      contact: '+91 9876543210'
+      contact: '+91 9876543210',
     },
     {
       id: 'player_2',
@@ -134,23 +134,54 @@ const generateDummyPlayers = (): FootballPlayer[] => {
       updatedAt: '2024-01-16T11:00:00Z',
       preferredFoot: 'Left',
       experience: 'Professional',
-      contact: '+91 9876543211'
+      contact: '+91 9876543211',
     },
-    // ... other players (keeping the same as original code)
+    {
+      id: 'player_3',
+      name: 'Rohit Verma',
+      position: 'Central Midfielder',
+      isRegistered: true,
+      createdAt: '2024-01-17T12:00:00Z',
+      updatedAt: '2024-01-17T12:00:00Z',
+      preferredFoot: 'Right',
+      experience: 'Intermediate',
+      contact: '+91 9876543212',
+    },
+    {
+      id: 'player_4',
+      name: 'Daniel Costa',
+      position: 'Right Winger',
+      isRegistered: true,
+      createdAt: '2024-01-18T13:00:00Z',
+      updatedAt: '2024-01-18T13:00:00Z',
+      preferredFoot: 'Right',
+      experience: 'Advanced',
+      contact: '+91 9876543213',
+    },
+    {
+      id: 'player_5',
+      name: 'Arjun Mehta',
+      position: 'Striker',
+      isRegistered: true,
+      createdAt: '2024-01-19T14:00:00Z',
+      updatedAt: '2024-01-19T14:00:00Z',
+      preferredFoot: 'Left',
+      experience: 'Professional',
+      contact: '+91 9876543214',
+    },
   ];
-  
-  return players;
 };
 
+
 const generateDummyTeams = (): Team[] => {
-  const teams: Team[] = [
+  return [
     {
       id: 'team_1',
       teamName: 'Mumbai Warriors',
       maxPlayers: 11,
       city: 'Mumbai',
-      memberPlayerIds: ['player_1', 'player_2', 'player_3', 'player_4', 'player_5'],
-      captainId: 'player_1', // Example captain
+      memberPlayerIds: ['player_1', 'player_2'],
+      captainId: 'player_1',
       createdAt: '2024-01-10T09:00:00Z',
       updatedAt: '2024-01-25T15:30:00Z',
       status: 'active',
@@ -159,12 +190,43 @@ const generateDummyTeams = (): Team[] => {
       matchesWon: 5,
       matchesLost: 2,
       matchesDrawn: 1,
-      achievements: ['City Championship 2023', 'Regional Cup Winner']
+      achievements: ['City Championship 2023'],
     },
-    // ... other teams (keeping the same as original code)
+    {
+      id: 'team_2',
+      teamName: 'Delhi Dynamos',
+      maxPlayers: 11,
+      city: 'Delhi',
+      memberPlayerIds: ['player_3', 'player_4'],
+      captainId: 'player_3',
+      createdAt: '2024-01-11T10:00:00Z',
+      updatedAt: '2024-01-26T12:00:00Z',
+      status: 'active',
+      description: 'Fast attacking side from Delhi',
+      matchesPlayed: 6,
+      matchesWon: 3,
+      matchesLost: 2,
+      matchesDrawn: 1,
+      achievements: ['North Zone Runners-up 2023'],
+    },
+    {
+      id: 'team_3',
+      teamName: 'Bangalore Strikers',
+      maxPlayers: 11,
+      city: 'Bangalore',
+      memberPlayerIds: ['player_5'],
+      captainId: 'player_5',
+      createdAt: '2024-01-12T11:30:00Z',
+      updatedAt: '2024-01-27T18:00:00Z',
+      status: 'active',
+      description: 'Young and aggressive team from Bangalore',
+      matchesPlayed: 4,
+      matchesWon: 2,
+      matchesLost: 1,
+      matchesDrawn: 1,
+      achievements: [],
+    },
   ];
-  
-  return teams;
 };
 
 // Create the unified football store

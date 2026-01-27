@@ -34,7 +34,7 @@ export default function ChildAcademiesScreen() {
   const childAcademyIds = [...new Set(childEnrollments.map((e) => e.academyId))];
 
   const handleBackPress = () => {
-    router.back();
+    router.navigate("/(homeScreenTabs)/academy");
   };
 
   const handleAcademyPress = (academyId: string, academyName: string) => {
@@ -115,7 +115,7 @@ export default function ChildAcademiesScreen() {
             {resolvedChildName} is not enrolled in any academies
           </Text>
           <TouchableOpacity
-            onPress={() => router.push("/(academy)/browseAcademies")}
+            onPress={() => router.push("/(academy)/browseAcademy")}
             className="mt-6 bg-blue-500 py-3 px-6 rounded-xl"
           >
             <Text className="text-white font-semibold text-base">

@@ -13,9 +13,11 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import signUpStore from '@/store/signUpStore'
+
 export default function ProfileScreen() {
   const router = useRouter()
   const { width } = useWindowDimensions()
+
   const {
     name,
     nickName,
@@ -25,9 +27,16 @@ export default function ProfileScreen() {
     profileImage,
     setProfileImage,
   } = signUpStore()
+
   const isSmallScreen = width < 380
   const profilePicSize = isSmallScreen ? 110 : 140
   const profileIconSize = isSmallScreen ? 50 : 70
+
+  /* ---------------- Coming Soon Helper ---------------- */
+  const comingSoon = (feature = 'Coming Soon') => {
+    Alert.alert(feature, 'This feature will be available soon.')
+  }
+
   /* ---------------- Image Picker ---------------- */
   const handlePickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -35,16 +44,20 @@ export default function ProfileScreen() {
       Alert.alert('Permission required', 'Please allow gallery access')
       return
     }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.85,
     })
+
     if (!result.canceled) {
       setProfileImage(result.assets[0].uri)
     }
   }
+
+  /* ---------------- Logout ---------------- */
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
@@ -65,7 +78,8 @@ export default function ProfileScreen() {
       },
     ])
   }
-  /* ---------------- UI helpers ---------------- */
+
+  /* ---------------- UI Helpers ---------------- */
   const ProfileSection = ({
     title,
     children,
@@ -82,6 +96,7 @@ export default function ProfileScreen() {
       </View>
     </View>
   )
+
   const ActionItem = ({
     icon,
     label,
@@ -130,17 +145,18 @@ export default function ProfileScreen() {
       />
     </TouchableOpacity>
   )
-  const fullName = `${name} ${nickName}`.trim() || 'User Profile'
+
+  const fullName = `${name} aka  ${nickName}`.trim() || 'User Profile'
   const displayCity = city || 'City not set'
   const displayEmail = email || 'email@example.com'
   const displayContact = contact || 'Not provided'
+
   return (
     <SafeAreaView className="flex-1 bg-slate-900">
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* ---------------- Decorative Header ---------------- */}
-        <View className="pt-10 pb-8 px-5 bg-slate-900">
+      <ScrollView showsVerticalScrollIndicator={false} className='mb-12'>
+        {/* ---------------- Header ---------------- */}
+        <View className="pt-10 pb-8 px-5 bg-slate-900 ">
           <View className="items-center">
-            {/* Profile Image */}
             <TouchableOpacity onPress={handlePickImage} activeOpacity={0.85}>
               <View
                 style={{ width: profilePicSize, height: profilePicSize }}
@@ -163,6 +179,7 @@ export default function ProfileScreen() {
                 <MaterialIcons name="edit" size={16} color="#fff" />
               </View>
             </TouchableOpacity>
+
             <Text className="text-white text-3xl font-bold mt-4">
               {fullName}
             </Text>
@@ -171,30 +188,37 @@ export default function ProfileScreen() {
             </Text>
           </View>
         </View>
+
         {/* ---------------- Quick Access ---------------- */}
         <View className="px-5 mt-4 mb-6 flex-row gap-3">
           <TouchableOpacity
-            onPress={() => router.push('/(tabs)/profile/subscriptions')}
+            onPress={() => comingSoon('Subscriptions')}
             className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-4 items-center"
           >
             <MaterialIcons name="card-membership" size={26} color="#22c55e" />
             <Text className="text-white text-sm mt-2">Subscriptions</Text>
           </TouchableOpacity>
+
+          {/* EVENTS — untouched */}
           <TouchableOpacity
-            onPress={() => router.push('/(EventManagement)/roleSelectionScreen')}
+            onPress={() =>
+              router.push('/(EventManagement)/roleSelectionScreen')
+            }
             className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-4 items-center"
           >
             <MaterialIcons name="event" size={26} color="#22c55e" />
             <Text className="text-white text-sm mt-2">Events</Text>
           </TouchableOpacity>
+
           <TouchableOpacity
-            onPress={() => Alert.alert('Stats', 'Coming soon')}
+            onPress={() => router.navigate("/(football)/playerStats")}
             className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-4 items-center"
           >
             <MaterialIcons name="bar-chart" size={26} color="#22c55e" />
             <Text className="text-white text-sm mt-2">Stats</Text>
           </TouchableOpacity>
         </View>
+
         {/* ---------------- Contact ---------------- */}
         <ProfileSection title="Contact Information">
           <View className="p-4 space-y-4">
@@ -209,43 +233,44 @@ export default function ProfileScreen() {
             </View>
           </View>
         </ProfileSection>
+
         {/* ---------------- Profile ---------------- */}
         <ProfileSection title="Profile">
           <ActionItem
             icon={<MaterialIcons name="edit" size={24} color="#22c55e" />}
             label="Edit Personal Details"
             value="Name, email, phone, city"
-            onPress={() =>
-              router.push('/(tabs)/profile/edit-personal-details')
-            }
+            onPress={() => comingSoon('Edit Profile')}
           />
         </ProfileSection>
+
         {/* ---------------- Account ---------------- */}
         <ProfileSection title="Account">
           <ActionItem
             icon={<MaterialIcons name="vpn-key" size={24} color="#e5e7eb" />}
             label="Change Password"
-            onPress={() =>
-              router.push('/(tabs)/profile/change-password')
-            }
+            onPress={() => comingSoon('Change Password')}
           />
         </ProfileSection>
+
         {/* ---------------- Support ---------------- */}
         <ProfileSection title="Support">
           <ActionItem
             icon={<MaterialIcons name="help" size={24} color="#e5e7eb" />}
             label="Help & Support"
-            onPress={() => Alert.alert('Support', 'Support page')}
+            onPress={() => comingSoon('Support')}
           />
           <ActionItem
             icon={<MaterialIcons name="info" size={24} color="#e5e7eb" />}
             label="About"
-            onPress={() => Alert.alert('About', 'App version 1.0.0')}
+            onPress={() => comingSoon('About')}
           />
         </ProfileSection>
+
         {/* ---------------- Danger Zone ---------------- */}
         <ProfileSection title="Danger Zone">
           <ActionItem
+          
             icon={<MaterialIcons name="logout" size={24} color="#ef4444" />}
             label="Logout"
             onPress={handleLogout}

@@ -10,40 +10,35 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-
 // STORES
 import { useRegistrationRequestStore } from '@/store/eventRegistrationRequestStore';
 import { useBookingStore } from '@/store/venueStore';
 import { RegistrationRequest } from '@/store/eventRegistrationRequestStore';
+import {useFootballStore} from "@/store/footballTeamStore"
 
-// MOCK USER ID (Replace with actual auth / player mapping)
-const CURRENT_USER_ID = 'user-123';
 
 export default function UserRegistrationsScreen() {
   const router = useRouter();
 
   /* ---------------- STORE ACCESS ---------------- */
-
   const { getEventById } = useBookingStore();
   const allRequests = useRegistrationRequestStore((state) => state.requests);
+  const {getCurrentPlayer} = useFootballStore()
+  const CURRENT_USER_ID = getCurrentPlayer()?.id
 
   /* ---------------- FILTER + SORT ---------------- */
-
   const sortedRequests = useMemo(() => {
     const myRequests = allRequests.filter((r) => {
       // Regular events → owned by userId
       if (r.domain === 'regular') {
         return 'userId' in r && r.userId === CURRENT_USER_ID;
       }
-
       // Football tournaments → owned by captain
       if (r.domain === 'football_tournament') {
         return r.captainPlayerId === CURRENT_USER_ID;
       }
-
       return false;
     });
-
     return myRequests.sort(
       (a, b) =>
         new Date(b.submittedAt).getTime() -
@@ -52,26 +47,28 @@ export default function UserRegistrationsScreen() {
   }, [allRequests]);
 
   /* ---------------- HELPERS ---------------- */
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'accepted':
         return {
           bg: 'bg-green-100',
-          text: 'text-green-700',
+          textColor: '#15803d', // Use hex color instead of className
           icon: 'checkmark-circle',
+          textClass: 'text-green-700',
         };
       case 'rejected':
         return {
           bg: 'bg-red-100',
-          text: 'text-red-700',
+          textColor: '#b91c1c',
           icon: 'close-circle',
+          textClass: 'text-red-700',
         };
       default:
         return {
           bg: 'bg-yellow-100',
-          text: 'text-yellow-700',
+          textColor: '#a16207',
           icon: 'time',
+          textClass: 'text-yellow-700',
         };
     }
   };
@@ -83,7 +80,6 @@ export default function UserRegistrationsScreen() {
   };
 
   /* ---------------- RENDER CARD ---------------- */
-
   const renderRequestCard = ({ item }: { item: RegistrationRequest }) => {
     const event = getEventById(item.eventId);
     if (!event) return null;
@@ -96,6 +92,12 @@ export default function UserRegistrationsScreen() {
         : item.participationType === 'team'
           ? 'Team Entry'
           : 'Individual';
+
+    // FIX: Pre-format the date string outside of Text component
+    const appliedDate = new Date(item.submittedAt).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+    });
 
     return (
       <TouchableOpacity
@@ -116,7 +118,6 @@ export default function UserRegistrationsScreen() {
               {event.sport.name} • {participationLabel}
             </Text>
           </View>
-
           <View className="bg-slate-100 px-2 py-1 rounded">
             <Text className="text-slate-700 font-bold text-xs">
               ₹{event.fees.amount}
@@ -132,28 +133,21 @@ export default function UserRegistrationsScreen() {
             <Ionicons
               name={statusStyle.icon as any}
               size={14}
-              color={
-                statusStyle.text === 'text-green-700'
-                  ? '#15803d'
-                  : statusStyle.text === 'text-red-700'
-                    ? '#b91c1c'
-                    : '#a16207'
-              }
+              color={statusStyle.textColor}
             />
+            {/* FIX: Use the textClass for styling instead of concatenating */}
             <Text
-              className={`text-xs font-bold ml-1.5 capitalize ${statusStyle.text}`}
+              className={`text-xs font-bold ml-1.5 capitalize ${statusStyle.textClass}`}
             >
               {item.status}
             </Text>
           </View>
 
-          <Text className="text-xs text-slate-400">
-            Applied:{' '}
-            {new Date(item.submittedAt).toLocaleDateString('en-IN', {
-              day: 'numeric',
-              month: 'short',
-            })}
-          </Text>
+          {/* FIX: Separate Text elements for clarity */}
+          <View className="flex-row">
+            <Text className="text-xs text-slate-400">Applied: </Text>
+            <Text className="text-xs text-slate-400">{appliedDate}</Text>
+          </View>
         </View>
 
         {/* Notes */}
@@ -164,11 +158,12 @@ export default function UserRegistrationsScreen() {
               size={14}
               color="#64748b"
             />
+            {/* FIX: Use proper template literal */}
             <Text
               className="text-xs text-slate-600 ml-2 flex-1"
               numberOfLines={1}
             >
-              Manager note: "{item.notes}"
+              {`Manager note: "${item.notes}"`}
             </Text>
           </View>
         )}
@@ -177,27 +172,25 @@ export default function UserRegistrationsScreen() {
   };
 
   /* ---------------- UI ---------------- */
-
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
       {/* Header */}
       <View className="bg-slate-900 px-6 py-4 border-b border-gray-200 mt-2">
-        <View className="flex-row items-center ">
+        <View className="flex-row items-center">
           <TouchableOpacity
             className="mr-4"
             onPress={() => router.back()}
             activeOpacity={0.7}
-          > <Ionicons name="arrow-back" size={24} color="white" />
+          >
+            <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
           <View>
             <Text className="text-xl font-bold text-white">
               My Requests
             </Text>
-
           </View>
-
         </View>
       </View>
 

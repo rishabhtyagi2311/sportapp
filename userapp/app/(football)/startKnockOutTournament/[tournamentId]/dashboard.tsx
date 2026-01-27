@@ -98,7 +98,7 @@ export default function KnockoutDashboard() {
     return (
       <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
         <Text className="text-slate-500 mb-4">Tournament not found</Text>
-        <TouchableOpacity onPress={() => router.navigate("/(football)/landingScreen/tournament")} className="bg-blue-600 px-6 py-3 rounded-full">
+        <TouchableOpacity onPress={() => router.navigate("/(football)/landingScreen/tournament")} className="bg-slate-900 px-6 py-3 rounded-full">
             <Text className="text-white font-bold">Go Back</Text>
         </TouchableOpacity>
       </SafeAreaView>
@@ -211,7 +211,7 @@ export default function KnockoutDashboard() {
          <View className="px-4 py-4">
              {/* Top Row: Back & Options */}
              <View className="flex-row items-center justify-between mb-4">
-                 <TouchableOpacity onPress={() => router.back()} className="p-1">
+                 <TouchableOpacity onPress={() => router.navigate("/(football)/landingScreen/tournament")} className="p-1">
                      <Ionicons name="arrow-back" size={24} color="#0f172a" />
                  </TouchableOpacity>
                  <TouchableOpacity onPress={handleDelete} className="p-1">

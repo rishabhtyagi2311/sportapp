@@ -81,7 +81,8 @@ export default function KnockoutMatchScoringScreen() {
     activeMatch, 
     addEvent, 
     endMatch,
-    startMatch
+    startMatch, 
+    initializeMatch
   } = useKnockoutStore();
 
   const { players: allPlayers } = useFootballStore();
@@ -113,6 +114,13 @@ export default function KnockoutMatchScoringScreen() {
     const s = (seconds % 60).toString().padStart(2, '0');
     return `${m}:${s}`;
   }, [seconds]);
+
+  useEffect(() => {
+  if (!activeMatch && tournamentId && fixtureId) {
+    initializeMatch(tournamentId, fixtureId);
+  }
+}, [activeMatch, tournamentId, fixtureId]);
+
 
   const events = useMemo(() => activeMatch?.events ?? [], [activeMatch]);
 
@@ -163,13 +171,29 @@ export default function KnockoutMatchScoringScreen() {
   const awaySquad = useMemo(() => calculateRealTimeSquads('away'), [calculateRealTimeSquads]);
 
   // Ensure activeMatch exists before rendering
-  if (!activeMatch) {
-    return (
-      <SafeAreaView className="flex-1 bg-slate-100 items-center justify-center">
-        <Text className="text-slate-500 text-lg">Loading match data...</Text>
-      </SafeAreaView>
-    );
-  }
+if (!activeMatch) {
+  return (
+    <SafeAreaView className="flex-1 bg-slate-100 items-center justify-center">
+      <Text className="text-slate-500 text-lg mb-4">
+        Match session expired
+      </Text>
+
+      <TouchableOpacity
+        onPress={() =>
+          router.replace(
+            `/(football)/landingScreen/tournament`
+          )
+        }
+        className="bg-blue-600 px-6 py-3 rounded-xl"
+      >
+        <Text className="text-white font-semibold">
+          Back to Tournament
+        </Text>
+      </TouchableOpacity>
+    </SafeAreaView>
+  );
+}
+
 
   const parseMinuteAndSeconds = (input: string) => {
     const parts = input.split(':').map((p) => p.trim());

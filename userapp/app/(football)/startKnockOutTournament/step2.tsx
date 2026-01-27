@@ -176,7 +176,7 @@ export default function KnockoutStep2() {
       </View>
 
       {/* Footer Action Button */}
-      <View className="bg-white px-4 py-4 border-t border-slate-200 absolute bottom-0 left-0 right-0">
+      <View className="bg-white px-4 py-4 border-t border-slate-200 absolute bottom-0 left-0 right-0 mb-4">
         <TouchableOpacity
           onPress={handleNext}
           disabled={selectedCount !== requiredCount}
