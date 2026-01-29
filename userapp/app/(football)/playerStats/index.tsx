@@ -67,54 +67,39 @@ export default function PlayerStatsScreen() {
   const matchExecutionStore = useMatchExecutionStore();
   const tournamentStore = useTournamentStore();
   const knockoutStore = useKnockoutStore();
-  const router = useRouter()
+  const router = useRouter();
 
   // Get current player
   const currentPlayer = footballStore.getCurrentPlayer();
 
   // Handle if no current player
-if (!currentPlayer) {
+  if (!currentPlayer) {
     return (
-    <SafeAreaView className='flex-1'>
-          <View className="flex-1 bg-slate-900 ">
-        {/* Header with Back Button */}
-       <View className="px-6 py-4 border-b border-white flex-row items-center mt-4">
-            <TouchableOpacity
-              className="mr-4"
-              onPress={() => router.back()}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="arrow-back" size={24} color="white" />
+      <SafeAreaView className="flex-1 bg-white">
+        {/* Header */}
+        <View className="px-6 py-4 border-b border-slate-200 flex-row items-center">
+          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7} className="mr-3">
+            <Ionicons name="arrow-back" size={24} color="#0f172a" />
+          </TouchableOpacity>
+          <Text className="text-xl font-bold text-slate-900">Player Statistics</Text>
+        </View>
+
+        {/* Empty State */}
+        <View className="flex-1 items-center justify-center px-6 py-8">
+          <View className="items-center gap-4">
+            <View className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-100 to-emerald-100 items-center justify-center">
+              <Ionicons name="person" size={40} color="#0f172a" />
+            </View>
+            <Text className="text-2xl font-bold text-slate-900 text-center">No Football Profile</Text>
+            <Text className="text-slate-600 text-center text-base leading-6">
+              Create a football profile to start tracking your statistics and performance metrics.
+            </Text>
+            <TouchableOpacity className="mt-4 px-6 py-3 bg-blue-600 rounded-lg">
+              <Text className="text-white font-semibold">Create Profile</Text>
             </TouchableOpacity>
-            <Text className="text-white text-xl font-bold">
-              Player Statistics 
-            </Text>
-          </View>
-
-        {/* No Profile Message */}
-        <View className="flex-1 items-center justify-center px-6 py-8 mb-12">
-          <View
-           
-            className="rounded-3xl p-8 w-full items-center border border-slate-600"
-          >
-            
-
-            {/* Title */}
-            <Text className="text-2xl font-black text-sky-300 text-center mb-3">
-              No Football Profile Found
-            </Text>
-
-            {/* Description */}
-            <Text className="text-slate-400 text-center text-base leading-6 mb-6">
-              It looks like you haven't created a football profile yet. Create one to start tracking your statistics and performance!
-            </Text>
-
-            {/* CTA Button */}
-            
           </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
     );
   }
 
@@ -334,127 +319,161 @@ if (!currentPlayer) {
   const cleanSheetRate = careerStats.matchesPlayed > 0 ? ((careerStats.cleanSheets / careerStats.matchesPlayed) * 100).toFixed(1) : '0';
 
   return (
-    <ScrollView className="flex-1 bg-slate-900">
-      {/* Hero Header */}
-      <LinearGradient colors={['#06b6d4', '#0ea5e9']} className="pt-6 pb-4 px-4">
-        <View className="gap-4">
-          {/* Player Avatar */}
-          <View className="flex-row gap-4 items-end">
-            <LinearGradient
-              colors={['#4ade80', '#059669']}
-              className="w-28 h-28 rounded-2xl items-center justify-center border-4 border-white"
-            >
-              <Text className="text-6xl">
-                {currentPlayer.position === 'Goalkeeper' ? '🧤' : '⚽'}
-              </Text>
-            </LinearGradient>
+    <SafeAreaView className="flex-1 bg-white">
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View className="px-6 py-4 border-b border-slate-200 flex-row items-center justify-between">
+          <View className="flex-row items-center gap-3 flex-1">
+            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+              <Ionicons name="arrow-back" size={24} color="#0f172a" />
+            </TouchableOpacity>
+            <Text className="text-xl font-bold text-slate-900">Player Profile</Text>
+          </View>
+          <Ionicons name="settings-outline" size={24} color="#64748b" />
+        </View>
 
-            {/* Player Info */}
-            <View className="flex-1">
-              <Text className="text-3xl font-black text-slate-900 mb-2">{currentPlayer.name}</Text>
-              <View className="gap-2 mb-2">
+        {/* Hero Section - Player Card */}
+        <View className="px-6 pt-6 pb-4">
+          <View className="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-3xl p-6">
+            <View className="flex-row gap-4 items-start mb-4">
+              {/* Avatar */}
+              <LinearGradient
+                colors={['#10b981', '#059669']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                className="w-24 h-24 rounded-2xl items-center justify-center border-3 border-white shadow-sm"
+              >
+                <Text className="text-5xl">
+                  {currentPlayer.position === 'Goalkeeper' ? '🧤' : '⚽'}
+                </Text>
+              </LinearGradient>
+
+              {/* Player Info */}
+              <View className="flex-1 gap-2">
+                <Text className="text-2xl font-bold text-slate-900">{currentPlayer.name}</Text>
                 <Badge label={currentPlayer.position} />
-               
+                <Text className="text-sm text-slate-600">{currentPlayer.contact}</Text>
               </View>
-              <Text className="text-slate-700 text-sm font-medium">📱 {currentPlayer.contact}</Text>
             </View>
           </View>
         </View>
-      </LinearGradient>
 
-      <View className="px-4 py-6 gap-6">
-        {/* Key Stats Grid */}
-        <View className="gap-3">
-          <View className="flex-row gap-3">
-            <StatCard label="Matches" value={careerStats.matchesPlayed} color={['#06b6d4', '#0284c7']} />
-            <StatCard label="Win Rate" value={`${winRate}%`} color={['#facc15', '#f97316']} />
-          </View>
-          <View className="flex-row gap-3">
-            <StatCard label="Goals" value={careerStats.goalsScored} color={['#4ade80', '#059669']} />
-            <StatCard label="Assists" value={careerStats.assists} color={['#f472b6', '#dc2626']} />
+        {/* Key Stats Section */}
+        <View className="px-6 py-4">
+          <Text className="text-lg font-bold text-slate-900 mb-4">Key Statistics</Text>
+          <View className="gap-3">
+            <View className="flex-row gap-3">
+              <StatCard
+                label="Matches"
+                value={careerStats.matchesPlayed}
+                icon="football"
+                color="#3b82f6"
+              />
+              <StatCard
+                label="Goals"
+                value={careerStats.goalsScored}
+                icon="flash"
+                color="#10b981"
+              />
+            </View>
+            <View className="flex-row gap-3">
+              <StatCard
+                label="Assists"
+                value={careerStats.assists}
+                icon="share-social"
+                color="#0ea5e9"
+              />
+              <StatCard
+                label="Win Rate"
+                value={`${winRate}%`}
+                icon="trending-up"
+                color="#f59e0b"
+              />
+            </View>
           </View>
         </View>
 
         {/* Secondary Stats */}
-        <View className="gap-3">
-          <View className="flex-row gap-3">
-            <SecondaryStatCard label="Min Played" value={careerStats.totalMinutesPlayed} />
-            <SecondaryStatCard label="Avg Min/Match" value={avgMinutesPerMatch} />
-          </View>
-          <View className="flex-row gap-3">
-            <SecondaryStatCard label="Yellow Cards" value={careerStats.yellowCards} />
-            <SecondaryStatCard label="Red Cards" value={careerStats.redCards} />
-          </View>
-          <View className="flex-row gap-3">
-            <SecondaryStatCard label="Clean Sheets" value={careerStats.cleanSheets} />
-            <SecondaryStatCard label="W-D-L" value={`${careerStats.matchesWon}-${careerStats.matchesDrawn}-${careerStats.matchesLost}`} />
+        <View className="px-6 py-4">
+          <Text className="text-lg font-bold text-slate-900 mb-4">Performance</Text>
+          <View className="bg-white border border-slate-200 rounded-2xl p-4 gap-3">
+            <StatRow label="Total Minutes" value={`${careerStats.totalMinutesPlayed} min`} />
+            <StatRow label="Avg Min/Match" value={`${avgMinutesPerMatch} min`} />
+            <StatRow label="Goals/Match" value={goalsPerMatch} />
+            <StatRow label="Record" value={`${careerStats.matchesWon}W-${careerStats.matchesDrawn}D-${careerStats.matchesLost}L`} />
+            <StatRow label="Yellow Cards" value={careerStats.yellowCards} />
+            <StatRow label="Red Cards" value={careerStats.redCards} />
+            {careerStats.cleanSheets > 0 && (
+              <StatRow label="Clean Sheets" value={careerStats.cleanSheets} />
+            )}
           </View>
         </View>
 
-        {/* Tabs */}
-        <View className="flex-row bg-slate-700 rounded-xl p-1 gap-1">
-          {['overview', 'recent-matches', 'tournaments', 'teams'].map((tab) => (
-            <TabButton
-              key={tab}
-              isActive={selectedTab === (tab as typeof selectedTab)}
-              onPress={() => setSelectedTab(tab as typeof selectedTab)}
-              label={
-                tab === 'overview'
-                  ? 'Overview'
-                  : tab === 'recent-matches'
-                    ? 'Matches'
-                    : tab === 'tournaments'
-                      ? 'Tournaments'
-                      : 'Teams'
-              }
-            />
-          ))}
+        {/* Tab Navigation */}
+        <View className="px-6 py-4">
+          <View className="flex-row bg-slate-100 rounded-lg p-1 gap-1">
+            {[
+              { key: 'overview', label: 'Overview' },
+              { key: 'recent-matches', label: 'Matches' },
+              { key: 'tournaments', label: 'Tournaments' },
+              { key: 'teams', label: 'Teams' },
+            ].map((tab) => (
+              <TabButton
+                key={tab.key}
+                isActive={selectedTab === (tab.key as typeof selectedTab)}
+                onPress={() => setSelectedTab(tab.key as typeof selectedTab)}
+                label={tab.label}
+              />
+            ))}
+          </View>
         </View>
 
         {/* Tab Content */}
-        {selectedTab === 'overview' && (
-          <View className="gap-4">
-            <CareerSummary stats={careerStats} />
-            <PerformanceInsights
-              winRate={winRate}
-              goalsPerMatch={goalsPerMatch}
-              avgMinutesPerMatch={avgMinutesPerMatch}
-              cleanSheetRate={cleanSheetRate}
-            />
-          </View>
-        )}
+        <View className="px-6 pb-12">
+          {selectedTab === 'overview' && (
+            <View className="gap-4">
+              <CareerSummary stats={careerStats} />
+              <PerformanceInsights
+                winRate={winRate}
+                goalsPerMatch={goalsPerMatch}
+                avgMinutesPerMatch={avgMinutesPerMatch}
+                cleanSheetRate={cleanSheetRate}
+              />
+            </View>
+          )}
 
-        {selectedTab === 'recent-matches' && (
-          <View className="gap-3">
-            {recentMatches.length > 0 ? (
-              recentMatches.map((match) => <MatchCard key={match.id} match={match} />)
-            ) : (
-              <Text className="text-slate-400 text-center py-6">No matches found</Text>
-            )}
-          </View>
-        )}
+          {selectedTab === 'recent-matches' && (
+            <View className="gap-3">
+              {recentMatches.length > 0 ? (
+                recentMatches.map((match) => <MatchCard key={match.id} match={match} />)
+              ) : (
+                <Text className="text-slate-500 text-center py-8">No matches found</Text>
+              )}
+            </View>
+          )}
 
-        {selectedTab === 'tournaments' && (
-          <View className="gap-3">
-            {tournaments.length > 0 ? (
-              tournaments.map((tournament) => <TournamentCard key={tournament.id} tournament={tournament} />)
-            ) : (
-              <Text className="text-slate-400 text-center py-6">No tournament participation yet</Text>
-            )}
-          </View>
-        )}
+          {selectedTab === 'tournaments' && (
+            <View className="gap-3">
+              {tournaments.length > 0 ? (
+                tournaments.map((tournament) => <TournamentCard key={tournament.id} tournament={tournament} />)
+              ) : (
+                <Text className="text-slate-500 text-center py-8">No tournament participation yet</Text>
+              )}
+            </View>
+          )}
 
-        {selectedTab === 'teams' && (
-          <View className="gap-3">
-            {teams.length > 0 ? (
-              teams.map((team) => <TeamCard key={team.id} team={team} />)
-            ) : (
-              <Text className="text-slate-400 text-center py-6">No team history found</Text>
-            )}
-          </View>
-        )}
-      </View>
-    </ScrollView>
+          {selectedTab === 'teams' && (
+            <View className="gap-3">
+              {teams.length > 0 ? (
+                teams.map((team) => <TeamCard key={team.id} team={team} />)
+              ) : (
+                <Text className="text-slate-500 text-center py-8">No team history found</Text>
+              )}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -466,8 +485,8 @@ interface BadgeProps {
 
 function Badge({ label }: BadgeProps) {
   return (
-    <View className="bg-white bg-opacity-70 px-3 py-1 rounded-full">
-      <Text className="text-xs font-bold text-slate-900">{label}</Text>
+    <View className="inline-flex bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+      <Text className="text-xs font-semibold text-emerald-700">{label}</Text>
     </View>
   );
 }
@@ -475,29 +494,33 @@ function Badge({ label }: BadgeProps) {
 interface StatCardProps {
   label: string;
   value: string | number;
-  color: [string, string];
+  icon: string;
+  color: string;
 }
 
-function StatCard({ label, value, color }: StatCardProps) {
+function StatCard({ label, value, icon, color }: StatCardProps) {
   return (
-    <LinearGradient colors={color} className="flex-1 rounded-2xl p-4 items-center justify-center">
-      <Text className="text-xs font-semibold text-white opacity-90 mb-1">{label}</Text>
-      <Text className="text-3xl font-black text-white">{value}</Text>
-    </LinearGradient>
+    <View className="flex-1 bg-white border border-slate-200 rounded-2xl p-4 items-center justify-center gap-2">
+      <View style={{ backgroundColor: color }} className="w-10 h-10 rounded-lg items-center justify-center">
+        <Ionicons name={icon as any} size={20} color="white" />
+      </View>
+      <Text className="text-xs text-slate-600 font-semibold">{label}</Text>
+      <Text className="text-2xl font-bold text-slate-900">{value}</Text>
+    </View>
   );
 }
 
-interface SecondaryStatCardProps {
+interface StatRowProps {
   label: string;
   value: string | number;
 }
 
-function SecondaryStatCard({ label, value }: SecondaryStatCardProps) {
+function StatRow({ label, value }: StatRowProps) {
   return (
-    <LinearGradient colors={['#1e293b', '#0f172a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} className="flex-1 rounded-xl p-3 border border-slate-600">
-      <Text className="text-xs font-semibold text-sky-300 mb-1">{label}</Text>
-      <Text className="text-xl font-black text-white">{value}</Text>
-    </LinearGradient>
+    <View className="flex-row justify-between items-center py-3 border-b border-slate-100 last:border-b-0">
+      <Text className="text-slate-700 font-medium text-sm">{label}</Text>
+      <Text className="text-slate-900 font-bold text-sm">{value}</Text>
+    </View>
   );
 }
 
@@ -511,9 +534,16 @@ function TabButton({ isActive, onPress, label }: TabButtonProps) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      className={`flex-1 px-3 py-2 rounded-lg ${isActive ? 'bg-sky-400' : ''}`}
+      className={`flex-1 px-3 py-2.5 rounded-md ${
+        isActive ? 'bg-white border border-slate-300' : ''
+      }`}
+      activeOpacity={0.7}
     >
-      <Text className={`text-xs font-semibold text-center ${isActive ? 'text-slate-900' : 'text-sky-200'}`}>
+      <Text
+        className={`text-xs font-semibold text-center ${
+          isActive ? 'text-slate-900' : 'text-slate-600'
+        }`}
+      >
         {label}
       </Text>
     </TouchableOpacity>
@@ -526,42 +556,19 @@ interface CareerSummaryProps {
 
 function CareerSummary({ stats }: CareerSummaryProps) {
   return (
-    <LinearGradient colors={['#1e293b', '#0f172a']} className="rounded-2xl p-4 border border-slate-600">
-      <Text className="text-xl font-black text-sky-300 mb-4">Career Summary</Text>
-      <View className="gap-3">
-        <SummaryRow label="Matches Played" value={stats.matchesPlayed} />
-        <SummaryRow label="Wins" value={stats.matchesWon} />
-        <SummaryRow label="Draws" value={stats.matchesDrawn} />
-        <SummaryRow label="Losses" value={stats.matchesLost} />
-        <SummaryRow label="Goals Scored" value={stats.goalsScored} />
-        <SummaryRow label="Assists" value={stats.assists} />
-        <SummaryRow label="Total Minutes" value={`${stats.totalMinutesPlayed} min`} />
-        <SummaryRow label="Yellow Cards" value={stats.yellowCards} />
-        <SummaryRow label="Red Cards" value={stats.redCards} />
-        {stats.cleanSheets > 0 && <SummaryRow label="Clean Sheets" value={stats.cleanSheets} />}
-      </View>
-    </LinearGradient>
-  );
-}
-
-interface PerformanceInsightsProps {
-  winRate: string;
-  goalsPerMatch: string;
-  avgMinutesPerMatch: number;
-  cleanSheetRate: string;
-}
-
-function PerformanceInsights({ winRate, goalsPerMatch, avgMinutesPerMatch, cleanSheetRate }: PerformanceInsightsProps) {
-  return (
-    <LinearGradient colors={['#1e293b', '#0f172a']} className="rounded-2xl p-4 border border-slate-600">
-      <Text className="text-xl font-black text-sky-300 mb-4">Performance Insights</Text>
-      <View className="gap-3">
-        <InsightCard label="Win Rate" value={`${winRate}%`} description="Based on all matches" color="#4ade80" />
-        <InsightCard label="Goals Per Match" value={goalsPerMatch} description="Average scoring" color="#f97316" />
-        <InsightCard label="Avg Min/Match" value={avgMinutesPerMatch} description="Playing time" color="#06b6d4" />
-        <InsightCard label="Clean Sheet Rate" value={`${cleanSheetRate}%`} description="GK performance" color="#10b981" />
-      </View>
-    </LinearGradient>
+    <View className="bg-white border border-slate-200 rounded-2xl p-6 gap-1">
+      <Text className="text-lg font-bold text-slate-900 mb-4">Career Summary</Text>
+      <SummaryRow label="Matches Played" value={stats.matchesPlayed} />
+      <SummaryRow label="Wins" value={stats.matchesWon} />
+      <SummaryRow label="Draws" value={stats.matchesDrawn} />
+      <SummaryRow label="Losses" value={stats.matchesLost} />
+      <SummaryRow label="Goals Scored" value={stats.goalsScored} />
+      <SummaryRow label="Assists" value={stats.assists} />
+      <SummaryRow label="Total Minutes" value={`${stats.totalMinutesPlayed} min`} />
+      <SummaryRow label="Yellow Cards" value={stats.yellowCards} />
+      <SummaryRow label="Red Cards" value={stats.redCards} />
+      {stats.cleanSheets > 0 && <SummaryRow label="Clean Sheets" value={stats.cleanSheets} />}
+    </View>
   );
 }
 
@@ -572,9 +579,33 @@ interface SummaryRowProps {
 
 function SummaryRow({ label, value }: SummaryRowProps) {
   return (
-    <View className="flex-row justify-between items-center py-2 border-b border-slate-600">
-      <Text className="text-sky-200 font-medium text-sm">{label}</Text>
-      <Text className="text-lg font-black text-white">{value}</Text>
+    <View className="flex-row justify-between items-center py-3 border-b border-slate-100 last:border-b-0">
+      <Text className="text-slate-700 font-medium text-sm">{label}</Text>
+      <Text className="text-slate-900 font-bold text-base">{value}</Text>
+    </View>
+  );
+}
+
+interface PerformanceInsightsProps {
+  winRate: string;
+  goalsPerMatch: string;
+  avgMinutesPerMatch: number;
+  cleanSheetRate: string;
+}
+
+function PerformanceInsights({
+  winRate,
+  goalsPerMatch,
+  avgMinutesPerMatch,
+  cleanSheetRate,
+}: PerformanceInsightsProps) {
+  return (
+    <View className="bg-white border border-slate-200 rounded-2xl p-6 gap-3">
+      <Text className="text-lg font-bold text-slate-900 mb-2">Performance Insights</Text>
+      <InsightCard label="Win Rate" value={`${winRate}%`} description="Based on all matches" icon="checkmark-circle" color="#10b981" />
+      <InsightCard label="Goals Per Match" value={goalsPerMatch} description="Average scoring" icon="flash" color="#f59e0b" />
+      <InsightCard label="Avg Min/Match" value={avgMinutesPerMatch} description="Playing time" icon="time" color="#3b82f6" />
+      <InsightCard label="Clean Sheet Rate" value={`${cleanSheetRate}%`} description="GK performance" icon="shield-checkmark" color="#0ea5e9" />
     </View>
   );
 }
@@ -583,20 +614,22 @@ interface InsightCardProps {
   label: string;
   value: string | number;
   description: string;
+  icon: string;
   color: string;
 }
 
-function InsightCard({ label, value, description, color }: InsightCardProps) {
+function InsightCard({ label, value, description, icon, color }: InsightCardProps) {
   return (
-    <LinearGradient colors={['#334155', '#1e293b']} className="rounded-xl p-3 border border-slate-600">
-      <View className="flex-row justify-between items-start mb-1">
-        <Text className="text-sky-200 text-xs font-semibold">{label}</Text>
-        <Text style={{ color }} className="text-2xl font-black">
-          {value}
-        </Text>
+    <View className="flex-row items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+      <View style={{ backgroundColor: color }} className="w-10 h-10 rounded-lg items-center justify-center flex-shrink-0">
+        <Ionicons name={icon as any} size={20} color="white" />
       </View>
-      <Text className="text-xs text-slate-400">{description}</Text>
-    </LinearGradient>
+      <View className="flex-1">
+        <Text className="text-slate-700 font-semibold text-sm">{label}</Text>
+        <Text className="text-slate-900 font-bold text-lg">{value}</Text>
+        <Text className="text-xs text-slate-600 mt-0.5">{description}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -605,42 +638,49 @@ interface MatchCardProps {
 }
 
 function MatchCard({ match }: MatchCardProps) {
-  const resultColor =
-    match.result === 'W' ? '#22c55e' : match.result === 'D' ? '#eab308' : '#ef4444';
-  const resultBgColor =
-    match.result === 'W' ? '#16a34a' : match.result === 'D' ? '#ca8a04' : '#b91c1c';
-  const performanceColor =
-    match.performance === 'Excellent'
-      ? '#4ade80'
-      : match.performance === 'Good'
-        ? '#06b6d4'
-        : '#fbbf24';
+  const resultColor = match.result === 'W' ? '#10b981' : match.result === 'D' ? '#f59e0b' : '#ef4444';
+  const resultBg = match.result === 'W' ? '#d1fae5' : match.result === 'D' ? '#fef3c7' : '#fee2e2';
 
   return (
-    <LinearGradient colors={['#1e293b', '#0f172a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} className="rounded-2xl p-4 border border-slate-600">
+    <View className="bg-white border border-slate-200 rounded-2xl p-4">
       <View className="flex-row items-center justify-between">
         <View className="flex-row items-center gap-3 flex-1">
-          <View
-            style={{ backgroundColor: resultBgColor }}
-            className="w-12 h-12 rounded-full items-center justify-center"
-          >
-            <Text className="text-lg font-black text-white">{match.result}</Text>
+          <View style={{ backgroundColor: resultBg, borderColor: resultColor }} className="w-12 h-12 rounded-full items-center justify-center border-2">
+            <Text className="text-lg font-bold" style={{ color: resultColor }}>
+              {match.result}
+            </Text>
           </View>
           <View className="flex-1">
-            <Text className="text-base font-black text-white">{match.opponent}</Text>
-            <Text className="text-sky-300 font-semibold text-xs">
+            <Text className="font-bold text-slate-900 text-base">{match.opponent}</Text>
+            <Text className="text-slate-600 text-xs">
               {match.score} • {match.date}
             </Text>
           </View>
         </View>
-        <View className="items-end">
-          <Text style={{ color: performanceColor }} className="text-xs font-bold mb-1">
-            {match.performance}
-          </Text>
-          <Text className="text-xs text-slate-400">{match.minutesPlayed} min</Text>
+        <View className="items-end gap-1">
+          <View className="bg-slate-100 px-2 py-1 rounded-full">
+            <Text className="text-xs font-semibold text-slate-700">{match.performance}</Text>
+          </View>
+          <Text className="text-xs text-slate-600">{match.minutesPlayed}′</Text>
         </View>
       </View>
-    </LinearGradient>
+      {(match.goals > 0 || match.assists > 0) && (
+        <View className="mt-3 pt-3 border-t border-slate-200 flex-row gap-4">
+          {match.goals > 0 && (
+            <View className="flex-row items-center gap-1">
+              <Ionicons name="flash" size={16} color="#10b981" />
+              <Text className="text-sm font-semibold text-slate-900">{match.goals} Goals</Text>
+            </View>
+          )}
+          {match.assists > 0 && (
+            <View className="flex-row items-center gap-1">
+              <Ionicons name="share-social" size={16} color="#0ea5e9" />
+              <Text className="text-sm font-semibold text-slate-900">{match.assists} Assists</Text>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -651,42 +691,51 @@ interface TournamentCardProps {
 function TournamentCard({ tournament }: TournamentCardProps) {
   const statusColor =
     tournament.status === 'completed'
-      ? '#22c55e'
+      ? '#10b981'
       : tournament.status === 'active'
         ? '#3b82f6'
-        : '#6b7280';
+        : '#9ca3af';
+
+  const statusBg =
+    tournament.status === 'completed'
+      ? '#d1fae5'
+      : tournament.status === 'active'
+        ? '#dbeafe'
+        : '#f3f4f6';
 
   return (
-    <LinearGradient colors={['#1e293b', '#0f172a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} className="rounded-2xl p-4 border border-slate-600">
-      <View className="flex-row justify-between items-start mb-3">
+    <View className="bg-white border border-slate-200 rounded-2xl p-4">
+      <View className="flex-row justify-between items-start mb-4">
         <View className="flex-1">
-          <Text className="text-base font-black text-white mb-1">{tournament.name}</Text>
-          <Text className="text-sky-300 font-semibold text-sm">{tournament.team}</Text>
+          <Text className="text-base font-bold text-slate-900 mb-1">{tournament.name}</Text>
+          <Text className="text-sm text-slate-600">{tournament.team}</Text>
         </View>
-        <View style={{ backgroundColor: statusColor }} className="px-3 py-1 rounded-full">
-          <Text className="text-xs font-bold text-white capitalize">{tournament.status}</Text>
+        <View style={{ backgroundColor: statusBg, borderColor: statusColor }} className="px-3 py-1.5 rounded-full border">
+          <Text className="text-xs font-semibold capitalize" style={{ color: statusColor }}>
+            {tournament.status}
+          </Text>
         </View>
       </View>
 
-      <View className="flex-row gap-3 pt-3 border-t border-slate-600">
-        <View className="flex-1">
-          <Text className="text-slate-400 text-xs font-semibold mb-1">Matches</Text>
-          <Text className="text-xl font-black text-sky-300">{tournament.matchesPlayed}</Text>
+      <View className="pt-3 border-t border-slate-200 flex-row gap-2">
+        <View className="flex-1 bg-slate-50 rounded-xl p-3 items-center">
+          <Text className="text-slate-600 text-xs font-semibold mb-1">Matches</Text>
+          <Text className="text-lg font-bold text-slate-900">{tournament.matchesPlayed}</Text>
         </View>
-        <View className="flex-1">
-          <Text className="text-slate-400 text-xs font-semibold mb-1">Goals</Text>
-          <Text className="text-xl font-black text-green-400">{tournament.goals}</Text>
+        <View className="flex-1 bg-emerald-50 rounded-xl p-3 items-center border border-emerald-200">
+          <Text className="text-emerald-700 text-xs font-semibold mb-1">Goals</Text>
+          <Text className="text-lg font-bold text-emerald-900">{tournament.goals}</Text>
         </View>
-        <View className="flex-1">
-          <Text className="text-slate-400 text-xs font-semibold mb-1">Assists</Text>
-          <Text className="text-xl font-black text-pink-400">{tournament.assists}</Text>
+        <View className="flex-1 bg-blue-50 rounded-xl p-3 items-center border border-blue-200">
+          <Text className="text-blue-700 text-xs font-semibold mb-1">Assists</Text>
+          <Text className="text-lg font-bold text-blue-900">{tournament.assists}</Text>
         </View>
-        <View className="flex-1">
-          <Text className="text-slate-400 text-xs font-semibold mb-1">Finish</Text>
-          <Text className="text-sm font-black text-yellow-400">{tournament.position}</Text>
+        <View className="flex-1 bg-amber-50 rounded-xl p-3 items-center border border-amber-200">
+          <Text className="text-amber-700 text-xs font-semibold mb-1">Finish</Text>
+          <Text className="text-sm font-bold text-amber-900">{tournament.position}</Text>
         </View>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -696,26 +745,38 @@ interface TeamCardProps {
 
 function TeamCard({ team }: TeamCardProps) {
   return (
-    <LinearGradient colors={['#1e293b', '#0f172a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} className="rounded-2xl p-4 border border-slate-600">
-      <View className="flex-row items-center justify-between">
+    <View className="bg-white border border-slate-200 rounded-2xl p-4">
+      <View className="flex-row items-start justify-between mb-3">
         <View className="flex-1">
-          <Text className="text-base font-black text-white mb-2">{team.name}</Text>
+          <Text className="text-base font-bold text-slate-900 mb-1">{team.name}</Text>
           <View className="gap-1">
-            <Text className="text-sky-300 font-semibold text-xs">Role: {team.role}</Text>
-            <Text className="text-slate-400 text-xs">Joined: {team.joinedDate}</Text>
+            <Text className="text-sm text-slate-600">
+              <Text className="font-semibold">Role:</Text> {team.role}
+            </Text>
+            <Text className="text-sm text-slate-600">
+              <Text className="font-semibold">Joined:</Text> {team.joinedDate}
+            </Text>
           </View>
         </View>
-        <View className="items-end">
-          <Text className="text-slate-400 text-xs font-semibold mb-1">Appearances</Text>
-          <Text className="text-2xl font-black text-green-400 mb-2">{team.appearances}</Text>
-          <View
-            style={{ backgroundColor: team.status === 'Active' ? '#22c55e' : '#4b5563' }}
-            className="px-2 py-1 rounded-full"
+        <View
+          style={{
+            backgroundColor: team.status === 'Active' ? '#d1fae5' : '#f3f4f6',
+            borderColor: team.status === 'Active' ? '#10b981' : '#d1d5db',
+          }}
+          className="px-3 py-1.5 rounded-full border"
+        >
+          <Text
+            className="text-xs font-semibold"
+            style={{ color: team.status === 'Active' ? '#10b981' : '#6b7280' }}
           >
-            <Text className="text-xs font-bold text-white">{team.status}</Text>
-          </View>
+            {team.status}
+          </Text>
         </View>
       </View>
-    </LinearGradient>
+      <View className="pt-3 border-t border-slate-200">
+        <Text className="text-slate-600 text-xs font-semibold mb-2">Appearances</Text>
+        <Text className="text-2xl font-bold text-slate-900">{team.appearances}</Text>
+      </View>
+    </View>
   );
 }

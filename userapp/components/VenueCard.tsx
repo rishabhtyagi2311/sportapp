@@ -33,6 +33,7 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onPress }) => {
       {/* Image Section */}
       <View className="relative">
         <View className="w-full h-48 bg-gray-300 rounded-t-xl items-center justify-center">
+       
           <Ionicons name="image-outline" size={48} color="#6b7280" />
           <Text className="text-gray-600 text-sm mt-2">No photos uploaded yet</Text>
         </View>

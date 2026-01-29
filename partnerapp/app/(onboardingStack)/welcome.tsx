@@ -134,17 +134,17 @@ const HeroSection: FC = () => {
     <View className="items-center mb-8">
       <SportifyLogo />
       <Animated.View style={[titleStyle]} className="mb-4">
-        <Text className="text-5xl font-black text-slate-900 text-center leading-tight tracking-tight">
-          Play.
+        <Text className="text-4xl font-black text-slate-900 text-center leading-tight tracking-tight">
+          Register.
         </Text>
-        <Text className="text-5xl font-black text-slate-900 text-center leading-tight tracking-tight">
-          Train.
-          <Text style={{ color: COLORS.logoGreen }}> Win.</Text>
+        <Text className="text-4xl font-black text-sky-500 text-center leading-tight tracking-tight">
+          Manage.
+          <Text style={{ color: COLORS.logoGreen }}> Earn.</Text>
         </Text>
       </Animated.View>
       <Animated.View style={descStyle}>
         <Text className="text-base text-center font-medium leading-6 text-sky-700">
-          One platform. Academies. Venues. Tournaments.
+          Manage Your Academies and Sport Venues. 
         </Text>
       </Animated.View>
     </View>
@@ -182,15 +182,15 @@ const CreateAccountSection: FC<{ onSignUp: () => void }> = ({ onSignUp }) => {
 
         <View className="mb-4 mx-2">
           <View className="flex-row items-center gap-2">
-            <Text className="text-2xl font-black text-green-600">Join the Game</Text>
+            <Text className="text-2xl font-black text-green-600">Start the Journey</Text>
           </View>
         </View>
 
         <View className="bg-slate-900 rounded-2xl p-4 mb-6">
           {[
-            { icon: 'check-circle' as const, text: 'Access elite academies' },
-            { icon: 'check-circle' as const, text: 'Book venues instantly' },
-            { icon: 'check-circle' as const, text: 'Join tournaments & competitions' },
+            { icon: 'check-circle' as const, text: 'Manage Sports Academies' },
+            { icon: 'check-circle' as const, text: 'Get Bookings for your Venues' },
+            { icon: 'check-circle' as const, text: 'Digitalize your Sports Journey' },
           ].map((item, idx) => (
             <View key={idx} className="flex-row items-center gap-3 py-2">
               <MaterialCommunityIcons name={item.icon} size={18} color={COLORS.logoGreen} />
@@ -216,67 +216,7 @@ const CreateAccountSection: FC<{ onSignUp: () => void }> = ({ onSignUp }) => {
   );
 };
 
-// ✅ MOVED OUTSIDE - Feature Blob
-const FeatureBlob: FC<{
-  title: string;
-  description: string;
-  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-  gradientStart: string;
-  gradientEnd: string;
-  rotation?: number;
-}> = ({
-  title,
-  description,
-  icon,
-  gradientStart,
-  gradientEnd,
-  rotation = 0,
-}) => {
-  const translateX = useSharedValue(100);
-  const opacity = useSharedValue(0);
 
-  useEffect(() => {
-    translateX.value = withTiming(0, { duration: 1000, easing: Easing.out(Easing.cubic) });
-    opacity.value = withTiming(1, { duration: 1000 });
-  }, []);
-
-  const cardStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-    opacity: opacity.value,
-  }));
-
-  return (
-    <Animated.View style={[cardStyle]} className="w-full my-4">
-      <View
-        className="rounded-3xl p-6 min-h-56 justify-between overflow-hidden"
-        style={[
-          {
-            backgroundColor: gradientStart,
-            borderColor: gradientEnd,
-            borderWidth: 2,
-            transform: [{ rotate: `${rotation}deg` }],
-          },
-        ]}
-      >
-        <View className="absolute top-0 left-0 w-10 h-10" style={{ backgroundColor: gradientEnd }} />
-        <View className="absolute bottom-0 right-0 w-10 h-10" style={{ backgroundColor: gradientEnd }} />
-        <View
-          className="w-18 h-18 rounded-2xl justify-center items-center mb-4"
-          style={{ backgroundColor: gradientEnd }}
-        >
-          <MaterialCommunityIcons name={icon} size={48} color={COLORS.white} />
-        </View>
-        <View className="flex-1">
-          <Text className="text-2xl font-black mb-2 text-white leading-8">{title}</Text>
-          <Text className="text-sm font-medium leading-6" style={{ color: `${COLORS.white}E6` }}>
-            {description}
-          </Text>
-        </View>
-        <View className="h-1 mt-4 rounded-full w-1/4" style={{ backgroundColor: gradientEnd }} />
-      </View>
-    </Animated.View>
-  );
-};
 
 // ✅ MOVED OUTSIDE - Navigation Section
 const NavigationSection: FC<{
@@ -299,7 +239,7 @@ const NavigationSection: FC<{
   }));
 
   return (
-    <Animated.View style={[containerStyle]} className="absolute bottom-0 left-0 right-0 px-6 py-6">
+    <Animated.View style={[containerStyle]} className="absolute bottom-0 left-0 right-0 px-6 py-6 mb-6">
       <Animated.View style={[buttonStyle]}>
         <Pressable
           onPress={onSignIn}
@@ -313,7 +253,7 @@ const NavigationSection: FC<{
             elevation: 15,
           }}
         >
-          <View className="flex-row items-center gap-3 justify-center">
+          <View className="flex-row items-center gap-3 justify-center ">
             <MaterialCommunityIcons name="login-variant" size={22} color={COLORS.logoGreen} />
             <View>
               <Text className="text-xs font-semibold" style={{ color: COLORS.skyBlue400 }}>

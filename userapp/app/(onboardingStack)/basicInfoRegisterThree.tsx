@@ -24,7 +24,7 @@ type FormData = {
 
 export default function InfoRegisterScreen() {
   const router = useRouter();
-  const {firstName, lastName, email, contact, setDob, setCity} = signUpStore()
+  const {name, nickName, email, contact, setDob, setCity} = signUpStore()
   
   const {
     control,
@@ -71,7 +71,7 @@ export default function InfoRegisterScreen() {
           >
             <View className="flex-1 justify-end">
               <View
-                className="bg-white border-black border-4"
+                className="bg-white border-black border-4 overflow-hidden"
                 style={{ height: "50%", borderTopRightRadius: 180 }}
               >
                 <ScrollView

@@ -188,7 +188,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* ---------------- Quick Access ---------------- */}
-        <View className="px-5 mt-4 mb-6 flex-row gap-3">
+        {/* <View className="px-5 mt-4 mb-6 flex-row gap-3">
           <TouchableOpacity
             onPress={() => router.push('./')}
             className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-4 items-center"
@@ -206,7 +206,7 @@ export default function ProfileScreen() {
             <MaterialIcons name="bar-chart" size={26} color="#22c55e" />
             <Text className="text-white text-sm mt-2">Stats</Text>
           </TouchableOpacity>
-        </View>
+        </View> */}
 
         {/* ---------------- Contact ---------------- */}
         <ProfileSection title="Contact Information">

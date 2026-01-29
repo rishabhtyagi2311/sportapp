@@ -149,9 +149,9 @@ export default function InfoRegisterScreen() {
             resizeMode="cover"
             className="flex-1"
           >
-            <View className="flex-1 justify-end">
+            <View className="flex-1 justify-end ">
               <View
-                className="bg-white border-black border-4"
+                className="bg-white border-black border-4 overflow-hidden"
                 style={{ height: "60%", borderTopRightRadius: 180 }}
               >
                 <ScrollView
