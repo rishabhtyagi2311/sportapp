@@ -71,8 +71,7 @@ export default function ProfileScreen() {
     );
   };
 
-  const renderProfileCard = (profile: any) => {
-    // Get enrollments for this child to show count
+const renderProfileCard = (profile: any) => {
     const childEnrollments = getEnrollmentsByChild(profile.id);
     const enrollmentCount = childEnrollments.length;
 
@@ -80,100 +79,84 @@ export default function ProfileScreen() {
       <TouchableOpacity
         key={profile.id}
         onPress={() => navigateToChildAcademies(profile.id, profile.childName)}
-        activeOpacity={0.7}
+        activeOpacity={0.9}
+        className="mx-4 mt-4"
       >
         <View
-          className="mx-4 mt-4 bg-white rounded-3xl p-6 shadow-lg"
+          className="bg-white rounded-3xl overflow-hidden border border-slate-100"
           style={{
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
+            shadowColor: "#64748b",
+            shadowOffset: { width: 0, height: 10 },
             shadowOpacity: 0.1,
-            shadowRadius: 8,
-            elevation: 3,
+            shadowRadius: 12,
+            elevation: 5,
           }}
         >
-          {/* Child Name Header with Action Buttons */}
-          <View className="flex-row justify-between items-start mb-4">
-            <View className="flex-1 mr-2">
-              <Text className="text-slate-900 font-bold text-2xl">
-                {profile.childName}
-              </Text>
-              <Text className="text-blue-500 text-sm mt-1">
-                Tap to view {enrollmentCount > 0 ? `${enrollmentCount} academies` : 'academies'}
+          {/* Top Decorative Bar or Action Row */}
+          <View className="flex-row items-center p-5">
+            {/* Avatar Placeholder */}
+            <View className="h-14 w-14 rounded-2xl bg-slate-100 items-center justify-center mr-4">
+              <Text className="text-slate-900 font-bold text-xl">
+                {profile.childName.charAt(0).toUpperCase()}
               </Text>
             </View>
-            <View className="flex-row">
+
+            {/* Name and Basic Info */}
+            <View className="flex-1">
+              <Text className="text-slate-900 font-bold text-xl leading-7">
+                {profile.childName}
+              </Text>
+              <View className="flex-row items-center mt-1">
+                <Ionicons name="location-sharp" size={14} color="#94a3b8" />
+                <Text className="text-slate-500 text-sm ml-1">{profile.city}</Text>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View className="flex-row space-x-2">
               <TouchableOpacity
                 onPress={(e) => {
-                  e.stopPropagation(); // Prevent navigating to academies
+                  e.stopPropagation();
                   navigateToForm(true, profile);
                 }}
-                className="bg-blue-500 rounded-full p-2.5 mr-2"
-                activeOpacity={0.7}
+                className="bg-slate-50 h-10 w-10 rounded-xl items-center justify-center"
               >
-                <Ionicons name="create-outline" size={18} color="#fff" />
+                <Ionicons name="pencil" size={18} color="#475569" />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={(e) => {
-                  e.stopPropagation(); // Prevent navigating to academies
+                  e.stopPropagation();
                   handleDelete(profile.id, profile.childName);
                 }}
-                className="bg-red-500 rounded-full p-2.5"
-                activeOpacity={0.7}
+                className="bg-red-50 h-10 w-10 rounded-xl items-center justify-center"
               >
-                <Ionicons name="trash-outline" size={18} color="#fff" />
+                <Ionicons name="trash" size={18} color="#ef4444" />
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Profile Details */}
-          <View className="space-y-3">
-            {/* Age */}
-            <View className="flex-row items-center py-2">
-              <View className="bg-blue-50 rounded-full p-2 mr-3">
-                <Ionicons name="calendar-outline" size={16} color="#3b82f6" />
+          {/* Stats/Details Footer */}
+          <View className="bg-slate-50/50 px-5 py-4 flex-row justify-between items-center border-t border-slate-50">
+            <View className="flex-row space-x-4">
+              <View>
+                <Text className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Age</Text>
+                <Text className="text-slate-700 font-semibold">{profile.childAge} yrs</Text>
               </View>
-              <View className="flex-1">
-                <Text className="text-slate-500 text-xs mb-0.5">Age</Text>
-                <Text className="text-slate-900 font-semibold text-base">
-                  {profile.childAge} years old
-                </Text>
-              </View>
-            </View>
-
-            {/* City */}
-            <View className="flex-row items-center py-2">
-              <View className="bg-green-50 rounded-full p-2 mr-3">
-                <Ionicons name="location-outline" size={16} color="#10b981" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-slate-500 text-xs mb-0.5">City</Text>
-                <Text className="text-slate-900 font-semibold text-base">
-                  {profile.city}
-                </Text>
+              <View className="w-[1px] h-8 bg-slate-200 mx-2" />
+              <View>
+                <Text className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Enrollments</Text>
+                <Text className="text-slate-700 font-semibold">{enrollmentCount} Active</Text>
               </View>
             </View>
-
-            {/* Academy Badge */}
-            {enrollmentCount > 0 && (
-              <View className="flex-row items-center py-2">
-                <View className="bg-indigo-50 rounded-full p-2 mr-3">
-                  <Ionicons name="school-outline" size={16} color="#6366f1" />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-slate-500 text-xs mb-0.5">Enrollments</Text>
-                  <Text className="text-slate-900 font-semibold text-base">
-                    {enrollmentCount} {enrollmentCount === 1 ? 'academy' : 'academies'}
-                  </Text>
-                </View>
-              </View>
-            )}
+            
+            <View className="bg-slate-900 rounded-lg px-3 py-1.5">
+              <Ionicons name="chevron-forward" size={16} color="white" />
+            </View>
           </View>
         </View>
       </TouchableOpacity>
     );
   };
-
   const handleBackPress = () => {
     router.back();
   };

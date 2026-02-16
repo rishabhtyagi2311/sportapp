@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
-  GestureResponderEvent,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -20,275 +19,109 @@ export default function ChildAcademiesScreen() {
     childId: string;
     childName: string;
   }>();
-  // Stores
+
   const childProfiles = usechildStore((state) => state.childProfiles);
-  const getEnrollmentsByChild = useEnrollmentStore(
-    (state) => state.getEnrollmentsByChild
-  );
+  const getEnrollmentsByChild = useEnrollmentStore((state) => state.getEnrollmentsByChild);
   const getAcademyById = useAcademyStore((state) => state.getAcademyById);
-  // Child profile
+
   const childProfile = childProfiles.find((profile) => profile.id === childId);
   const resolvedChildName = childProfile?.childName || childName || "Child";
-  // Enrollments for this child
   const childEnrollments = getEnrollmentsByChild(childId);
   const childAcademyIds = [...new Set(childEnrollments.map((e) => e.academyId))];
 
-  const handleBackPress = () => {
-    router.navigate("/(homeScreenTabs)/academy");
-  };
+  const handleBackPress = () => router.navigate("/(homeScreenTabs)/academy");
 
   const handleAcademyPress = (academyId: string, academyName: string) => {
     router.push({
-      pathname: "/(academy)/manageProfile/childAttendance",
-      params: {
-        childId,
-        academyId,
-        academyName,
-      },
+      pathname: "/(academy)/manageProfile/academyDashboard",
+      params: { childId, academyId, academyName },
     });
   };
-
-  // Navigate to announcements screen
-  const navigateToAnnouncements = (
-    academyId: string,
-    academyName: string,
-    e: GestureResponderEvent
-  ) => {
-    e.stopPropagation();
-    router.push({
-      pathname: "/(academy)/manageProfile/announcements",
-      params: {
-        academyId,
-        academyName,
-        childId,
-      },
-    });
-  };
-
-  // Navigate to Add Review screen (form only, no review display here)
-  const navigateToWriteReview = (
-    academyId: string,
-    academyName: string,
-    e: GestureResponderEvent
-  ) => {
-    e.stopPropagation();
-    router.push({
-      pathname: "/(academy)/manageProfile/addReviewForm",
-      params: {
-        academyId,
-        academyName,
-        childId,
-        childName: resolvedChildName,
-      },
-    });
-  };
-
-  // Empty state
-  if (childAcademyIds.length === 0) {
-    return (
-      <SafeAreaView className="flex-1 bg-white">
-        <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
-        <View className="bg-slate-900 shadow-lg">
-          <View className="flex-row items-center px-4 py-3 border-b border-slate-800">
-            <TouchableOpacity
-              onPress={handleBackPress}
-              className="mr-3 p-2 rounded-lg"
-            >
-              <Ionicons name="arrow-back" size={24} color="white" />
-            </TouchableOpacity>
-            <View className="flex-1">
-              <Text className="text-white font-bold text-lg" numberOfLines={1}>
-                {resolvedChildName}'s Academies
-              </Text>
-              <Text className="text-slate-400 text-xs mt-0.5">
-                View enrolled academies
-              </Text>
-            </View>
-          </View>
-        </View>
-        <View className="flex-1 bg-white items-center justify-center px-6">
-          <Ionicons name="school-outline" size={80} color="#e2e8f0" />
-          <Text className="text-slate-900 text-2xl font-bold text-center mt-4">
-            No Enrollments Yet
-          </Text>
-          <Text className="text-slate-500 text-center mt-2">
-            {resolvedChildName} is not enrolled in any academies
-          </Text>
-          <TouchableOpacity
-            onPress={() => router.push("/(academy)/browseAcademy")}
-            className="mt-6 bg-blue-500 py-3 px-6 rounded-xl"
-          >
-            <Text className="text-white font-semibold text-base">
-              Browse Academies
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
-      {/* Header */}
-      <View className="bg-slate-900 shadow-lg">
-        <View className="flex-row items-center px-4 py-3 border-b border-slate-800">
-          <TouchableOpacity
-            onPress={handleBackPress}
-            className="mr-3 p-2 rounded-lg"
-          >
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </TouchableOpacity>
-          <View className="flex-1">
-            <Text className="text-white font-bold text-lg" numberOfLines={1}>
-              {resolvedChildName}'s Academies
-            </Text>
-            <Text className="text-slate-400 text-xs mt-0.5">
-              {childAcademyIds.length}{" "}
-              {childAcademyIds.length === 1 ? "academy" : "academies"} enrolled
-            </Text>
-          </View>
+    <SafeAreaView className="flex-1 bg-slate-50">
+      <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+      
+      {/* Sleek Header */}
+      <View className="px-6 py-6 flex-row items-center justify-between">
+        <TouchableOpacity 
+          onPress={handleBackPress} 
+          className="h-12 w-12 bg-white rounded-2xl items-center justify-center shadow-sm border border-slate-100"
+        >
+          <Ionicons name="chevron-back" size={24} color="#0f172a" />
+        </TouchableOpacity>
+        <View className="items-end">
+          <Text className="text-slate-400 text-xs font-bold uppercase tracking-widest">Enrolled In</Text>
+          <Text className="text-slate-900 font-black text-xl">{childAcademyIds.length} {childAcademyIds.length === 1 ? 'Academy' : 'Academies'}</Text>
         </View>
       </View>
-      {/* List */}
+
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
+      
+
         {childAcademyIds.map((academyId) => {
           const academy = getAcademyById(academyId);
           if (!academy) return null;
           return (
             <TouchableOpacity
               key={academyId}
-              onPress={() =>
-                handleAcademyPress(academyId, academy.academyName)
-              }
-              activeOpacity={0.7}
-              className="bg-white rounded-2xl mb-4 overflow-hidden border border-gray-200"
-              style={{
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.05,
-                shadowRadius: 8,
-                elevation: 2,
-              }}
+              onPress={() => handleAcademyPress(academyId, academy.academyName)}
+              activeOpacity={0.95}
+              className="mb-6"
             >
-              {/* Card Header */}
-              <View className="bg-slate-900 px-5 py-4">
-                <View className="flex-row items-start justify-between">
-                  <View className="flex-1 mr-3">
-                    <Text className="text-white text-lg font-bold mb-2">
-                      {academy.academyName}
-                    </Text>
+              <View className="bg-white rounded-[28px] flex-row overflow-hidden shadow-md shadow-slate-200 border border-slate-100">
+                {/* Left Accent Bar - Uses a sport-themed color */}
+                <View className="w-3 bg-slate-900" />
+                
+                <View className="flex-1 p-5">
+                  <View className="flex-row justify-between items-start">
+                    <View className="flex-1">
+                      <Text className="text-slate-900 font-bold text-xs uppercase tracking-tighter mb-1">
+                        {academy.sportType} Academy
+                      </Text>
+                      <Text className="text-slate-900 text-2xl font-black mb-4 leading-7">
+                        {academy.academyName}
+                      </Text>
+                    </View>
+                    <View className="bg-slate-50 p-2 rounded-xl">
+                      <Ionicons name="rocket-sharp" size={20} color="#6366f1" />
+                    </View>
+                  </View>
+
+                  {/* Info Grid */}
+                  <View className="flex-row items-center justify-between border-t border-slate-50 pt-4">
                     <View className="flex-row items-center">
-                      <View className="bg-white/20 px-3 py-1 rounded-lg">
-                        <Text className="text-white text-xs font-semibold">
-                          {academy.sportType}
-                        </Text>
+                      <View className="h-8 w-8 rounded-full bg-slate-100 items-center justify-center">
+                        <Ionicons name="medal" size={14} color="#475569" />
+                      </View>
+                      <View className="ml-2">
+                        <Text className="text-slate-400 text-[10px] font-bold uppercase">Head Coach</Text>
+                        <Text className="text-slate-700 font-bold text-sm">{academy.coachName}</Text>
+                      </View>
+                    </View>
+
+                    <View className="flex-row items-center">
+                      <View className="h-8 w-8 rounded-full bg-slate-100 items-center justify-center">
+                        <Ionicons name="location" size={14} color="#475569" />
+                      </View>
+                      <View className="ml-2">
+                        <Text className="text-slate-400 text-[10px] font-bold uppercase">Location</Text>
+                        <Text className="text-slate-700 font-bold text-sm">{academy.city}</Text>
                       </View>
                     </View>
                   </View>
-                  <Ionicons
-                    name="chevron-forward-circle"
-                    size={28}
-                    color="rgba(255,255,255,0.7)"
-                  />
                 </View>
               </View>
-              {/* Card Body */}
-              <View className="px-5 py-4">
-                <View className="space-y-3">
-                  <View className="flex-row items-center">
-                    <View className="w-10 h-10 bg-purple-50 rounded-xl items-center justify-center mr-3">
-                      <Ionicons name="person" size={20} color="#a855f7" />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-slate-500 text-xs">Coach</Text>
-                      <Text className="text-slate-900 font-semibold text-base">
-                        {academy.coachName}
-                      </Text>
-                    </View>
-                  </View>
-                  <View className="flex-row items-center">
-                    <View className="w-10 h-10 bg-green-50 rounded-xl items-center justify-center mr-3">
-                      <Ionicons name="location" size={20} color="#10b981" />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-slate-500 text-xs">Location</Text>
-                      <Text className="text-slate-900 font-semibold text-base">
-                        {academy.city}
-                      </Text>
-                    </View>
-                  </View>
-                  <View className="flex-row items-center">
-                    <View className="w-10 h-10 bg-blue-50 rounded-xl items-center justify-center mr-3">
-                      <Ionicons name="call" size={20} color="#3b82f6" />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-slate-500 text-xs">Contact</Text>
-                      <Text className="text-slate-900 font-semibold text-base">
-                        {academy.contactNumber}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-              {/* Card Footer */}
-              <View className="px-5 py-3 bg-gray-50 border-t border-gray-100">
-                <View className="flex-row items-center justify-between gap-2">
-                  <View className="flex-1">
-                    <Text className="text-slate-500 text-xs">
-                      Tap to view attendance
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={(e) =>
-                      navigateToAnnouncements(
-                        academyId,
-                        academy.academyName,
-                        e
-                      )
-                    }
-                    className="bg-amber-500 py-2 px-3 rounded-full flex-row items-center"
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name="notifications-outline"
-                      size={14}
-                      color="#ffffff"
-                    />
-                    <Text className="text-white text-xs font-medium ml-1">
-                      Announcements
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={(e) =>
-                      navigateToWriteReview(
-                        academyId,
-                        academy.academyName,
-                        e
-                      )
-                    }
-                    className="bg-blue-500 py-2 px-3 rounded-full flex-row items-center"
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name="create-outline"
-                      size={14}
-                      color="#ffffff"
-                    />
-                    <Text className="text-white text-xs font-medium ml-1">
-                      Review
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+              
+              {/* Decorative "Ticket" Cutouts for a more 'Proper' UI feel */}
+              <View className="absolute left-[3px] top-1/2 -translate-y-1/2 h-6 w-3 bg-slate-50 rounded-r-full" />
             </TouchableOpacity>
           );
         })}
-        <View className="h-4" />
       </ScrollView>
     </SafeAreaView>
   );
