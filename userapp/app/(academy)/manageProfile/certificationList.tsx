@@ -9,15 +9,77 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useCertificateStore } from "@/store/academyCertifications";
+import { useCertificateStore, Certificate } from "@/store/academyCertifications";
 
 export default function CertificationsScreen() {
   const router = useRouter();
   const { childId } = useLocalSearchParams<{ childId: string }>();
   
-  // Get certificates from store
-  const getCertificatesByChild = useCertificateStore((state) => state.getCertificatesByChild);
-  const certificates = getCertificatesByChild(childId);
+  // Dummy Data (Filtering by childId to simulate real behavior)
+  const allDummyCertificates: Certificate[] = [
+    {
+      id: '1',
+      childId: 'child_01',
+      academyName: 'Star Cricket Academy',
+      recipientName: 'Rahul Kumar',
+      achievementText: 'Best Bowler of the Month',
+      date: 'Feb 15, 2026',
+      headCoachName: 'Coach Vikram Singh',
+    },
+    {
+      id: '2',
+      childId: 'child_01',
+      academyName: 'Star Cricket Academy',
+      recipientName: 'Rahul Kumar',
+      achievementText: 'Outstanding Discipline Award',
+      date: 'Jan 20, 2026',
+      headCoachName: 'Coach Vikram Singh',
+    },
+    {
+      id: '3',
+      childId: 'child_01',
+      academyName: 'Elite Tennis Club',
+      recipientName: 'Rahul Kumar',
+      achievementText: 'Inter-Academy Runner Up',
+      date: 'Dec 12, 2025',
+      headCoachName: 'Sania Mirza',
+    },
+    {
+      id: '4',
+      childId: 'child_02',
+      academyName: 'Global Football Academy',
+      recipientName: 'Sneha Kapoor',
+      achievementText: 'Most Improved Player',
+      date: 'Feb 05, 2026',
+      headCoachName: 'Coach Ricardo',
+    },
+    {
+      id: '5',
+      childId: 'child_02',
+      academyName: 'Global Football Academy',
+      recipientName: 'Sneha Kapoor',
+      achievementText: 'Top Scorer - Winter League',
+      date: 'Jan 15, 2026',
+      headCoachName: 'Coach Ricardo',
+    }
+  ];
+
+  // Filter based on the child profile being viewed
+  const certificates = allDummyCertificates
+
+  const handleViewCertificate = (cert: Certificate) => {
+    router.push({
+      pathname: "/(academy)/manageProfile/certificates",
+      params: { 
+        id: cert.id,
+        academyName: cert.academyName,
+        recipientName: cert.recipientName,
+        achievementText: cert.achievementText,
+        date: cert.date,
+        headCoachName: cert.headCoachName
+      },
+    });
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
@@ -45,9 +107,7 @@ export default function CertificationsScreen() {
             <TouchableOpacity
               key={cert.id}
               activeOpacity={0.8}
-              onPress={() => {
-                // Future step: Navigate to certificate detail/view
-              }}
+              onPress={() => handleViewCertificate(cert)}
               className="bg-white rounded-3xl p-5 mb-4 border border-slate-100 shadow-sm"
             >
               <View className="flex-row items-center">
@@ -79,7 +139,7 @@ export default function CertificationsScreen() {
             </View>
             <Text className="text-slate-900 font-bold text-lg">No certificates yet</Text>
             <Text className="text-slate-400 text-center mt-2 px-10">
-              Certificates awarded by the academy will appear here.
+              Certificates awarded for this child will appear here.
             </Text>
           </View>
         )}
