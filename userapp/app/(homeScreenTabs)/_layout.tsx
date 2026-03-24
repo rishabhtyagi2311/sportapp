@@ -1,85 +1,115 @@
-import { Tabs } from 'expo-router';
+import React, { useState } from 'react';
+import { Tabs, useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { View, Platform } from 'react-native';
+import ActionModal from './actionModal'; 
 
 export default function TabLayout() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isModalVisible, setModalVisible] = useState(false);
+
+  const isHome = pathname === '/';
+
   return (
-    <Tabs
-      initialRouteName="index"
-      screenOptions={({ route }) => ({
-        headerShown: false,
+    <>
+      <Tabs
+        initialRouteName="index"
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: '#60a5fa',
+          tabBarInactiveTintColor: '#94a3b8',
+          tabBarStyle: {
+            position: 'absolute',
+            height: 85,
+            backgroundColor: 'transparent',
+            borderTopWidth: 0,
+            elevation: 0,
+            // --- THE KEY FIXES ---
+            overflow: 'visible', // Allows the icon to "break out" of the bar
+          },
+          tabBarBackground: () => (
+            <BlurView 
+              tint="dark" 
+              intensity={80} 
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              className="bg-slate-900/85" 
+            />
+          ),
+        }}
+      >
+        <Tabs.Screen 
+            name="venues" 
+            options={{ 
+                title: 'Venues',
+                tabBarIcon: ({ color }) => <Ionicons name="home-outline" size={24} color={color} /> 
+            }} 
+        />
+        
+        <Tabs.Screen
+          name="sports"
+          options={{
+            title: 'Sports',
+            tabBarIcon: ({ color }) => <Ionicons name="trophy-outline" size={24} color={color} />,
+          }}
+        />
 
-        tabBarStyle: {
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: 90,
-          backgroundColor: 'transparent',
-          borderTopWidth: 0,
-          borderTopLeftRadius: 16,
-          borderTopRightRadius: 16,
-          overflow: 'hidden',
-        },
+        <Tabs.Screen
+          name="index"
+          listeners={{
+            tabPress: (e) => {
+              if (isHome) {
+                e.preventDefault();
+                setModalVisible(true);
+              } else {
+                // If not home, the default behavior will take them home
+              }
+            },
+          }}
+          options={{
+            title: isHome ? 'Add' : 'Home',
+            tabBarIcon: ({ focused, color }) => (
+              <View style={{
+                // Lift the button up
+                top: isHome ? -15 : 0,
+                height: isHome ? 60 : 'auto',
+                width: isHome ? 60 : 'auto',
+                backgroundColor: isHome ? '#1e293b' : 'transparent', // Matches slate-900
+                borderRadius: 30,
+                justifyContent: 'center',
+                alignItems: 'center',
+                // Shadow for depth
+                ...Platform.select({
+                  ios: {
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 4,
+                  },
+                  android: {
+                    elevation: 8,
+                  },
+                }),
+              }}> 
+                <Ionicons 
+                  name={isHome ? 'add-circle' : (focused ? 'home' : 'home-outline')} 
+                  size={isHome ? 54 : 24} 
+                  color={isHome ? "#60a5fa" : color} 
+                />
+              </View>
+            ),
+          }}
+        />
 
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
-        },
+        <Tabs.Screen name="academy" options={{ title: 'Academy', tabBarIcon: ({ color }) => <Ionicons name="apps-outline" size={24} color={color} /> }} />
+        <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color }) => <Ionicons name="person-outline" size={24} color={color} /> }} />
+      </Tabs>
 
-        tabBarBackground: () => (
-          <BlurView
-            tint="dark"
-            intensity={80}
-            style={{
-              flex: 1,
-              backgroundColor: 'rgba(15,23,42,0.85)',
-            }}
-          />
-        ),
-
-        tabBarActiveTintColor: '#60a5fa',
-        tabBarInactiveTintColor: '#cbd5e1',
-
-        tabBarIcon: ({ focused, color }) => {
-          let iconName: keyof typeof Ionicons.glyphMap = 'ellipse';
-
-          if (route.name === 'index') {
-            iconName = focused ? 'home' : 'home-outline';
-          } 
-          else if (route.name === 'sports') {
-            iconName = focused ? 'trophy' : 'trophy-outline';
-          } 
-          else if (route.name === 'academy') {
-            iconName = focused ? 'apps' : 'apps-outline';
-          } 
-          else if (route.name === 'profile') {
-            iconName = focused ? 'person' : 'person-outline';
-          }
-
-          return <Ionicons name={iconName} size={22} color={color} />;
-        },
-      })}
-    >
-      <Tabs.Screen
-        name="sports"
-        options={{ title: 'Sports' }}
+      <ActionModal 
+        isVisible={isModalVisible} 
+        onClose={() => setModalVisible(false)} 
       />
-
-      <Tabs.Screen
-        name="index"
-        options={{ title: 'Home' }}
-      />
-
-      <Tabs.Screen
-        name="academy"
-        options={{ title: 'Academy' }}
-      />
-
-      <Tabs.Screen
-        name="profile"
-        options={{ title: 'Profile' }}
-      />
-    </Tabs>
+    </>
   );
 }
