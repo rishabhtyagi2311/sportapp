@@ -3,7 +3,7 @@ import { Tabs, useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { View, Platform } from 'react-native';
-import ActionModal from './actionModal'; 
+import ActionModal from '../../components/actionModal'; 
 
 export default function TabLayout() {
   const router = useRouter();
@@ -68,7 +68,7 @@ export default function TabLayout() {
             },
           }}
           options={{
-            title: isHome ? 'Add' : 'Home',
+            title: isHome ? '' : 'Home',
             tabBarIcon: ({ focused, color }) => (
               <View style={{
                 // Lift the button up
