@@ -6,8 +6,8 @@ import {
   Pressable,
   SafeAreaView,
   Dimensions,
-  TextInput,
   Image,
+  StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,31 +17,24 @@ import Animated, {
   withRepeat,
   withTiming,
   Easing,
+  withSpring,
 } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
-// Premium Color Palette
+// Refined Premium Palette (Tailwind-aligned)
 const COLORS = {
-  skyBlue: '#E0F2FE',
-  navyBlue: '#0F172A',
-  darkBrown: '#4B2E2B',
+  bgDark: '#0F172A', // Slate-900
+  accentBlue: '#7DD3FC', // Blue-300
   white: '#FFFFFF',
-  darkText: '#1E293B',
-  brown200: '#A89878',
-  brown300: '#8B7355',
-  skyBlue300: '#7DD3FC',
-  skyBlue400: '#38BDF8',
-  navyBlue900: '#001F3F',
-  cream: '#FFFAF5',
-  darkNavy: '#0A0E1F',
-  lightBrown: '#D4B5A0',
-  logoRed: '#FF4B4B',
-  logoGreen: '#4EAE6E',
+  glassWhite: 'rgba(255, 255, 255, 0.85)',
+  glassBorder: 'rgba(255, 255, 255, 0.3)',
+  textMain: '#1E293B',
+  textMuted: '#64748B',
+  success: '#10B981',
 };
 
-// Smooth Animated Bubble with Continuous Motion
 const AnimatedBubble: FC<{
   size: number;
   color: string;
@@ -49,29 +42,38 @@ const AnimatedBubble: FC<{
   left: number;
 }> = ({ size, color, delay, left }) => {
   const yPosition = useSharedValue(-size);
+  const opacity = useSharedValue(0.1);
+
   useEffect(() => {
     yPosition.value = withRepeat(
       withTiming(height + size, {
-        duration: 15000 + delay * 1000,
-        easing: Easing.linear,
+        duration: 18000 + delay * 1000,
+        easing: Easing.bezier(0.4, 0, 0.2, 1),
       }),
       -1,
       false
     );
   }, []);
+
   const bubbleStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: yPosition.value }],
+    opacity: opacity.value,
   }));
+
   return (
     <Animated.View
-      className="absolute rounded-full"
       style={[
         {
+          position: 'absolute',
           width: size,
           height: size,
+          borderRadius: size / 2,
           backgroundColor: color,
           left,
-          opacity: 0.08,
+          // Premium Glow effect
+          shadowColor: color,
+          shadowRadius: 40,
+          shadowOpacity: 0.4,
         },
         bubbleStyle,
       ]}
@@ -79,236 +81,129 @@ const AnimatedBubble: FC<{
   );
 };
 
-// Sportify Logo - Now replaced with image
-const SportifyLogo: FC = () => {
-  const scale = useSharedValue(0.85);
-  const opacity = useSharedValue(0);
+const HeroSection: FC = () => {
+  const fadeAnim = useSharedValue(0);
+  const slideAnim = useSharedValue(20);
+
   useEffect(() => {
-    scale.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.cubic) });
-    opacity.value = withTiming(1, { duration: 800 });
+    fadeAnim.value = withTiming(1, { duration: 1000 });
+    slideAnim.value = withSpring(0);
   }, []);
-  const logoStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: fadeAnim.value,
+    transform: [{ translateY: slideAnim.value }],
   }));
+
   return (
-    <Animated.View style={[logoStyle]} className="mb-5  -mt-12 items-center ">
+    <Animated.View style={[animatedStyle]} className="items-center mb-10 mt-4">
       <Image
         source={require("@/assets/images/app_name.jpeg")}
-        style={{ width: 200, height: 100, resizeMode: 'contain' }}
+        style={{ width: 180, height: 60, resizeMode: 'contain', marginBottom: 20 }}
       />
-     
+      <View className="items-center">
+        <Text className="text-5xl font-extrabold text-slate-900 tracking-tighter text-center">
+          Elevate Your
+        </Text>
+        <Text className="text-5xl font-extrabold text-blue-500 tracking-tighter text-center">
+          Athletic Life.
+        </Text>
+      </View>
     </Animated.View>
   );
 };
 
-// Hero Section
-const HeroSection: FC = () => {
-  const titleScale = useSharedValue(0.9);
-  const titleOpacity = useSharedValue(0);
-  const descriptionTranslateY = useSharedValue(20);
-  const descriptionOpacity = useSharedValue(0);
-  useEffect(() => {
-    titleScale.value = withTiming(1, { duration: 900, easing: Easing.out(Easing.cubic) });
-    titleOpacity.value = withTiming(1, { duration: 900 });
-    descriptionTranslateY.value = withTiming(0, { duration: 1000, easing: Easing.out(Easing.cubic) });
-    descriptionOpacity.value = withTiming(1, { duration: 1000 });
-  }, []);
-  const titleStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: titleScale.value }],
-    opacity: titleOpacity.value,
-  }));
-  const descStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: descriptionTranslateY.value }],
-    opacity: descriptionOpacity.value,
-  }));
+const CreateAccountSection: FC<{ onSignUp: () => void }> = ({ onSignUp }) => {
   return (
-    <View className="items-center mb-8  ">
-      <SportifyLogo />
-      <Animated.View style={[titleStyle]} className="mb-4">
-        <Text className="text-5xl font-black text-slate-900 text-center leading-tight tracking-tight">
-          Play.
-        </Text>
-        <Text className="text-5xl font-black text-slate-900 text-center leading-tight tracking-tight">
-          Train.
-          <Text style={{ color: COLORS.logoGreen }}> Win.</Text>
-        </Text>
-      </Animated.View>
-     
+    <View style={styles.glassContainer} className="rounded-[40px] p-8 border border-white/40 shadow-2xl overflow-hidden">
+      <View className="mb-6">
+        <Text className="text-3xl font-bold text-slate-900 mb-2">Get Started</Text>
+        <Text className="text-slate-500 font-medium">Experience the future of sports management.</Text>
+      </View>
+
+      <View className="space-y-4 mb-8">
+        {[
+          { icon: 'star-four-points', text: 'Elite Academy Access', color: '#8B5CF6' },
+          { icon: 'map-marker-radius', text: 'Instant Venue Booking', color: '#3B82F6' },
+          { icon: 'trophy-outline', text: 'Global Tournaments', color: '#F59E0B' },
+        ].map((item, idx) => (
+          <View key={idx} className="flex-row items-center bg-slate-50/80 p-4 rounded-2xl mb-3">
+            <View className="bg-white p-2 rounded-xl shadow-sm mr-4">
+              <MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} />
+            </View>
+            <Text className="text-slate-700 font-semibold text-base">{item.text}</Text>
+          </View>
+        ))}
+      </View>
+
+      <Pressable
+        onPress={onSignUp}
+        style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.97 : 1 }] }]}
+        className="bg-slate-900 rounded-2xl py-5 items-center flex-row justify-center"
+      >
+        <Text className="text-white font-bold text-lg mr-2">Create Account</Text>
+        <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
+      </Pressable>
     </View>
   );
 };
 
-// Premium Create Account Section
-const CreateAccountSection: FC<{ onSignUp: () => void }> = ({ onSignUp }) => {
-  const containerOpacity = useSharedValue(0);
-  const containerScale = useSharedValue(0.95);
-  
-  useEffect(() => {
-    containerOpacity.value = withTiming(1, { duration: 1000, easing: Easing.out(Easing.cubic) });
-    containerScale.value = withTiming(1, { duration: 1000, easing: Easing.out(Easing.cubic) });
-  }, []);
-
-  const containerStyle = useAnimatedStyle(() => ({
-    opacity: containerOpacity.value,
-    transform: [{ scale: containerScale.value }],
-  }));
-
+const NavigationSection: FC<{ onSignIn: () => void }> = ({ onSignIn }) => {
   return (
-    <Animated.View style={[containerStyle]} className="my-8">
-      <View
-        className="rounded-3xl p-8 border-2 overflow-hidden"
-        style={{
-          backgroundColor: `${COLORS.white}08`,
-          borderColor: COLORS.skyBlue400,
-        }}
+    <View className="absolute bottom-10 left-0 right-0 px-8">
+      <Pressable
+        onPress={onSignIn}
+        style={({ pressed }) => [{ 
+          backgroundColor: pressed ? 'rgba(255,255,255,0.9)' : 'white',
+          transform: [{ scale: pressed ? 0.98 : 1 }] 
+        }]}
+        className="rounded-3xl py-4 flex-row items-center justify-center border border-slate-200 shadow-xl"
       >
-        {/* Top Accent */}
-        <View
-          className="absolute top-0 left-0 right-0 h-1"
-          style={{ backgroundColor: COLORS.logoGreen }}
-        />
-
-        {/* Header */}
-        <View className="mb-4 mx-2">
-          <View className="flex-row items-center gap-2 ">
-           
-            <Text className="text-2xl font-black text-green-600">Join the Game</Text>
-          </View>
-          
+        <MaterialCommunityIcons name="account-circle-outline" size={24} color="#0F172A" className="mr-3" />
+        <View className="ml-3">
+          <Text className="text-slate-400 text-xs font-bold uppercase tracking-widest">Welcome Back</Text>
+          <Text className="text-slate-900 text-base font-black">Sign In to Dashboard</Text>
         </View>
-
-        {/* Features List */}
-        <View className="bg-slate-900 rounded-2xl p-4 mb-6">
-          {[
-            { icon: 'check-circle' as const, text: 'Access elite academies' },
-            { icon: 'check-circle' as const, text: 'Book venues instantly' },
-            { icon: 'check-circle' as const, text: 'Join tournaments & competitions' },
-          ].map((item, idx) => (
-            <View key={idx} className="flex-row items-center gap-3 py-2">
-              <MaterialCommunityIcons name={item.icon} size={18} color={COLORS.logoGreen} />
-              <Text className="text-xs font-semibold flex-1" style={{ color: COLORS.skyBlue300 }}>
-                {item.text}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        {/* CTA Button */}
-        <Pressable
-          onPress={onSignUp}
-          className="rounded-xl py-4 items-center justify-center active:opacity-80 overflow-hidden"
-          style={{ backgroundColor: COLORS.logoGreen }}
-        >
-          <View className="flex-row items-center gap-2">
-            <Text className="text-base font-black text-white">Create Account</Text>
-            <MaterialCommunityIcons name="arrow-right" size={20} color={COLORS.white} />
-          </View>
-        </Pressable>
-      </View>
-    </Animated.View>
+      </Pressable>
+    </View>
   );
 };
 
-
-
-// Navigation Section - Premium Design
-const NavigationSection: FC<{
-  onSignIn: () => void;
-}> = ({ onSignIn }) => {
-  const containerOpacity = useSharedValue(0);
-  const buttonScale = useSharedValue(0.9);
-  
-  useEffect(() => {
-    containerOpacity.value = withTiming(1, { duration: 1000, easing: Easing.out(Easing.cubic) });
-    buttonScale.value = withTiming(1, { duration: 1200, easing: Easing.out(Easing.cubic) });
-  }, []);
-  
-  const containerStyle = useAnimatedStyle(() => ({
-    opacity: containerOpacity.value,
-  }));
-  
-  const buttonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: buttonScale.value }],
-  }));
-  
-  return (
-    <Animated.View style={[containerStyle]} className="absolute bottom-12 left-0 right-0 px-6 py-6">
-      <Animated.View style={[buttonStyle]}>
-        <Pressable
-          onPress={onSignIn}
-          className="rounded-2xl py-5 px-6 items-center justify-center overflow-hidden active:opacity-75"
-          style={{
-            backgroundColor: COLORS.white,
-            shadowColor: COLORS.logoGreen,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.3,
-            shadowRadius: 12,
-            elevation: 15,
-          }}
-        >
-          <View className="flex-row items-center gap-3 justify-center ">
-            <MaterialCommunityIcons name="login-variant" size={22} color={COLORS.logoGreen} />
-            <View>
-              <Text className="text-xs font-semibold" style={{ color: COLORS.skyBlue400 }}>
-                Already have an Account ? 
-              </Text>
-              <Text className="text-sm font-black" style={{ color: COLORS.navyBlue }}>
-                Sign In
-              </Text>
-            </View>
-          </View>
-        </Pressable>
-      </Animated.View>
-    </Animated.View>
-  );
-};
-
-// Main Welcome Screen
 const WelcomeScreen: FC = () => {
   const router = useRouter();
-  const handleSignUp = () => {
-    router.push('/(homeScreenTabs)');
-    // router.push('/(homeScreenTabs)');    
-  };
-  const handleSignIn = () => {
-    router.push('/(onboardingStack)/basicInfoRegisterOne');
-  };
+
   return (
-    <SafeAreaView className="flex-1">
-      {/* Gradient Background */}
+    <SafeAreaView className="flex-1 bg-white">
+      {/* Premium Mesh Gradient Background */}
       <LinearGradient
-        colors={['#FFFFFF', '#E0F2FE', '#7DD3FC']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
+        colors={['#F8FAFC', '#E0F2FE', '#DBEAFE']}
+        className="absolute inset-0"
       />
-      
-      {/* Animated Bubbles */}
-      <View className="absolute w-full h-full overflow-hidden">
-        <AnimatedBubble size={150} color={COLORS.logoGreen} delay={0} left={-20} />
-        <AnimatedBubble size={120} color={COLORS.skyBlue400} delay={2} left={width - 80} />
-        <AnimatedBubble size={100} color={COLORS.logoGreen} delay={4} left={width / 2 - 50} />
-        <AnimatedBubble size={130} color={COLORS.skyBlue400} delay={1} left={width - 120} />
-        <AnimatedBubble size={110} color={COLORS.logoGreen} delay={3} left={30} />
+
+      {/* Ambient Animated Lights */}
+      <View className="absolute inset-0 overflow-hidden">
+        <AnimatedBubble size={250} color="#7DD3FC" delay={0} left={-100} />
+        <AnimatedBubble size={200} color="#BAE6FD" delay={2} left={width - 150} />
       </View>
-      
-      {/* Content */}
+
       <ScrollView
         showsVerticalScrollIndicator={false}
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 240 }}
+        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 180 }}
       >
         <HeroSection />
-        
-        {/* Create Account Section - Replaces Stats */}
-        <CreateAccountSection onSignUp={handleSignUp} />
-        
-       
-        
+        <CreateAccountSection onSignUp={() => router.push('/(homeScreenTabs)')} />
       </ScrollView>
-      <NavigationSection onSignIn={handleSignIn} />
+
+      <NavigationSection onSignIn={() => router.push('/(onboardingStack)/basicInfoRegisterOne')} />
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  glassContainer: {
+    backgroundColor: COLORS.glassWhite,
+ // For web/ios support if enabled
+  },
+});
+
 export default WelcomeScreen;

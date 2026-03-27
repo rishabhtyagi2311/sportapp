@@ -25,7 +25,7 @@ export default function Index() {
           setInitialRoute("/(homeScreenTabs)");
         } else {
           // later you can change this to onboarding or something else
-          setInitialRoute("/(onboardingStack)/welcome");
+          setInitialRoute("/(onboardingStack)/advertise");
         }
       } catch (error) {
         console.log("[Index] checkAuth error:", error);
