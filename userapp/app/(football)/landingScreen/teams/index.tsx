@@ -140,7 +140,7 @@ export default function TeamsScreen() {
       ) : (
         <>
           {/* Header */}
-          <View className="px-4 -mt-4 border-b border-gray-100">
+          <View className="px-4 mt-8 border-b border-gray-100">
             <View className="flex-row items-center justify-between ">
               <View >
                 <Text className="text-2xl font-bold text-gray-900">My Teams</Text>

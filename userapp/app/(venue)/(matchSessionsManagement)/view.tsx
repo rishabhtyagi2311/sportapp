@@ -17,7 +17,7 @@ export default function MatchDiscoveryScreen() {
     return (
       <TouchableOpacity 
         activeOpacity={0.9}
-        onPress={() => router.push({ pathname: '/match-details', params: { id: item.id } })}
+        onPress={() => router.push({ pathname: './details', params: { id: item.id } })}
         className="bg-white rounded-[30px] p-6 mb-5 shadow-xl shadow-slate-100 border border-slate-50"
       >
         <View className="flex-row justify-between items-start mb-4">

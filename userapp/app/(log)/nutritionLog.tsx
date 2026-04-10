@@ -1,22 +1,30 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { 
+  View, Text, ScrollView, TextInput, TouchableOpacity, 
+  KeyboardAvoidingView, Platform 
+} from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useHealthStore } from '@/store/HealthLogStore';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const MEAL_CATEGORIES = [
-  'Early Morning', 'Breakfast', 'Mid Morning', 
-  'Lunch', 'Tea Time', 'Dinner', 'Post Dinner'
+  { label: 'Early Morning', icon: 'weather-sunset-up' },
+  { label: 'Breakfast', icon: 'coffee-outline' },
+  { label: 'Mid Morning', icon: 'apple-icrate' },
+  { label: 'Lunch', icon: 'food-variant' },
+  { label: 'Tea Time', icon: 'tea-outline' },
+  { label: 'Dinner', icon: 'silverware-variant' },
+  { label: 'Post Dinner', icon: 'moon-waning-crescent' }
 ];
 
 export default function NutritionScreen() {
   const router = useRouter();
   const addNutrition = useHealthStore((state) => state.addNutritionEntry);
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
 
-  // Initialize 7 rows of empty meal data
   const [meals, setMeals] = useState(
-    MEAL_CATEGORIES.map(cat => ({ category: cat, time: '', description: '' }))
+    MEAL_CATEGORIES.map(cat => ({ category: cat.label, icon: cat.icon, time: '', description: '' }))
   );
 
   const updateMeal = (index: number, field: string, value: string) => {
@@ -26,10 +34,8 @@ export default function NutritionScreen() {
   };
 
   const handleSave = () => {
-    // Filter out rows where the user didn't enter a meal description
     const filteredMeals = meals.filter(m => m.description.trim() !== '');
     addNutrition({
-     
       date: new Date().toISOString(),
       meals: filteredMeals,
     });
@@ -37,67 +43,103 @@ export default function NutritionScreen() {
   };
 
   return (
-    <View className="flex-1 bg-slate-900">
-      <ScrollView className="px-4" showsVerticalScrollIndicator={false}>
-        {/* Header Section */}
-        <View className="flex-row justify-between items-center mt-12 mb-6">
-          <View>
-            <Text className="text-slate-400 text-sm font-medium">Today</Text>
-            <Text className="text-white text-2xl font-bold">{today}</Text>
-          </View>
+    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        className="flex-1"
+      >
+        {/* HEADER */}
+        <View className="px-6 py-4 flex-row justify-between items-center">
+          <TouchableOpacity onPress={() => router.back()} className="p-2 bg-slate-800 rounded-full">
+            <Ionicons name="chevron-back" size={20} color="white" />
+          </TouchableOpacity>
+          <Text className="text-black font-bold text-lg">Fuel Log</Text>
           <TouchableOpacity 
             onPress={() => router.push('/nutrition-history')}
-            className="bg-slate-800 p-3 rounded-full border border-slate-700"
+            className="p-2 bg-emerald-500/10 rounded-full"
           >
-            <Ionicons name="journal-outline" size={24} color="#60a5fa" />
+            <Ionicons name="time-outline" size={22} color="#10b981" />
           </TouchableOpacity>
         </View>
 
-        <Text className="text-white text-xl font-bold mb-4">Your Meals</Text>
-
-        {/* Table Header */}
-        <View className="flex-row mb-2 px-2">
-          <Text className="flex-[1.5] text-slate-500 font-bold text-xs uppercase">Category</Text>
-          <Text className="flex-1 text-slate-500 font-bold text-xs uppercase ml-2">Time</Text>
-          <Text className="flex-[2] text-slate-500 font-bold text-xs uppercase ml-2">What did you eat?</Text>
-        </View>
-
-        {/* Meal Rows */}
-        {meals.map((meal, index) => (
-          <View key={index} className="flex-row items-center mb-3 bg-slate-800/50 p-2 rounded-2xl border border-slate-800">
-            {/* Category Column (Read Only/Display) */}
-            <View className="flex-[1.5] justify-center">
-              <Text className="text-blue-400 font-semibold text-xs">{meal.category}</Text>
-            </View>
-
-            {/* Time Column */}
-            <TextInput
-              className="flex-1 bg-slate-800 text-white h-10 rounded-xl px-2 border border-slate-700 text-sm"
-              placeholder="08:00 AM"
-              placeholderTextColor="#475569"
-              value={meal.time}
-              onChangeText={(val) => updateMeal(index, 'time', val)}
-            />
-
-            {/* Meal Description Column */}
-            <TextInput
-              className="flex-[2] bg-slate-800 text-white h-10 rounded-xl px-3 border border-slate-700 ml-2 text-sm"
-              placeholder="e.g. Eggs & Oats"
-              placeholderTextColor="#475569"
-              value={meal.description}
-              onChangeText={(val) => updateMeal(index, 'description', val)}
-            />
+        <ScrollView className="flex-1 px-6" showsVerticalScrollIndicator={false}>
+          {/* DATE DISPLAY */}
+          <View className="mt-4 mb-8">
+            <Text className="text-slate-900 text-xs font-bold uppercase tracking-[2px]">Daily Intake</Text>
+            <Text className="text-black text-3xl font-black">{today}</Text>
           </View>
-        ))}
 
-        {/* Save Button */}
-        <TouchableOpacity 
-          onPress={handleSave}
-          className="bg-blue-500 w-full py-4 rounded-2xl items-center mt-6 mb-10 shadow-lg shadow-blue-500/20"
-        >
-          <Text className="text-white text-lg font-bold">Save Nutrition Log</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+          {/* TIMELINE MEAL LIST */}
+          <View>
+            {meals.map((meal, index) => {
+              const isFirst = index === 0;
+              const isLast = index === meals.length - 1;
+              const hasValue = meal.description.length > 0;
+
+              return (
+                <View key={index} className="flex-row">
+                  {/* LEFT TIMELINE DECORATION */}
+                  <View className="items-center mr-4">
+                    <View className={`w-0.5 flex-1 ${isFirst ? 'bg-transparent' : 'bg-slate-700'}`} />
+                    <View className={`w-10 h-10 rounded-full items-center justify-center border-2 
+                      ${hasValue ? 'bg-emerald-500 border-emerald-400' : 'bg-slate-800 border-slate-700'}`}>
+                      <MaterialCommunityIcons 
+                        name={meal.icon as any} 
+                        size={18} 
+                        color={hasValue ? '#064e3b' : '#94a3b8'} 
+                      />
+                    </View>
+                    <View className={`w-0.5 flex-1 ${isLast ? 'bg-transparent' : 'bg-slate-700'}`} />
+                  </View>
+
+                  {/* MEAL CARD */}
+                  <View className={`flex-1 mb-6 p-4 rounded-[24px] border 
+                    ${hasValue ? 'bg-slate-800/80 border-emerald-500/30' : 'bg-slate-800/30 border-slate-800'}`}>
+                    
+                    <View className="flex-row justify-between items-center mb-3">
+                      <Text className={`font-black text-xs uppercase tracking-wider 
+                        ${hasValue ? 'text-emerald-400' : 'text-slate-500'}`}>
+                        {meal.category}
+                      </Text>
+                      <TextInput
+                        placeholder="Time"
+                        placeholderTextColor="#475569"
+                        className="text-slate-400 text-[10px] font-bold bg-slate-900/50 px-3 py-1 rounded-full"
+                        value={meal.time}
+                        onChangeText={(val) => updateMeal(index, 'time', val)}
+                      />
+                    </View>
+
+                    <TextInput
+                      multiline
+                      placeholder="What's on the menu?"
+                      placeholderTextColor="#475569"
+                      className="text-white font-medium text-base p-0"
+                      value={meal.description}
+                      onChangeText={(val) => updateMeal(index, 'description', val)}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+          
+          <View className="h-10" />
+        </ScrollView>
+
+        {/* SAVE ACTION */}
+        <View className="px-6 py-6 bg-[#0f172a] border-t border-slate-800/50">
+          <TouchableOpacity 
+            onPress={handleSave}
+            activeOpacity={0.8}
+            className="bg-emerald-500 py-5 rounded-[22px] items-center shadow-xl shadow-emerald-500/20"
+          >
+            <Text className="text-emerald-950 text-lg font-black uppercase tracking-widest">
+              Update Journal
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

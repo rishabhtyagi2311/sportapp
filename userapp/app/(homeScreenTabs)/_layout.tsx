@@ -23,7 +23,7 @@ export default function TabLayout() {
           tabBarStyle: {
             position: 'absolute',
             height: 85,
-            backgroundColor: 'transparent',
+            backgroundColor: 'black',
             borderTopWidth: 0,
             elevation: 0,
             // --- THE KEY FIXES ---
@@ -102,7 +102,7 @@ export default function TabLayout() {
           }}
         />
 
-        <Tabs.Screen name="academy" options={{ title: 'Academy', tabBarIcon: ({ color }) => <Ionicons name="apps-outline" size={24} color={color} /> }} />
+        <Tabs.Screen name="academy" options={{ title: 'Train', tabBarIcon: ({ color }) => <Ionicons name="apps-outline" size={24} color={color} /> }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color }) => <Ionicons name="person-outline" size={24} color={color} /> }} />
       </Tabs>
 

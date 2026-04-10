@@ -9,12 +9,13 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
-  ImageBackground
+  ImageBackground,
+  Dimensions
 } from "react-native";
 import { useForm, Controller } from "react-hook-form";
-import { ChevronDown, User, Mail, MapPin } from "lucide-react-native";
+import { User, Phone } from "lucide-react-native";
 import Animated, {
-  FadeInDown, FlipInYRight, FlipOutYLeft,
+  FadeInDown,
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
@@ -26,179 +27,172 @@ import Animated, {
 import { useRouter } from "expo-router";
 import signUpStore from "./../../store/signUpStore"
 
+const { width, height } = Dimensions.get('window');
+const isTablet = width >= 500;
 
 type FormData = {
   name: string;
-  nickName: string;
-  email: string;
+  phone: string;
 };
 
-
-
-
 export default function InfoRegisterScreen() {
-  
-  const { setName, setNickName, setEmail} = signUpStore();
+  const { setName, setContact } = signUpStore();
   const scale = useSharedValue(1);
-  const opacity = useSharedValue(0.5);
-  const router = useRouter()
+  const opacity = useSharedValue(0.9);
+  const router = useRouter();
+
   const {
     control,
     handleSubmit,
-    watch,
-    setValue,
     formState: { errors },
   } = useForm<FormData>({
-    defaultValues: {
-      name: "",
-      nickName: "",
-      email: "",
-    },
+    defaultValues: { name: "", phone: "" },
   });
 
   useEffect(() => {
     scale.value = withRepeat(
       withSequence(
-        withTiming(1.05, { duration: 800, easing: Easing.out(Easing.exp) }),
-        withTiming(1, { duration: 800, easing: Easing.out(Easing.exp) })
+        withTiming(1.02, { duration: 1200, easing: Easing.bezier(0.4, 0, 0.2, 1) }),
+        withTiming(1, { duration: 1200 })
       ),
       -1,
       true
     );
+  }, []);
 
-    opacity.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 800 }),
-        withTiming(0.8, { duration: 800 })
-      ),
-      -1,
-      true
-    );
-  })
-
-  const animatedStyle = useAnimatedStyle(() => ({
+  const animatedTextStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
     opacity: opacity.value,
   }));
 
-
-
- 
-
   const onSubmit = async (data: FormData) => {
-
-  
-  setName(data.name)
-  setNickName(data.nickName)
-  setEmail(data.email)
-  
-  router.push("./basicInfoRegisterTwo")
-
-
-
-
-
+    setName(data.name);
+    setContact(data.phone);
+    router.push("./../(homeScreenTabs)");
   };
-
-  const renderInput = (
-    name: keyof FormData,
-    label: string,
-    icon: React.ReactNode,
-    rules: object = {},
-    props: object = {}
-  ) => (
-    <Animated.View entering={FadeInDown.delay(200)} className="m-2 self-center">
-
-
-      <View className="flex-row items-center bg-white rounded-xl border border-black h-14 px-4 shadow-sm mb-6 w-11/12">
-        <View className="mr-3">{icon}</View>
-        <Controller
-          control={control}
-          name={name}
-          rules={rules}
-          render={({ field: { onChange, value } }) => (
-            <TextInput
-              className="flex-1 text-base text-black"
-              placeholder={`Enter ${label}`}
-              placeholderTextColor="#94A3B8"
-              onChangeText={onChange}
-              value={value}
-              {...props}
-            />
-          )}
-        />
-      </View>
-      {errors[name] && (
-        <Animated.Text entering={FadeInDown} className="text-red-900 text-base font-bold ml-4 ">
-          {errors[name]?.message as string}
-        </Animated.Text>
-      )}
-    </Animated.View>
-  );
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1"
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0} // adjust if needed
+      className="flex-1 bg-black"
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View className="flex-1 bg-white">
+        <View className="flex-1">
           <ImageBackground
             source={require('../../assets/images/coverImageNew.png')}
-            resizeMode="cover"
             className="flex-1"
+            resizeMode="cover"
           >
-            <View className="flex-1 justify-end ">
-              <View
-                className="bg-white border-black border-4 overflow-hidden"
-                style={{ height: "60%", borderTopRightRadius: 180 }}
+            {/* Spacer to push content down */}
+            <View className="flex-1" />
+
+            {/* Content Container */}
+            <View 
+              className="bg-white px-8 pt-10  "
+              style={{ 
+                height: height * 0.47, 
+                borderTopRightRadius: isTablet ? 220 : 220,
+                borderTopWidth: 4,
+                borderRightWidth: 4,
+                borderColor: '#000'
+              }}
+            >
+              <ScrollView 
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                className="mt-12"
               >
-                <ScrollView
-                  contentContainerStyle={{ paddingBottom: 30 }}
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                >
+                <Animated.View entering={FadeInDown.delay(100)}>
                   <Animated.Text
-                    style={animatedStyle}
-                    className="text-black text-3xl font-extrabold  mt-8 mb-10 ml-12"
+                    style={animatedTextStyle}
+                    className="text-black text-4xl ml-2 font-black mb-8"
                   >
                     Get Started.
                   </Animated.Text>
+                </Animated.View>
 
-                  <View className="px-2 flex ">
-                    
-                    {renderInput("name", "Name", <User size={20} color="#64748B" />, {
-                      required: "Name is required",
-                    })}
-                    {renderInput("nickName", "Nickname", <User size={20} color="#64748B" />, {
-                      required: "Nickname is required",
-                    })}
-                    {renderInput(
-                      "email",
-                      "Email",
-                      <Mail size={20} color="#64748B" />,
-                      {
-                        required: "Email is required",
-                        pattern: {
-                          value: /^\S+@\S+\.\S+$/,
-                          message: "Please enter a valid email",
-                        },
-                      },
-                      { keyboardType: "email-address" }
-                    )}
+                {/* Name Input */}
+                <KeyboardAvoidingView className="mb-6 ">
+                  <View className="flex-row items-center bg-slate-50 rounded-2xl border-2 border-black h-16 px-4 shadow-sm">
+                    <User size={22} color="#000" />
+                    <Controller
+                      control={control}
+                      name="name"
+                      rules={{ required: "Name is required" }}
+                      render={({ field: { onChange, value } }) => (
+                        <TextInput
+                          className="flex-1 ml-3 text-lg font-bold text-black "
+                          placeholder="Full Name"
+                          placeholderTextColor="#94A3B8"
+                          onChangeText={onChange}
+                          value={value}
+                        />
+                      )}
+                    />
                   </View>
+                  {errors.name && (
+                    <Text className="text-red-600 font-bold mt-1 ml-2">{errors.name.message}</Text>
+                  )}
+                </KeyboardAvoidingView>
 
-                  <View className="w-full flex items-center mt-6">
-                    <TouchableOpacity
-                      className="bg-black h-14 rounded-3xl flex items-center justify-center w-10/12"
-                      onPress={handleSubmit(onSubmit)}
-                    >
-                      <Text className="text-white text-2xl font-bold ">Proceed</Text>
-                    </TouchableOpacity>
+                {/* Phone Input Group */}
+                <Animated.View entering={FadeInDown.delay(300)} className="mb-8">
+                  <View className="flex-row">
+                    {/* Country Code */}
+                    <View className="bg-slate-100 border-2 border-black rounded-2xl px-4 h-16 justify-center items-center flex-row">
+                      <Text className="text-xl mr-1">🇮🇳</Text>
+                      <Text className="text-lg font-black">+91</Text>
+                    </View>
+
+                    {/* Number Field */}
+                    <View className="flex-1 ml-3 bg-slate-50 border-2 border-black rounded-2xl px-4 h-16 justify-center shadow-sm">
+                      <Controller
+                        control={control}
+                        name="phone"
+                        rules={{
+                          required: "Required",
+                          pattern: { value: /^[0-9]{10}$/, message: "Invalid number" }
+                        }}
+                        render={({ field: { onChange, value } }) => (
+                          <TextInput
+                            className="text-lg font-bold text-black"
+                            placeholder="Phone number"
+                            placeholderTextColor="#94A3B8"
+                            keyboardType="phone-pad"
+                            maxLength={10}
+                            value={value}
+                            onChangeText={onChange}
+                          />
+                        )}
+                      />
+                    </View>
                   </View>
-                </ScrollView>
-              </View>
+                  {errors.phone && (
+                    <Text className="text-red-600 font-bold mt-1 ml-2">{errors.phone.message}</Text>
+                  )}
+                </Animated.View>
+
+                {/* Submit Button */}
+                <Animated.View entering={FadeInDown.delay(400)} className="items-center pb-10">
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={{ 
+                      width: '100%', 
+                      shadowColor: "#000",
+                      shadowOffset: { width: 4, height: 4 },
+                      shadowOpacity: 1,
+                      shadowRadius: 0,
+                    }}
+                    className="bg-black h-16 rounded-2xl items-center justify-center flex-row"
+                    onPress={handleSubmit(onSubmit)}
+                  >
+                    <Text className="text-white text-xl font-black mr-2 uppercase tracking-tighter">
+                      Proceed
+                    </Text>
+                    <Phone size={20} color="#fff" />
+                  </TouchableOpacity>
+                </Animated.View>
+              </ScrollView>
             </View>
           </ImageBackground>
         </View>

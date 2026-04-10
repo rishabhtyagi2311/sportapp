@@ -19,9 +19,9 @@ export interface MatchEvent {
   timestamp: Date;
 }
 
-export type EventType = 'goal' | 'penalty' | 'card' | 'substitution' | 'offside' | 'foul' | 'corner' | 'free_kick';
+export type EventType = 'goal' | 'penalty' | 'card' | 'substitution' | 'offside' | 'foul' | 'corner' | 'free_kick' | 'save';
 
-export type EventSubType = 
+export type EventSubType =
   | 'header' | 'left_foot' | 'right_foot' | 'penalty_goal' | 'free_kick_goal' | 'own_goal'
   | 'yellow_card' | 'red_card' | 'second_yellow'
   | 'dangerous_play' | 'unsporting_behavior' | 'dissent' | 'handball'
@@ -33,9 +33,8 @@ export type MatchStatus = 'preparing' | 'in_progress' | 'half_time' | 'second_ha
 // Match statistics
 export interface TeamStats {
   goals: number;
-  shots: number;
-  shotsOnTarget: number;
-  possession: number;
+  shots: number; // You can now increment this on goals/saves
+  saves: number; // NEW
   corners: number;
   fouls: number;
   yellowCards: number;
@@ -103,10 +102,15 @@ export interface ActiveMatch {
   homeTeamBench: string[];
   awayTeamOnPitch: string[];
   awayTeamBench: string[];
-  
+
   // NEW: Substitution Limits
   homeSubsUsed: number;
   awaySubsUsed: number;
+
+  homePossessionSeconds: number; // Running total
+  awayPossessionSeconds: number; // Running total
+  currentPossessionTeamId: string | null; // Who has it now?
+  lastPossessionChangeTime: number; // timestamp in seconds (match time)
 }
 
 export interface MatchExecutionState {
@@ -124,10 +128,10 @@ export interface MatchExecutionState {
   endMatch: (notes?: string) => CompletedMatch | null;
   abandonMatch: (reason: string) => void;
   addEvent: (event: Omit<MatchEvent, 'id' | 'timestamp'>) => void;
-  
+
   // NEW: Substitution Action
   performSubstitution: (teamId: string, playerOutId: string, playerInId: string, playerOutName: string, playerInName: string, minute: number, seconds: number) => void;
-  
+
   updateEvent: (eventId: string, updates: Partial<MatchEvent>) => void;
   removeEvent: (eventId: string) => void;
   updateMatchStatus: (status: MatchStatus) => void;
@@ -161,11 +165,14 @@ export interface MatchExecutionState {
 // Helper functions
 const calculateTeamStats = (events: MatchEvent[], teamId: string): TeamStats => {
   const teamEvents = events.filter(event => event.teamId === teamId);
+
+  const goals = teamEvents.filter(e => e.eventType === 'goal' && e.eventSubType !== 'own_goal').length;
+  const saves = teamEvents.filter(e => e.eventType === 'save').length;
+
   return {
-    goals: teamEvents.filter(e => e.eventType === 'goal' && e.eventSubType !== 'own_goal').length,
-    shots: 0,
-    shotsOnTarget: 0,
-    possession: 0,
+    goals,
+    saves,
+    shots: goals + saves, // Basic premium stat: Shots on target
     corners: teamEvents.filter(e => e.eventType === 'corner').length,
     fouls: teamEvents.filter(e => e.eventType === 'foul').length,
     yellowCards: teamEvents.filter(e => e.eventType === 'card' && e.eventSubType === 'yellow_card').length,
@@ -173,7 +180,6 @@ const calculateTeamStats = (events: MatchEvent[], teamId: string): TeamStats => 
     offsides: teamEvents.filter(e => e.eventType === 'offside').length,
   };
 };
-
 const calculatePlayerStats = (events: MatchEvent[], matchSetup: MatchCreationData): PlayerStats[] => {
   const allPlayers = [
     ...matchSetup.myTeam.selectedPlayers,
@@ -183,27 +189,27 @@ const calculatePlayerStats = (events: MatchEvent[], matchSetup: MatchCreationDat
   ];
   return allPlayers.map(playerId => {
     const playerEvents = events.filter(e => e.playerId === playerId || e.assistPlayerId === playerId);
-    
+
     const goals = playerEvents.filter(e => e.playerId === playerId && e.eventType === 'goal' && e.eventSubType !== 'own_goal').length;
     const assists = playerEvents.filter(e => e.assistPlayerId === playerId && e.eventType === 'goal').length;
     const yellowCards = playerEvents.filter(e => e.playerId === playerId && e.eventType === 'card' && e.eventSubType === 'yellow_card').length;
     const redCards = playerEvents.filter(e => e.playerId === playerId && e.eventType === 'card' && (e.eventSubType === 'red_card' || e.eventSubType === 'second_yellow')).length;
-    
+
     const substitutionOut = events.find(e => e.playerId === playerId && e.eventType === 'substitution');
     const substitutionIn = events.find(e => e.assistPlayerId === playerId && e.eventType === 'substitution');
-    
+
     let minutesPlayed = 0;
     // Check if player was in starting lineup
     const isStartingPlayer = matchSetup.myTeam.selectedPlayers.includes(playerId) || matchSetup.opponentTeam.selectedPlayers.includes(playerId);
-    
+
     if (isStartingPlayer) {
-      minutesPlayed = substitutionOut ? substitutionOut.minute : 90; 
+      minutesPlayed = substitutionOut ? substitutionOut.minute : 90;
     } else if (substitutionIn) {
-      minutesPlayed = 90 - substitutionIn.minute; 
+      minutesPlayed = 90 - substitutionIn.minute;
     }
     return {
       playerId,
-      playerName: 'Player Name', 
+      playerName: 'Player Name',
       goals,
       assists,
       yellowCards,
@@ -231,17 +237,37 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
       immer((set, get) => ({
         ...initialState,
 
+        togglePossession: (teamId: string, currentMatchSeconds: number) => set((state) => {
+          const match = state.activeMatch;
+          if (!match) return;
+
+          // 1. Calculate time spent by the PREVIOUS team
+          if (match.currentPossessionTeamId) {
+            const duration = currentMatchSeconds - match.lastPossessionChangeTime;
+            if (duration > 0) {
+              if (match.currentPossessionTeamId === match.matchSetup.myTeam.teamId) {
+                match.homePossessionSeconds += duration;
+              } else {
+                match.awayPossessionSeconds += duration;
+              }
+            }
+          }
+
+          // 2. Update to NEW team
+          match.currentPossessionTeamId = teamId;
+          match.lastPossessionChangeTime = currentMatchSeconds;
+        }),
         startMatch: (matchSetup) => set((state) => {
           const matchId = `match_${Date.now()}`;
           const now = new Date();
-          
+
           const newMatch: ActiveMatch = {
             id: matchId,
             matchSetup,
             startTime: now,
             timerStartedAt: now,
             currentMinute: 0,
-            status: 'preparing', 
+            status: 'preparing',
             events: [],
             homeTeamScore: 0,
             awayTeamScore: 0,
@@ -253,9 +279,14 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
             awayTeamOnPitch: [...matchSetup.opponentTeam.selectedPlayers],
             awayTeamBench: [...matchSetup.opponentTeam.substitutes],
             homeSubsUsed: 0,
-            awaySubsUsed: 0
+            awaySubsUsed: 0,
+            homePossessionSeconds: 0, // Running total
+  awayPossessionSeconds: 0, // Running total
+  currentPossessionTeamId: "", 
+  lastPossessionChangeTime: 0 
+
           };
-          
+
           state.activeMatch = newMatch;
           state.liveMatches.push(newMatch);
           state.error = null;
@@ -272,62 +303,62 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
         }),
 
         performSubstitution: (teamId, playerOutId, playerInId, playerOutName, playerInName, minute, seconds) => set((state) => {
-            if (!state.activeMatch) return;
-            
-            const isHome = teamId === state.activeMatch.matchSetup.myTeam.teamId;
-            const limit = state.activeMatch.matchSetup.matchSettings?.maxSubstitutions ?? 5;
-            const used = isHome ? state.activeMatch.homeSubsUsed : state.activeMatch.awaySubsUsed;
-        
-            if (used >= limit) {
-                state.error = "Maximum substitutions reached.";
-                return;
-            }
-        
-            // Swap in state
-            if (isHome) {
-                state.activeMatch.homeTeamOnPitch = state.activeMatch.homeTeamOnPitch.filter(id => id !== playerOutId);
-                state.activeMatch.homeTeamOnPitch.push(playerInId);
-                state.activeMatch.homeTeamBench = state.activeMatch.homeTeamBench.filter(id => id !== playerInId);
-                state.activeMatch.homeTeamBench.push(playerOutId); 
-                state.activeMatch.homeSubsUsed++;
-            } else {
-                state.activeMatch.awayTeamOnPitch = state.activeMatch.awayTeamOnPitch.filter(id => id !== playerOutId);
-                state.activeMatch.awayTeamOnPitch.push(playerInId);
-                state.activeMatch.awayTeamBench = state.activeMatch.awayTeamBench.filter(id => id !== playerInId);
-                state.activeMatch.awayTeamBench.push(playerOutId);
-                state.activeMatch.awaySubsUsed++;
-            }
-        
-            // Log Event
-            const newEvent: MatchEvent = {
-                id: `event_${Date.now()}`,
-                teamId,
-                eventType: 'substitution',
-                playerId: playerOutId, // Player leaving
-                playerName: playerOutName,
-                assistPlayerId: playerInId, // Player entering
-                assistPlayerName: playerInName,
-                minute,
-                seconds,
-                isExtraTime: false,
-                timestamp: new Date()
-            };
-            
-            state.activeMatch.events.push(newEvent);
-            state.activeMatch.events.sort((a, b) => a.minute - b.minute);
+          if (!state.activeMatch) return;
 
-            // Sync with LiveMatches
-            const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
-            if (liveMatchIndex !== -1) {
-                state.liveMatches[liveMatchIndex] = state.activeMatch; // Full sync recommended for roster changes
-            }
+          const isHome = teamId === state.activeMatch.matchSetup.myTeam.teamId;
+          const limit = state.activeMatch.matchSetup.matchSettings?.maxSubstitutions ?? 5;
+          const used = isHome ? state.activeMatch.homeSubsUsed : state.activeMatch.awaySubsUsed;
+
+          if (used >= limit) {
+            state.error = "Maximum substitutions reached.";
+            return;
+          }
+
+          // Swap in state
+          if (isHome) {
+            state.activeMatch.homeTeamOnPitch = state.activeMatch.homeTeamOnPitch.filter(id => id !== playerOutId);
+            state.activeMatch.homeTeamOnPitch.push(playerInId);
+            state.activeMatch.homeTeamBench = state.activeMatch.homeTeamBench.filter(id => id !== playerInId);
+            state.activeMatch.homeTeamBench.push(playerOutId);
+            state.activeMatch.homeSubsUsed++;
+          } else {
+            state.activeMatch.awayTeamOnPitch = state.activeMatch.awayTeamOnPitch.filter(id => id !== playerOutId);
+            state.activeMatch.awayTeamOnPitch.push(playerInId);
+            state.activeMatch.awayTeamBench = state.activeMatch.awayTeamBench.filter(id => id !== playerInId);
+            state.activeMatch.awayTeamBench.push(playerOutId);
+            state.activeMatch.awaySubsUsed++;
+          }
+
+          // Log Event
+          const newEvent: MatchEvent = {
+            id: `event_${Date.now()}`,
+            teamId,
+            eventType: 'substitution',
+            playerId: playerOutId, // Player leaving
+            playerName: playerOutName,
+            assistPlayerId: playerInId, // Player entering
+            assistPlayerName: playerInName,
+            minute,
+            seconds,
+            isExtraTime: false,
+            timestamp: new Date()
+          };
+
+          state.activeMatch.events.push(newEvent);
+          state.activeMatch.events.sort((a, b) => a.minute - b.minute);
+
+          // Sync with LiveMatches
+          const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+          if (liveMatchIndex !== -1) {
+            state.liveMatches[liveMatchIndex] = state.activeMatch; // Full sync recommended for roster changes
+          }
         }),
 
         addLiveMatch: (matchSetup) => {
           // ... (same as previous, just ensure roster is initialized if used here)
           const matchId = `match_${Date.now()}`;
           // ...
-          return matchId; 
+          return matchId;
         },
 
         updateLiveMatch: (matchId, updates) => set((state) => {
@@ -338,58 +369,58 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
         }),
 
         completeLiveMatch: (matchId, notes) => {
-           const state = get();
-           const matchIndex = state.liveMatches.findIndex(m => m.id === matchId);
-           if (matchIndex === -1) return null;
+          const state = get();
+          const matchIndex = state.liveMatches.findIndex(m => m.id === matchId);
+          if (matchIndex === -1) return null;
 
-           const match = state.liveMatches[matchIndex];
-           const endTime = new Date();
-           const actualDuration = Math.floor((endTime.getTime() - match.startTime.getTime()) / (1000 * 60));
-           
-           const homeTeamStats = calculateTeamStats(match.events, match.matchSetup.myTeam.teamId);
-           const awayTeamStats = calculateTeamStats(match.events, match.matchSetup.opponentTeam.teamId);
-           const playerStats = calculatePlayerStats(match.events, match.matchSetup);
-           
-           const completedMatch: CompletedMatch = {
-             id: match.id,
-             matchSetup: match.matchSetup,
-             startTime: match.startTime,
-             endTime,
-             actualDuration,
-             status: 'finished',
-             homeTeamScore: match.homeTeamScore,
-             awayTeamScore: match.awayTeamScore,
-             events: match.events,
-             homeTeamStats,
-             awayTeamStats,
-             playerStats,
-             referees: match.matchSetup.referees.map(ref => ref.name),
-             venue: match.matchSetup.venue?.name || 'Unknown Venue',
-             notes: notes || match.notes,
-             createdAt: match.startTime,
-             updatedAt: endTime,
-           };
-           
-           set((state) => {
-             state.completedMatches.unshift(completedMatch);
-             state.liveMatches.splice(matchIndex, 1);
-           });
-           return completedMatch;
+          const match = state.liveMatches[matchIndex];
+          const endTime = new Date();
+          const actualDuration = Math.floor((endTime.getTime() - match.startTime.getTime()) / (1000 * 60));
+
+          const homeTeamStats = calculateTeamStats(match.events, match.matchSetup.myTeam.teamId);
+          const awayTeamStats = calculateTeamStats(match.events, match.matchSetup.opponentTeam.teamId);
+          const playerStats = calculatePlayerStats(match.events, match.matchSetup);
+
+          const completedMatch: CompletedMatch = {
+            id: match.id,
+            matchSetup: match.matchSetup,
+            startTime: match.startTime,
+            endTime,
+            actualDuration,
+            status: 'finished',
+            homeTeamScore: match.homeTeamScore,
+            awayTeamScore: match.awayTeamScore,
+            events: match.events,
+            homeTeamStats,
+            awayTeamStats,
+            playerStats,
+            referees: match.matchSetup.referees.map(ref => ref.name),
+            venue: match.matchSetup.venue?.name || 'Unknown Venue',
+            notes: notes || match.notes,
+            createdAt: match.startTime,
+            updatedAt: endTime,
+          };
+
+          set((state) => {
+            state.completedMatches.unshift(completedMatch);
+            state.liveMatches.splice(matchIndex, 1);
+          });
+          return completedMatch;
         },
 
         endMatch: (notes) => {
           const state = get();
           if (!state.activeMatch) return null;
-          
+
           const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
-          
+
           const endTime = new Date();
           const actualDuration = Math.floor((endTime.getTime() - state.activeMatch.startTime.getTime()) / (1000 * 60));
-          
+
           const homeTeamStats = calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.myTeam.teamId);
           const awayTeamStats = calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.opponentTeam.teamId);
           const playerStats = calculatePlayerStats(state.activeMatch.events, state.activeMatch.matchSetup);
-          
+
           const completedMatch: CompletedMatch = {
             id: state.activeMatch.id,
             matchSetup: state.activeMatch.matchSetup,
@@ -409,7 +440,7 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
             createdAt: state.activeMatch.startTime,
             updatedAt: endTime,
           };
-          
+
           set((state) => {
             state.completedMatches.unshift(completedMatch);
             state.activeMatch = null;
@@ -417,7 +448,7 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
               state.liveMatches.splice(liveMatchIndex, 1);
             }
           });
-          
+
           return completedMatch;
         },
 
@@ -440,15 +471,16 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
             id: `event_${Date.now()}`,
             timestamp: new Date(),
           };
-          
+
           state.activeMatch.events.push(newEvent);
           state.activeMatch.events.sort((a, b) => a.minute - b.minute);
-          
+
           if (newEvent.eventType === 'goal') {
             const isHomeTeam = newEvent.teamId === state.activeMatch.matchSetup.myTeam.teamId;
             const isOwnGoal = newEvent.eventSubType === 'own_goal';
-            
+
             if (isOwnGoal) {
+              // If my team scores an own goal, the opponent gets the point
               if (isHomeTeam) state.activeMatch.awayTeamScore += 1;
               else state.activeMatch.homeTeamScore += 1;
             } else {
@@ -457,11 +489,10 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
             }
           }
 
+          // Update the live matches array to keep it in sync with the active match
           const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
           if (liveMatchIndex !== -1) {
-            state.liveMatches[liveMatchIndex].events = state.activeMatch.events;
-            state.liveMatches[liveMatchIndex].homeTeamScore = state.activeMatch.homeTeamScore;
-            state.liveMatches[liveMatchIndex].awayTeamScore = state.activeMatch.awayTeamScore;
+            state.liveMatches[liveMatchIndex] = state.activeMatch;
           }
         }),
 
@@ -471,53 +502,53 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
           if (eventIndex !== -1) {
             Object.assign(state.activeMatch.events[eventIndex], updates);
             state.activeMatch.events.sort((a, b) => a.minute - b.minute);
-            
+
             let homeScore = 0;
             let awayScore = 0;
             state.activeMatch.events.filter(e => e.eventType === 'goal').forEach(goal => {
-               const isHome = goal.teamId === state.activeMatch!.matchSetup.myTeam.teamId;
-               const isOwn = goal.eventSubType === 'own_goal';
-               if(isOwn) { isHome ? awayScore++ : homeScore++; }
-               else { isHome ? homeScore++ : awayScore++; }
+              const isHome = goal.teamId === state.activeMatch!.matchSetup.myTeam.teamId;
+              const isOwn = goal.eventSubType === 'own_goal';
+              if (isOwn) { isHome ? awayScore++ : homeScore++; }
+              else { isHome ? homeScore++ : awayScore++; }
             });
             state.activeMatch.homeTeamScore = homeScore;
             state.activeMatch.awayTeamScore = awayScore;
 
             const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
             if (liveMatchIndex !== -1) {
-               state.liveMatches[liveMatchIndex].events = state.activeMatch.events;
-               state.liveMatches[liveMatchIndex].homeTeamScore = homeScore;
-               state.liveMatches[liveMatchIndex].awayTeamScore = awayScore;
+              state.liveMatches[liveMatchIndex].events = state.activeMatch.events;
+              state.liveMatches[liveMatchIndex].homeTeamScore = homeScore;
+              state.liveMatches[liveMatchIndex].awayTeamScore = awayScore;
             }
           }
         }),
 
         removeEvent: (eventId) => set((state) => {
-           if (!state.activeMatch) return;
-           const index = state.activeMatch.events.findIndex(e => e.id === eventId);
-           if (index !== -1) {
-             const removed = state.activeMatch.events[index];
-             state.activeMatch.events.splice(index, 1);
-             
-             if (removed.eventType === 'goal') {
-                const isHome = removed.teamId === state.activeMatch.matchSetup.myTeam.teamId;
-                const isOwn = removed.eventSubType === 'own_goal';
-                if(isOwn) { 
-                   if(isHome) state.activeMatch.awayTeamScore = Math.max(0, state.activeMatch.awayTeamScore - 1);
-                   else state.activeMatch.homeTeamScore = Math.max(0, state.activeMatch.homeTeamScore - 1);
-                } else {
-                   if(isHome) state.activeMatch.homeTeamScore = Math.max(0, state.activeMatch.homeTeamScore - 1);
-                   else state.activeMatch.awayTeamScore = Math.max(0, state.activeMatch.awayTeamScore - 1);
-                }
-             }
+          if (!state.activeMatch) return;
+          const index = state.activeMatch.events.findIndex(e => e.id === eventId);
+          if (index !== -1) {
+            const removed = state.activeMatch.events[index];
+            state.activeMatch.events.splice(index, 1);
 
-             const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
-             if (liveMatchIndex !== -1) {
-               state.liveMatches[liveMatchIndex].events = state.activeMatch.events;
-               state.liveMatches[liveMatchIndex].homeTeamScore = state.activeMatch.homeTeamScore;
-               state.liveMatches[liveMatchIndex].awayTeamScore = state.activeMatch.awayTeamScore;
-             }
-           }
+            if (removed.eventType === 'goal') {
+              const isHome = removed.teamId === state.activeMatch.matchSetup.myTeam.teamId;
+              const isOwn = removed.eventSubType === 'own_goal';
+              if (isOwn) {
+                if (isHome) state.activeMatch.awayTeamScore = Math.max(0, state.activeMatch.awayTeamScore - 1);
+                else state.activeMatch.homeTeamScore = Math.max(0, state.activeMatch.homeTeamScore - 1);
+              } else {
+                if (isHome) state.activeMatch.homeTeamScore = Math.max(0, state.activeMatch.homeTeamScore - 1);
+                else state.activeMatch.awayTeamScore = Math.max(0, state.activeMatch.awayTeamScore - 1);
+              }
+            }
+
+            const liveMatchIndex = state.liveMatches.findIndex(m => m.id === state.activeMatch?.id);
+            if (liveMatchIndex !== -1) {
+              state.liveMatches[liveMatchIndex].events = state.activeMatch.events;
+              state.liveMatches[liveMatchIndex].homeTeamScore = state.activeMatch.homeTeamScore;
+              state.liveMatches[liveMatchIndex].awayTeamScore = state.activeMatch.awayTeamScore;
+            }
+          }
         }),
 
         updateMatchStatus: (status) => set((state) => {
@@ -568,29 +599,29 @@ export const useMatchExecutionStore = create<MatchExecutionState>()(
         }),
 
         getMatchDuration: () => {
-           const state = get();
-           if (!state.activeMatch) return 0;
-           return Math.floor((new Date().getTime() - state.activeMatch.startTime.getTime()) / (1000 * 60));
+          const state = get();
+          if (!state.activeMatch) return 0;
+          return Math.floor((new Date().getTime() - state.activeMatch.startTime.getTime()) / (1000 * 60));
         },
 
         getTeamScore: (teamId) => {
-           const state = get();
-           if (!state.activeMatch) return 0;
-           return teamId === state.activeMatch.matchSetup.myTeam.teamId 
-             ? state.activeMatch.homeTeamScore 
-             : state.activeMatch.awayTeamScore;
+          const state = get();
+          if (!state.activeMatch) return 0;
+          return teamId === state.activeMatch.matchSetup.myTeam.teamId
+            ? state.activeMatch.homeTeamScore
+            : state.activeMatch.awayTeamScore;
         },
 
         getTeamEvents: (teamId) => get().activeMatch?.events.filter(e => e.teamId === teamId) || [],
         getPlayerEvents: (playerId) => get().activeMatch?.events.filter(e => e.playerId === playerId || e.assistPlayerId === playerId) || [],
-        
+
         getMatchStats: () => {
-           const state = get();
-           if (!state.activeMatch) return { homeStats: {} as TeamStats, awayStats: {} as TeamStats };
-           return {
-             homeStats: calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.myTeam.teamId),
-             awayStats: calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.opponentTeam.teamId)
-           };
+          const state = get();
+          if (!state.activeMatch) return { homeStats: {} as TeamStats, awayStats: {} as TeamStats };
+          return {
+            homeStats: calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.myTeam.teamId),
+            awayStats: calculateTeamStats(state.activeMatch.events, state.activeMatch.matchSetup.opponentTeam.teamId)
+          };
         },
 
         getCompletedMatches: () => get().completedMatches,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
+import { router } from 'expo-router';
 interface QuickActionModalProps {
   isVisible: boolean;
   onClose: () => void;
@@ -56,15 +56,15 @@ export default function ActionModal({ isVisible, onClose }: QuickActionModalProp
           {/* LOG SECTION */}
           <SectionHeader title="Log" />
           <View className="flex-row justify-around items-center">
-            <ActionButton icon="barbell-outline" label="Workout" onPress={() => {}} />
-            <ActionButton icon="fast-food-outline" label="Nutrition" onPress={() => {}} />
-            <ActionButton icon="heart-outline" label="Health" onPress={() => {}} />
+            <ActionButton icon="barbell-outline" label="Workout" onPress={() => {router.navigate('/(log)/workoutLog')}} />
+            <ActionButton icon="fast-food-outline" label="Nutrition" onPress={() => {router.navigate('/(log)/nutritionLog')}} />
+            <ActionButton icon="heart-outline" label="Health" onPress={() => {router.navigate('/(log)/healthLog')}} />
           </View>
 
           {/* BOOK SECTION */}
           <SectionHeader title="Book" />
           <View className="flex-row justify-around items-center">
-            <ActionButton icon="ribbon-outline" label="Coach" onPress={() => {}} />
+            <ActionButton icon="ribbon-outline" label="Coach" onPress={() => {router.navigate('/(log)')}} />
             <ActionButton icon="map-outline" label="Venue" onPress={() => {}} />
             <ActionButton icon="fitness-outline" label="Gym" onPress={() => {}} />
           </View>

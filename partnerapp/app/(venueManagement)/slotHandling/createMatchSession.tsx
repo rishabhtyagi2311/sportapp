@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useForm, Controller } from 'react-hook-form';
 import { useMatchSessionStore } from '@/store/matchSessionStore';
 
@@ -23,21 +23,22 @@ export default function CreateMatchSession() {
   const params = useLocalSearchParams();
   const createSession = useMatchSessionStore((state) => state.createSession);
 
-  const { control, handleSubmit, watch, formState: { errors } } = useForm<MatchForm>({
+  const { control, handleSubmit, setValue, watch, formState: { errors } } = useForm<MatchForm>({
     defaultValues: {
       sport: 'Football',
-      totalPlayers: '16',
-      minPlayers: '12',
+      totalPlayers: '14',
+      minPlayers: '10',
       price: '',
-      skillLevel: 'Open',
+      skillLevel: 'Intermediate',
       description: '',
     }
   });
 
+  const currentSkill = watch('skillLevel');
+
   const onSubmit = (data: MatchForm) => {
-    // Basic Security Check: Min players cannot exceed total players
     if (parseInt(data.minPlayers) > parseInt(data.totalPlayers)) {
-      Alert.alert("Invalid Logic", "Minimum players for 'Live' status cannot exceed total players.");
+      Alert.alert("Logic Error", "Min players cannot be higher than total players.");
       return;
     }
 
@@ -60,113 +61,107 @@ export default function CreateMatchSession() {
     };
 
     createSession(newSession);
-    Alert.alert("Success", "Match session is now live for registration!");
+    Alert.alert("Success", "Match published successfully!");
     router.back();
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
         className="flex-1"
       >
-        {/* HEADER */}
-        <View className="px-4 py-4 border-b border-slate-100 flex-row items-center justify-between">
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="close" size={28} color="#1e293b" />
+        {/* MODAL HEADER */}
+        <View className="px-6 py-4 bg-white flex-row items-center justify-between shadow-sm">
+          <TouchableOpacity 
+            onPress={() => router.back()}
+            className="bg-slate-100 p-2 rounded-full"
+          >
+            <Ionicons name="close" size={20} color="#64748b" />
           </TouchableOpacity>
-          <Text className="text-xl font-bold text-slate-900">New Match Session</Text>
+          <Text className="text-lg font-bold text-slate-900">Create Session</Text>
           <View className="w-10" /> 
         </View>
 
-        <ScrollView className="flex-1 px-6 pt-6" showsVerticalScrollIndicator={false}>
-          {/* SLOT SUMMARY CARD */}
-          <View className="bg-slate-900 p-5 rounded-3xl mb-8 flex-row items-center justify-between">
-            <View>
-              <Text className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Selected Slot</Text>
-              <Text className="text-white text-lg font-bold mt-1">{params.startTime} - {params.endTime}</Text>
-              <Text className="text-slate-400 text-xs">{params.date}</Text>
+        <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 24 }}>
+          
+          {/* INFO CARD */}
+          <View className="bg-slate-900 p-6 rounded-[32px] mb-8 shadow-xl shadow-slate-900">
+            <View className="flex-row items-center space-x-3 mb-4">
+               <View className="bg-white/20 p-2 rounded-xl">
+                 <Ionicons name="calendar" size={20} color="white" />
+               </View>
+               <Text className="text-white/80 font-medium">{params.date}</Text>
             </View>
-            <FontAwesome5 name="calendar-check" size={24} color="#60a5fa" />
+            <Text className="text-white text-3xl font-bold">{params.startTime} - {params.endTime}</Text>
+            <Text className="text-slate-900 mt-1 opacity-80">{params.venueName || 'Premium Turf Center'}</Text>
           </View>
 
-          {/* FORM FIELDS */}
-          <View className="space-y-6 pb-20">
-            
-            {/* Sport Selection */}
+          <View className="space-y-8">
+            {/* SPORT TYPE */}
             <View>
-              <Text className="text-slate-700 font-bold mb-2">Sport Type</Text>
+              <Label text="What are we playing?" />
               <Controller
                 control={control}
                 name="sport"
                 render={({ field: { onChange, value } }) => (
-                  <TextInput 
-                    className="bg-slate-50 border border-slate-200 p-4 rounded-2xl"
-                    placeholder="e.g. Football (7-a-side)"
-                    value={value}
-                    onChangeText={onChange}
-                  />
+                  <View className="flex-row items-center bg-white border border-slate-200 rounded-2xl px-4 py-1">
+                    <MaterialCommunityIcons name="soccer" size={20} color="#6366f1" />
+                    <TextInput 
+                      className="flex-1 p-4 text-slate-900 font-medium"
+                      placeholder="e.g. Football (7v7)"
+                      value={value}
+                      onChangeText={onChange}
+                    />
+                  </View>
                 )}
               />
             </View>
 
-            {/* Players Config */}
+            {/* SKILL LEVEL CHIPS */}
+            <View>
+              <Label text="Skill Level" />
+              <View className="flex-row flex-wrap gap-2">
+                {['Beginner', 'Intermediate', 'Advanced', 'Open'].map((level) => (
+                  <TouchableOpacity 
+                    key={level}
+                    onPress={() => setValue('skillLevel', level)}
+                    className={`px-5 py-3 rounded-full border ${currentSkill === level ? 'bg-slate-900 border-slate-900' : 'bg-white border-slate-200'}`}
+                  >
+                    <Text className={`font-semibold ${currentSkill === level ? 'text-white' : 'text-slate-500'}`}>{level}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* PLAYER CONFIG & PRICING */}
             <View className="flex-row justify-between">
               <View className="w-[48%]">
-                <Text className="text-slate-700 font-bold mb-2">Total Players</Text>
+                <Label text="Capacity" />
                 <Controller
                   control={control}
                   name="totalPlayers"
                   render={({ field: { onChange, value } }) => (
-                    <TextInput 
-                      keyboardType="numeric"
-                      className="bg-slate-50 border border-slate-200 p-4 rounded-2xl"
-                      value={value}
-                      onChangeText={onChange}
-                    />
+                    <InputWithIcon icon="people" value={value} onChangeText={onChange} keyboardType="numeric" />
                   )}
                 />
               </View>
               <View className="w-[48%]">
-                <Text className="text-slate-700 font-bold mb-2">Min. to Go Live</Text>
+                <Label text="Price (₹)" />
                 <Controller
                   control={control}
-                  name="minPlayers"
+                  name="price"
+                  rules={{ required: true }}
                   render={({ field: { onChange, value } }) => (
-                    <TextInput 
-                      keyboardType="numeric"
-                      className="bg-slate-50 border border-slate-200 p-4 rounded-2xl"
-                      value={value}
-                      onChangeText={onChange}
-                    />
+                    <InputWithIcon icon="cash-outline" value={value} onChangeText={onChange} keyboardType="numeric" placeholder="0.00" />
                   )}
                 />
               </View>
             </View>
 
-            {/* Pricing */}
+            {/* DESCRIPTION */}
             <View>
-              <Text className="text-slate-700 font-bold mb-2">Price per Person (₹)</Text>
-              <Controller
-                control={control}
-                name="price"
-                rules={{ required: true }}
-                render={({ field: { onChange, value } }) => (
-                  <TextInput 
-                    keyboardType="numeric"
-                    placeholder="Enter amount"
-                    className="bg-slate-50 border border-slate-200 p-4 rounded-2xl"
-                    value={value}
-                    onChangeText={onChange}
-                  />
-                )}
-              />
-              {errors.price && <Text className="text-red-500 text-xs mt-1">Price is required</Text>}
-            </View>
-
-            {/* Description */}
-            <View>
-              <Text className="text-slate-700 font-bold mb-2">Match Rules / Notes</Text>
+              <Label text="Match Details" />
               <Controller
                 control={control}
                 name="description"
@@ -174,8 +169,8 @@ export default function CreateMatchSession() {
                   <TextInput 
                     multiline
                     numberOfLines={4}
-                    placeholder="e.g. We provide bibs. Please bring your own water."
-                    className="bg-slate-50 border border-slate-200 p-4 rounded-2xl h-32"
+                    placeholder="Rules, bibs info, or parking details..."
+                    className="bg-white border border-slate-200 p-4 rounded-2xl h-32 text-slate-900"
                     textAlignVertical="top"
                     value={value}
                     onChangeText={onChange}
@@ -184,19 +179,33 @@ export default function CreateMatchSession() {
               />
             </View>
           </View>
+          <View className="h-10" />
         </ScrollView>
 
-        {/* FOOTER BUTTON */}
-        <View className="p-6 border-t border-slate-100">
+        {/* FLOATING FOOTER */}
+        <View className="px-6 py-6 bg-white border-t border-slate-100 shadow-2xl">
           <TouchableOpacity 
             onPress={handleSubmit(onSubmit)}
-            className="bg-blue-600 py-5 rounded-2xl items-center shadow-lg shadow-blue-200"
+            activeOpacity={0.8}
+            className="bg-slate-900 py-5 rounded-2xl items-center shadow-lg shadow-slate-900"
           >
-            <Text className="text-white font-bold text-lg">Publish Match Session</Text>
+            <Text className="text-white font-bold text-lg">Publish Match</Text>
           </TouchableOpacity>
         </View>
-
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
+// --- SUB-COMPONENTS FOR CLEANER CODE ---
+
+const Label = ({ text }: { text: string }) => (
+  <Text className="text-slate-500 font-bold mb-3 uppercase text-[11px] tracking-wider ml-1">{text}</Text>
+);
+
+const InputWithIcon = ({ icon, ...props }: any) => (
+  <View className="flex-row items-center bg-white border border-slate-200 rounded-2xl px-4 py-1">
+    <Ionicons name={icon} size={18} color="#6366f1" />
+    <TextInput className="flex-1 p-4 text-slate-900 font-bold" {...props} />
+  </View>
+);

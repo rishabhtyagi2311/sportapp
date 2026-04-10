@@ -32,7 +32,7 @@ export default function BookingScreen() {
       title: 'Join a Match',
       subtitle: 'Pay per head • Meet players',
       icon: <Ionicons name="people" size={30} color="#10b981" />,
-      path: '/match-sessions', // The new screen we discussed
+      path: '/(venue)/(matchSessionsManagement)/view', // The new screen we discussed
       accent: 'border-emerald-500/20'
     },
   ];
