@@ -7,21 +7,21 @@ import {
   ScrollView, 
   KeyboardAvoidingView, 
   Platform,
-  StatusBar
+  StatusBar,
+  Dimensions
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
+import { useVenueStore } from '@/store/venueStore'
 
-// 1. IMPORT ONLY THE MAIN STORE
-import { useVenueStore } from '@/store/venueStore' // Adjust path if needed
+const { width } = Dimensions.get('window');
+const isTablet = width > 768;
 
 export default function Step1Essentials() {
   const router = useRouter()
-
-  /* -------------------------------------------------------------------------- */
-  /* 2. ZUSTAND SELECTORS (Atomic selection to prevent re-renders)              */
-  /* -------------------------------------------------------------------------- */
+  const [activeField, setActiveField] = useState<string | null>(null)
+  
   const draftName = useVenueStore((state) => state.draftVenue.name)
   const draftDesc = useVenueStore((state) => state.draftVenue.description)
   const draftPhone = useVenueStore((state) => state.draftVenue.contactInfo.phone)
@@ -30,43 +30,55 @@ export default function Step1Essentials() {
   const updateDraftVenue = useVenueStore((state) => state.updateDraftVenue)
   const updateDraftContact = useVenueStore((state) => state.updateDraftContact)
 
-  /* -------------------------------------------------------------------------- */
-  /* 3. LOCAL STATE (For Input Handling)                                        */
-  /* -------------------------------------------------------------------------- */
   const [error, setError] = useState('')
 
-  /* -------------------------------------------------------------------------- */
-  /* 4. HANDLERS                                                                */
-  /* -------------------------------------------------------------------------- */
-  
   const handleNext = () => {
     if (!draftName || draftName.length < 3) {
-      setError("Please enter a valid venue name.")
+      setError("Venue name must be at least 3 characters.")
       return
     }
     if (!draftPhone || draftPhone.length < 10) {
-      setError("Please enter a valid contact number.")
+      setError("Please enter a valid 10-digit phone number.")
       return
     }
-
-    // No need to "save" here, data is saved on every keystroke via onChangeText
-    // Just navigate
     router.push('/(venueManagement)/venueHandling/createVenue/step-2')
   }
 
+  // Common Input Style Helper
+ const getInputStyle = (fieldName: string) => {
+  const base = "bg-white border rounded-2xl px-4 py-4 text-slate-900 text-lg font-semibold shadow-sm mb-4";
+  
+  if (error && fieldName === 'name' && !draftName) {
+    return `${base} border-red-500 bg-red-50`;
+  }
+  
+  return activeField === fieldName 
+    ? `${base} border-blue-600` // Use a simple border color change instead of a ring
+    : `${base} border-slate-200`;
+}
   return (
-    <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
-      {/* HEADER */}
-      <View className="flex-row items-center px-4 py-4 bg-white border-b border-slate-100">
-        <TouchableOpacity 
-          onPress={() => router.back()} 
-          className="w-10 h-10 rounded-full bg-slate-50 items-center justify-center mr-3"
-        >
-          <Ionicons name="arrow-back" size={24} color="#1e293b" />
-        </TouchableOpacity>
-        <Text className="text-xl font-bold text-slate-900">Add New Venue</Text>
+      {/* HEADER & PROGRESS */}
+      <View className="bg-white border-b border-slate-50">
+        <View className="flex-row items-center px-4 py-3 justify-between">
+          <TouchableOpacity 
+            onPress={() => router.back()} 
+            className="w-10 h-10 rounded-full items-center justify-center"
+          >
+            <Ionicons name="close-outline" size={28} color="#64748b" />
+          </TouchableOpacity>
+          <View className="flex-1 items-center">
+            <Text className="text-slate-400 text-xs font-bold uppercase tracking-widest">Setup</Text>
+            <Text className="text-slate-900 font-bold">Venue Identity</Text>
+          </View>
+          <View className="w-10" /> 
+        </View>
+        {/* Modern Progress Bar */}
+        <View className="h-1.5 w-full bg-slate-100 flex-row">
+          <View className="h-full bg-blue-600 w-1/5 rounded-r-full" />
+        </View>
       </View>
 
       <KeyboardAvoidingView 
@@ -74,115 +86,121 @@ export default function Step1Essentials() {
         className="flex-1"
       >
         <ScrollView 
-          className="flex-1"
-          contentContainerStyle={{ padding: 24, paddingBottom: 100 }}
+          className="flex-1 bg-slate-50/50"
+          contentContainerStyle={{ 
+            paddingHorizontal: isTablet ? 40 : 20, 
+            paddingTop: 32, 
+            paddingBottom: 120 
+          }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View className="mb-8">
-            <Text className="text-sm font-bold text-blue-600 uppercase tracking-wider mb-2">Step 1 of 5</Text>
-            <Text className="text-3xl font-extrabold text-slate-900 mb-2">Basic Details</Text>
-            <Text className="text-slate-500 text-base">Enter the essential details for your sports venue.</Text>
-          </View>
-
-          <View className="space-y-6">
-            
-            {/* VENUE NAME */}
-            <View>
-              <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">
-                Venue Name <Text className="text-red-500">*</Text>
+          {/* CONTENT WRAPPER (Restricts width on Tablets) */}
+          <View className="self-center w-full max-w-2xl">
+            <View className="mb-10">
+              <Text className="text-4xl font-black text-slate-900 tracking-tight mb-2">
+                Let's start with the basics
               </Text>
-              <TextInput
-                value={draftName}
-                onChangeText={(text) => {
-                  updateDraftVenue({ name: text }) // Update store directly
-                  if (error) setError('')
-                }}
-                placeholder="e.g. Spartan Sports Arena"
-                placeholderTextColor="#cbd5e1"
-                className={`bg-white border ${error ? 'border-red-500' : 'border-slate-200'} rounded-2xl px-4 py-4 text-slate-900 text-lg font-semibold shadow-sm`}
-              />
             </View>
 
-            {/* CONTACT NUMBER (Since we removed sign-up store, we need this input back) */}
-            <View>
-              <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">
-                Contact Number <Text className="text-red-500">*</Text>
-              </Text>
-              <TextInput
-                value={draftPhone}
-                onChangeText={(text) => {
-                   updateDraftContact({ phone: text }) // Updates draftVenue.contactInfo.phone
-                   if (error) setError('')
-                }}
-                keyboardType="number-pad"
-                maxLength={10}
-                placeholder="98765 43210"
-                placeholderTextColor="#cbd5e1"
-                className="bg-white border border-slate-200 rounded-2xl px-4 py-4 text-slate-900 text-lg font-semibold shadow-sm"
-              />
-            </View>
+            <View className="space-y-8">
+              
+              {/* VENUE NAME */}
+              <View>
+                <Text className="text-sm font-bold text-slate-700 mb-3 ml-1">
+                  Venue Name <Text className="text-blue-600">*</Text>
+                </Text>
+                <TextInput
+                  value={draftName}
+                  onFocus={() => setActiveField('name')}
+                  onBlur={() => setActiveField(null)}
+                  onChangeText={(text) => {
+                    updateDraftVenue({ name: text })
+                    if (error) setError('')
+                  }}
+                  placeholder="The Grand Arena"
+                  placeholderTextColor="#94a3b8"
+                  className={getInputStyle('name')}
+                />
+              </View>
 
-            {/* DESCRIPTION */}
-            <View>
-              <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">
-                About Venue (Optional)
-              </Text>
-              <View className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm h-32">
+              {/* CONTACT & WHATSAPP ROW (Grid for Tablet, Stack for Mobile) */}
+              <View className={`${isTablet ? 'flex-row space-x-4' : 'space-y-8'}`}>
+                <View className="flex-1">
+                  <Text className="text-sm font-bold text-slate-700 mb-3 ml-1">Contact Phone</Text>
+                  <TextInput
+                    value={draftPhone}
+                    onFocus={() => setActiveField('phone')}
+                    onBlur={() => setActiveField(null)}
+                    onChangeText={(text) => updateDraftContact({ phone: text })}
+                    keyboardType="number-pad"
+                    maxLength={10}
+                    placeholder="99999 00000"
+                    placeholderTextColor="#94a3b8"
+                    className={getInputStyle('phone')}
+                  />
+                </View>
+
+                <View className="flex-1">
+                  <Text className="text-sm font-bold text-slate-700 mb-3 ml-1">WhatsApp (Optional)</Text>
+                  <View className="relative">
+                    <View className="absolute left-4 top-4 z-10">
+                      <FontAwesome5 name="whatsapp" size={20} color={activeField === 'whatsapp' ? '#10b981' : '#cbd5e1'} />
+                    </View>
+                    <TextInput
+                      value={draftWhatsapp}
+                      onFocus={() => setActiveField('whatsapp')}
+                      onBlur={() => setActiveField(null)}
+                      onChangeText={(text) => updateDraftContact({ whatsapp: text })}
+                      keyboardType="number-pad"
+                      maxLength={10}
+                      className={`${getInputStyle('whatsapp')} pl-12`}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* DESCRIPTION */}
+              <View>
+                <Text className="text-sm font-bold text-slate-700 mb-3 ml-1">About the Venue</Text>
                 <TextInput
                   value={draftDesc}
+                  onFocus={() => setActiveField('desc')}
+                  onBlur={() => setActiveField(null)}
                   onChangeText={(text) => updateDraftVenue({ description: text })}
                   multiline
+                  numberOfLines={4}
                   textAlignVertical="top"
-                  placeholder="Tell customers about your turf quality..."
-                  placeholderTextColor="#cbd5e1"
-                  className="flex-1 text-slate-700 text-base font-medium leading-6"
+                  placeholder="Briefly describe your facilities, turf type, or special features..."
+                  placeholderTextColor="#94a3b8"
+                  className={`${getInputStyle('desc')} h-32 leading-6 py-4`}
                 />
               </View>
-            </View>
 
-            {/* WHATSAPP */}
-            <View>
-              <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">
-                WhatsApp Number (Optional)
-              </Text>
-              <View className="relative">
-                <View className="absolute left-4 top-4 z-10">
-                  <FontAwesome5 name="whatsapp" size={20} color="#10b981" />
+              {/* ERROR ALERT */}
+              {error ? (
+                <View className="bg-red-50 border border-red-100 p-4 rounded-2xl flex-row items-center">
+                  <Ionicons name="alert-circle" size={24} color="#ef4444" />
+                  <Text className="ml-3 text-red-700 font-semibold flex-1">{error}</Text>
                 </View>
-                <TextInput
-                  value={draftWhatsapp}
-                  onChangeText={(text) => updateDraftContact({ whatsapp: text })}
-                  keyboardType="number-pad"
-                  maxLength={10}
-                  placeholder="If different from contact"
-                  placeholderTextColor="#cbd5e1"
-                  className="bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-4 text-slate-900 text-base font-medium shadow-sm"
-                />
-              </View>
+              ) : null}
             </View>
-
-            {/* ERROR MESSAGE */}
-            {error ? (
-              <View className="bg-red-50 p-4 rounded-xl flex-row items-center">
-                <MaterialIcons name="error" size={20} color="#ef4444" />
-                <Text className="ml-2 text-red-600 font-bold text-sm">{error}</Text>
-              </View>
-            ) : null}
-
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* FOOTER */}
-      <View className="p-6 bg-white border-t border-slate-100 shadow-sm mb-6">
+      {/* STICKY FOOTER */}
+      <View 
+        className="absolute bottom-0 left-0 right-0 p-6 bg-white border-t border-slate-100 items-center"
+        style={{ paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}
+      >
         <TouchableOpacity
           onPress={handleNext}
           activeOpacity={0.8}
-          className="bg-slate-900 w-full py-4 rounded-2xl items-center shadow-lg shadow-slate-300 flex-row justify-center"
+          className={`bg-slate-900 rounded-2xl items-center flex-row justify-center h-16 ${isTablet ? 'w-80' : 'w-full'}`}
         >
-          <Text className="text-white font-bold text-lg mr-2">Next Step</Text>
-          <MaterialIcons name="arrow-forward" size={20} color="white" />
+          <Text className="text-white font-black text-lg mr-2">Continue</Text>
+          <MaterialIcons name="arrow-forward" size={22} color="white" />
         </TouchableOpacity>
       </View>
     </SafeAreaView>

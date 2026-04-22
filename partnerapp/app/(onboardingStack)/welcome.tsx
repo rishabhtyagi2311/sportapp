@@ -7,316 +7,173 @@ import {
   SafeAreaView,
   Dimensions,
   Image,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withRepeat,
   withTiming,
-  Easing,
+  withSpring,
 } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
+const isTablet = width >= 500;
 
-// Premium Color Palette
+const responsiveFontSize = (f: number) => (isTablet ? f * 1.3 : f);
+
 const COLORS = {
-  skyBlue: '#E0F2FE',
-  navyBlue: '#0F172A',
-  darkBrown: '#4B2E2B',
-  white: '#FFFFFF',
-  darkText: '#1E293B',
-  brown200: '#A89878',
-  brown300: '#8B7355',
-  skyBlue300: '#7DD3FC',
-  skyBlue400: '#38BDF8',
-  navyBlue900: '#001F3F',
-  cream: '#FFFAF5',
-  darkNavy: '#0A0E1F',
-  lightBrown: '#D4B5A0',
-  logoRed: '#FF4B4B',
-  logoGreen: '#4EAE6E',
+  navy900: '#0F172A',
+  emerald600: '#059669',
+  sky400: '#38BDF8',
 };
 
-// ✅ MOVED OUTSIDE - Animated Bubble
-const AnimatedBubble: FC<{
-  size: number;
-  color: string;
-  delay: number;
-  left: number;
-}> = ({ size, color, delay, left }) => {
-  const yPosition = useSharedValue(-size);
-  
-  useEffect(() => {
-    yPosition.value = withRepeat(
-      withTiming(height + size, {
-        duration: 15000 + delay * 1000,
-        easing: Easing.linear,
-      }),
-      -1,
-      false
-    );
-  }, [delay]);
-
-  const bubbleStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: yPosition.value }],
-  }));
-
-  return (
-    <Animated.View
-      className="absolute rounded-full"
-      style={[
-        {
-          width: size,
-          height: size,
-          backgroundColor: color,
-          left,
-          opacity: 0.08,
-        },
-        bubbleStyle,
-      ]}
-    />
-  );
-};
-
-// ✅ MOVED OUTSIDE - Sportify Logo
-const SportifyLogo: FC = () => {
-  const scale = useSharedValue(0.85);
-  const opacity = useSharedValue(0);
+const HeroSection: FC = () => {
+  const fadeAnim = useSharedValue(0);
+  const slideAnim = useSharedValue(30);
 
   useEffect(() => {
-    scale.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.cubic) });
-    opacity.value = withTiming(1, { duration: 800 });
+    fadeAnim.value = withTiming(1, { duration: 1000 });
+    slideAnim.value = withSpring(0);
   }, []);
 
-  const logoStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: fadeAnim.value,
+    transform: [{ translateY: slideAnim.value }],
   }));
 
   return (
-    <Animated.View style={[logoStyle]} className="mb-5 -mt-12 items-center">
-      <Image
-        source={require("@/assets/images/app_name.jpeg")}
-        style={{ width: 200, height: 100, resizeMode: 'contain' }}
-      />
+    <Animated.View style={[animatedStyle]} className="items-center mb-10 mt-6">
+      <View className="bg-white rounded-3xl p-4 mb-8 mt-10 shadow-sm border border-slate-100">
+        <Image
+          source={require("@/assets/images/app_name.jpeg")}
+          style={{ width: isTablet ? 280 : 180, height: isTablet ? 80 : 50, resizeMode: 'contain' }}
+        />
+      </View>
+      
+      <View className="px-4">
+        <Text 
+          style={{ fontSize: responsiveFontSize(40) }} 
+          className="font-black text-slate-900 leading-none text-center tracking-tight"
+        >
+          Scale Your{"\n"}
+          <Text className="text-emerald-600">Sports Business.</Text>
+        </Text>
+        <Text 
+          style={{ fontSize: responsiveFontSize(16) }}
+          className="text-slate-500 text-center mt-4 font-medium px-6"
+        >
+          The professional command center for academy owners and venue managers.
+        </Text>
+      </View>
     </Animated.View>
   );
 };
 
-// ✅ MOVED OUTSIDE - Hero Section
-const HeroSection: FC = () => {
-  const titleScale = useSharedValue(0.9);
-  const titleOpacity = useSharedValue(0);
-  const descriptionTranslateY = useSharedValue(20);
-  const descriptionOpacity = useSharedValue(0);
-
-  useEffect(() => {
-    titleScale.value = withTiming(1, { duration: 900, easing: Easing.out(Easing.cubic) });
-    titleOpacity.value = withTiming(1, { duration: 900 });
-    descriptionTranslateY.value = withTiming(0, { duration: 1000, easing: Easing.out(Easing.cubic) });
-    descriptionOpacity.value = withTiming(1, { duration: 1000 });
-  }, []);
-
-  const titleStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: titleScale.value }],
-    opacity: titleOpacity.value,
-  }));
-
-  const descStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: descriptionTranslateY.value }],
-    opacity: descriptionOpacity.value,
-  }));
-
-  return (
-    <View className="items-center mb-8">
-      <SportifyLogo />
-      <Animated.View style={[titleStyle]} className="mb-4">
-        <Text className="text-4xl font-black text-slate-900 text-center leading-tight tracking-tight">
-          Register.
-        </Text>
-        <Text className="text-4xl font-black text-sky-500 text-center leading-tight tracking-tight">
-          Manage.
-          <Text style={{ color: COLORS.logoGreen }}> Earn.</Text>
-        </Text>
-      </Animated.View>
-      <Animated.View style={descStyle}>
-        <Text className="text-base text-center font-medium leading-6 text-sky-700">
-          Manage Your Academies and Sport Venues. 
-        </Text>
-      </Animated.View>
+const FeatureCard: FC<{ icon: string, title: string, desc: string, color: string }> = ({ icon, title, desc, color }) => (
+  <View 
+    style={{ width: isTablet ? '48%' : '100%' }} 
+    className="bg-white p-6 rounded-3xl mb-4 border border-slate-100 shadow-sm"
+  >
+    <View style={{ backgroundColor: color + '15' }} className="w-12 h-12 rounded-2xl items-center justify-center mb-4">
+      <MaterialCommunityIcons name={icon as any} size={24} color={color} />
     </View>
-  );
-};
+    <Text className="text-slate-900 font-bold text-lg mb-1">{title}</Text>
+    <Text className="text-slate-500 text-sm leading-5 font-medium">{desc}</Text>
+  </View>
+);
 
-// ✅ MOVED OUTSIDE - Create Account Section
-const CreateAccountSection: FC<{ onSignUp: () => void }> = ({ onSignUp }) => {
-  const containerOpacity = useSharedValue(0);
-  const containerScale = useSharedValue(0.95);
+const WelcomeScreen: FC = () => {
+  const router = useRouter();
 
-  useEffect(() => {
-    containerOpacity.value = withTiming(1, { duration: 1000, easing: Easing.out(Easing.cubic) });
-    containerScale.value = withTiming(1, { duration: 1000, easing: Easing.out(Easing.cubic) });
-  }, []);
-
-  const containerStyle = useAnimatedStyle(() => ({
-    opacity: containerOpacity.value,
-    transform: [{ scale: containerScale.value }],
-  }));
+  const handleSignUp = () => router.push('/(homeScreenTabs)');
+  const handleSignIn = () => router.push('/(homeScreenTabs)');
 
   return (
-    <Animated.View style={[containerStyle]} className="my-8">
-      <View
-        className="rounded-3xl p-8 border-2 overflow-hidden"
-        style={{
-          backgroundColor: `${COLORS.white}08`,
-          borderColor: COLORS.skyBlue400,
-        }}
+    <SafeAreaView className="flex-1 bg-white">
+      {/* Mesh Gradient Background */}
+      <LinearGradient colors={['#F8FAFC', '#ECFDF5', '#F1F5F9']} className="absolute inset-0" />
+
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: isTablet ? 40 : 20, paddingBottom: 220 }}
       >
-        <View
-          className="absolute top-0 left-0 right-0 h-1"
-          style={{ backgroundColor: COLORS.logoGreen }}
-        />
+        <HeroSection />
 
-        <View className="mb-4 mx-2">
-          <View className="flex-row items-center gap-2">
-            <Text className="text-2xl font-black text-green-600">Start the Journey</Text>
-          </View>
-        </View>
-
-        <View className="bg-slate-900 rounded-2xl p-4 mb-6">
+        {/* Partner Stats Bar - Demonstrating Value */}
+        <View className="flex-row justify-between bg-emerald-900 rounded-3xl p-6 mb-8 shadow-xl">
           {[
-            { icon: 'check-circle' as const, text: 'Manage Sports Academies' },
-            { icon: 'check-circle' as const, text: 'Get Bookings for your Venues' },
-            { icon: 'check-circle' as const, text: 'Digitalize your Sports Journey' },
-          ].map((item, idx) => (
-            <View key={idx} className="flex-row items-center gap-3 py-2">
-              <MaterialCommunityIcons name={item.icon} size={18} color={COLORS.logoGreen} />
-              <Text className="text-xs font-semibold flex-1" style={{ color: COLORS.skyBlue300 }}>
-                {item.text}
-              </Text>
+            { label: 'Market Growth', val: '15%↑' },
+            { label: 'Active Partners', val: '200+' },
+            { label: 'Booking Rate', val: '88%' }
+          ].map((s, i) => (
+            <View key={i} className="items-center flex-1">
+              <Text className="text-emerald-400 font-black text-xl">{s.val}</Text>
+              <Text className="text-emerald-100/60 text-[9px] uppercase font-bold tracking-widest">{s.label}</Text>
             </View>
           ))}
         </View>
 
-        <Pressable
-          onPress={onSignUp}
-          className="rounded-xl py-4 items-center justify-center active:opacity-80 overflow-hidden"
-          style={{ backgroundColor: COLORS.logoGreen }}
-        >
-          <View className="flex-row items-center gap-2">
-            <Text className="text-base font-black text-white">Create Account</Text>
-            <MaterialCommunityIcons name="arrow-right" size={20} color={COLORS.white} />
-          </View>
-        </Pressable>
-      </View>
-    </Animated.View>
-  );
-};
+        {/* Create Account Section */}
+        <View className="mt-4 bg-emerald-600 rounded-[40px] p-8 items-center shadow-2xl">
+          <Text className="text-white text-2xl font-black text-center mb-2 italic uppercase">Join the Network</Text>
+          <Text className="text-emerald-100 text-center mb-6 font-medium">Digitalize your operations and maximize your facility revenue.</Text>
+          <Pressable 
+            onPress={handleSignUp}
+            className="bg-white w-full py-5 rounded-2xl items-center flex-row justify-center shadow-md active:opacity-90"
+          >
+            <Text className="text-emerald-600 font-black text-lg mr-2">CREATE PARTNER ACCOUNT</Text>
+            <MaterialCommunityIcons name="arrow-right" size={20} color="#059669" />
+          </Pressable>
+        </View>
 
-
-
-// ✅ MOVED OUTSIDE - Navigation Section
-const NavigationSection: FC<{
-  onSignIn: () => void;
-}> = ({ onSignIn }) => {
-  const containerOpacity = useSharedValue(0);
-  const buttonScale = useSharedValue(0.9);
-
-  useEffect(() => {
-    containerOpacity.value = withTiming(1, { duration: 1000, easing: Easing.out(Easing.cubic) });
-    buttonScale.value = withTiming(1, { duration: 1200, easing: Easing.out(Easing.cubic) });
-  }, []);
-
-  const containerStyle = useAnimatedStyle(() => ({
-    opacity: containerOpacity.value,
-  }));
-
-  const buttonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: buttonScale.value }],
-  }));
-
-  return (
-    <Animated.View style={[containerStyle]} className="absolute bottom-0 left-0 right-0 px-6 py-6 mb-6">
-      <Animated.View style={[buttonStyle]}>
-        <Pressable
-          onPress={onSignIn}
-          className="rounded-2xl py-5 px-6 items-center justify-center overflow-hidden active:opacity-75"
-          style={{
-            backgroundColor: COLORS.white,
-            shadowColor: COLORS.logoGreen,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.3,
-            shadowRadius: 12,
-            elevation: 15,
-          }}
-        >
-          <View className="flex-row items-center gap-3 justify-center ">
-            <MaterialCommunityIcons name="login-variant" size={22} color={COLORS.logoGreen} />
-            <View>
-              <Text className="text-xs font-semibold" style={{ color: COLORS.skyBlue400 }}>
-                Welcome Back
-              </Text>
-              <Text className="text-sm font-black" style={{ color: COLORS.navyBlue }}>
-                Sign In
-              </Text>
-            </View>
-          </View>
-        </Pressable>
-      </Animated.View>
-    </Animated.View>
-  );
-};
-
-// ✅ MAIN COMPONENT - Now clean and simple
-const WelcomeScreen: FC = () => {
-  const router = useRouter();
-
-  const handleSignUp = () => {
-    // router.push('/(onboardingStack)/basicInfoRegisterOne');
-   router.push('/(homeScreenTabs)');
-  };
-
-  const handleSignIn = () => {
-    router.push('/(homeScreenTabs)');
-  };
-
-  return (
-    <SafeAreaView className="flex-1">
-      {/* Gradient Background */}
-      <LinearGradient
-        colors={['#FFFFFF', '#E0F2FE', '#7DD3FC']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
-      />
-
-      {/* Animated Bubbles */}
-      <View className="absolute w-full h-full overflow-hidden">
-        <AnimatedBubble size={150} color={COLORS.logoGreen} delay={0} left={-20} />
-        <AnimatedBubble size={120} color={COLORS.skyBlue400} delay={2} left={width - 80} />
-        <AnimatedBubble size={100} color={COLORS.logoGreen} delay={4} left={width / 2 - 50} />
-        <AnimatedBubble size={130} color={COLORS.skyBlue400} delay={1} left={width - 120} />
-        <AnimatedBubble size={110} color={COLORS.logoGreen} delay={3} left={30} />
-      </View>
-
-      {/* Content */}
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 240 }}
-      >
-        <HeroSection />
-        <CreateAccountSection onSignUp={handleSignUp} />
-
-        
-
-     
+        {/* Partner Core Modules */}
+        <Text className="text-slate-900 font-black text-xl mt-12 mb-6 px-2 italic uppercase">Operational Suite</Text>
+        <View className="flex-row flex-wrap justify-between">
+          <FeatureCard 
+            icon="office-building-marker" 
+            title="Venue Manager" 
+            desc="Automated slot scheduling and real-time availability sync."
+            color="#059669"
+          />
+          <FeatureCard 
+            icon="account-tie" 
+            title="Academy ERP" 
+            desc="Centralized student database, fees, and attendance."
+            color="#0891B2"
+          />
+          <FeatureCard 
+            icon="finance" 
+            title="Revenue Analytics" 
+            desc="Daily earnings reports and automated UPI settlement."
+            color="#0F172A"
+          />
+          <FeatureCard 
+            icon="bullhorn-outline" 
+            title="Promotions" 
+            desc="Target active local athletes with custom membership plans."
+            color="#7C3AED"
+          />
+        </View>
       </ScrollView>
 
-      <NavigationSection onSignIn={handleSignIn} />
+      {/* Bottom Navigation */}
+      <View 
+        style={{ paddingBottom: Platform.OS === 'ios' ? 40 : 40 }}
+        className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-8 pt-4 shadow-2xl"
+      >
+        <Pressable
+          onPress={handleSignIn}
+          className="flex-row items-center justify-center py-5 bg-slate-900 rounded-2xl shadow-lg"
+        >
+          <MaterialCommunityIcons name="login-variant" size={22} color="white" />
+          <View className="ml-4">
+            <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Partner Login</Text>
+          </View>
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 };

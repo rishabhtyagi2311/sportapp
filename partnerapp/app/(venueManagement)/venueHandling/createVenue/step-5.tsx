@@ -6,243 +6,259 @@ import {
   ScrollView, 
   Image, 
   Alert, 
-  ActivityIndicator,
-  Platform,
-  StatusBar
+  ActivityIndicator, 
+  Platform, 
+  StatusBar,
+  Dimensions
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
+import * as ImagePicker from 'expo-image-picker'
 
-// 1. IMPORT MAIN STORE
+// Store Import
 import { useVenueStore } from '@/store/venueStore'
+
+const { width } = Dimensions.get('window');
+const isTablet = width > 768;
 
 export default function Step5Review() {
   const router = useRouter()
   
-  /* -------------------------------------------------------------------------- */
-  /* 2. ZUSTAND SELECTORS                                                       */
-  /* -------------------------------------------------------------------------- */
+  // Zustand Selectors
   const draftVenue = useVenueStore((state) => state.draftVenue)
   const updateDraftVenue = useVenueStore((state) => state.updateDraftVenue)
   const submitDraftVenue = useVenueStore((state) => state.submitDraftVenue)
 
-  /* -------------------------------------------------------------------------- */
-  /* 3. LOCAL STATE                                                             */
-  /* -------------------------------------------------------------------------- */
+  // Local UI State
+  const [uploading, setUploading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   /* -------------------------------------------------------------------------- */
-  /* 4. HANDLERS                                                                */
+  /* IMAGE PICKING & S3 PRODUCTION UPLOAD                                       */
   /* -------------------------------------------------------------------------- */
 
-  // MOCK Image Picker
-  const handleAddImage = () => {
-    const mockImages = [
-      'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?auto=format&fit=crop&w=500&q=80',
-      'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=500&q=80',
-      'https://images.unsplash.com/photo-1521537634581-0dced2fee2ef?auto=format&fit=crop&w=500&q=80',
-    ]
-    const randomImg = mockImages[Math.floor(Math.random() * mockImages.length)]
-    
-    updateDraftVenue({
-      images: [...draftVenue.images, randomImg]
-    })
-  }
-
-  const removeImage = (index: number) => {
-    const newImages = [...draftVenue.images]
-    newImages.splice(index, 1)
-    updateDraftVenue({ images: newImages })
-  }
-
-  const handleLaunch = async () => {
-    if (draftVenue.images.length === 0) {
-      Alert.alert("Photos Required", "Please add at least one photo of your venue.")
-      return
+  const pickImage = async () => {
+    if (draftVenue.images.length >= 5) {
+      Alert.alert("Limit Reached", "You can upload a maximum of 5 photos.");
+      return;
     }
 
-    setIsSubmitting(true)
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert("Permission Denied", "We need gallery access to upload photos.");
+      return;
+    }
 
-    setTimeout(() => {
-      // 1. Commit to Store
-      submitDraftVenue()
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.6, // Optimize size before upload
+    });
+
+    if (!result.canceled) {
+      const asset = result.assets[0];
+      uploadImageToS3(asset.uri, asset.fileName || `venue_${Date.now()}.jpg`);
+    }
+  };
+
+  const uploadImageToS3 = async (uri: string, fileName: string) => {
+    setUploading(true);
+    try {
       
-      setIsSubmitting(false)
+      const backendUrl = 'https://your-api-domain.com/api/v1/storage/presigned-url';
       
-      // 2. Success & Redirect
+      const presignedResponse = await fetch(backendUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName, fileType: 'image/jpeg' })
+      });
+
+      const { uploadUrl, publicUrl } = await presignedResponse.json();
+
+      // 2. Convert URI to Blob (Crucial for React Native S3 uploads)
+      const imageBlobResponse = await fetch(uri);
+      const blob = await imageBlobResponse.blob();
+
+      // 3. PUT request directly to AWS S3
+      const s3UploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: blob,
+        headers: { 'Content-Type': 'image/jpeg' }
+      });
+
+      if (s3UploadResponse.status === 200) {
+        // 4. Update Zustand with the permanent S3 URL
+        updateDraftVenue({
+          images: [...draftVenue.images, publicUrl]
+        });
+      } else {
+        throw new Error("S3 Upload Failed");
+      }
+    } catch (err) {
+      console.error("Upload Error:", err);
+      Alert.alert("Upload Failed", "Could not upload image to cloud storage.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    const newImages = draftVenue.images.filter((_, i) => i !== index);
+    updateDraftVenue({ images: newImages });
+  };
+
+  const handleFinalLaunch = async () => {
+    if (draftVenue.images.length === 0) {
+      Alert.alert("Photos Missing", "Please add at least one photo of your venue.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await submitDraftVenue();
+      
       Alert.alert(
-        "Venue Live! 🎉", 
-        "Your venue has been successfully listed and is ready for bookings.",
-        [
-          { 
-            text: "Go to Dashboard", 
-            onPress: () => router.navigate("/(venueManagement)/venueHandling/landingDashboard") 
-          }
-        ]
-      )
-    }, 1500)
-  }
-
-  /* -------------------------------------------------------------------------- */
-  /* 5. RENDER                                                                  */
-  /* -------------------------------------------------------------------------- */
+        "Venue Launched! 🎉",
+        "Your venue is now live and available for bookings.",
+        [{ text: "Go to Dashboard", onPress: () => router.navigate("/(venueManagement)/venueHandling/landingDashboard") }]
+      );
+    } catch (err) {
+      Alert.alert("Launch Failed", "There was an error saving your venue details.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
       {/* HEADER */}
-      <View className="flex-row items-center px-4 py-4 bg-white border-b border-slate-100">
-        <TouchableOpacity 
-          onPress={() => router.back()} 
-          className="w-10 h-10 rounded-full bg-slate-50 items-center justify-center mr-3"
-        >
-          <Ionicons name="arrow-back" size={24} color="#1e293b" />
-        </TouchableOpacity>
-        <Text className="text-xl font-bold text-slate-900">Review Details</Text>
+      <View className="bg-white border-b border-slate-50">
+        <View className="flex-row items-center px-4 py-3 justify-between">
+          <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 items-center justify-center">
+            <Ionicons name="arrow-back" size={24} color="#1e293b" />
+          </TouchableOpacity>
+          <View className="flex-1 items-center">
+            <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Step 5 of 5</Text>
+            <Text className="text-slate-900 font-bold">Review & Photos</Text>
+          </View>
+          <View className="w-10" />
+        </View>
+        <View className="h-1.5 w-full bg-slate-100 flex-row">
+          <View className="h-full bg-green-500 w-full rounded-r-full" />
+        </View>
       </View>
 
-      <ScrollView 
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <View className="px-6 pt-6 mb-2">
-          <Text className="text-sm font-bold text-blue-600 uppercase tracking-wider mb-2">Step 5 of 5</Text>
-          <Text className="text-3xl font-extrabold text-slate-900 mb-2">Finalize</Text>
-          <Text className="text-slate-500 text-base">Add photos and review your details before launching.</Text>
-        </View>
+      <ScrollView className="flex-1 bg-slate-50/30" showsVerticalScrollIndicator={false}>
+        <View className="self-center w-full max-w-2xl px-6 pt-8">
+          <Text className="text-3xl font-black text-slate-900 mb-2">Final Review</Text>
+          <Text className="text-slate-500 text-lg mb-8">Add photos and verify your details.</Text>
 
-        {/* 1. PHOTOS SECTION */}
-        <View className="px-6 pt-6">
-          <Text className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">
-            Venue Photos
-          </Text>
-
-          <View className="flex-row flex-wrap gap-3">
-            {/* Add Button */}
-            <TouchableOpacity 
-              onPress={handleAddImage}
-              className="w-24 h-24 bg-white border-2 border-dashed border-slate-300 rounded-2xl items-center justify-center active:bg-slate-50"
-            >
-              <MaterialIcons name="add-a-photo" size={24} color="#64748b" />
-              <Text className="text-[10px] font-bold text-slate-500 mt-1">ADD NEW</Text>
-            </TouchableOpacity>
-
-            {/* Image List */}
-            {draftVenue.images.map((img, index) => (
-              <View key={index} className="w-24 h-24 relative shadow-sm">
-                <Image 
-                  source={{ uri: img }} 
-                  className="w-full h-full rounded-2xl bg-slate-200" 
-                  resizeMode="cover"
-                />
+          {/* PHOTO UPLOAD SECTION */}
+          <View className="mb-10">
+            <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Venue Gallery (Max 5)</Text>
+            <View className="flex-row flex-wrap gap-4">
+              
+              {/* Add Button */}
+              {draftVenue.images.length < 5 && (
                 <TouchableOpacity 
-                  onPress={() => removeImage(index)}
-                  className="absolute -top-2 -right-2 bg-red-500 rounded-full w-6 h-6 items-center justify-center border-2 border-white shadow-sm"
+                  onPress={pickImage}
+                  disabled={uploading}
+                  className="w-[105px] h-[105px] bg-white border-2 border-dashed border-slate-200 rounded-[30px] items-center justify-center shadow-sm"
                 >
-                  <MaterialIcons name="close" size={12} color="white" />
+                  {uploading ? (
+                    <ActivityIndicator color="#2563eb" />
+                  ) : (
+                    <>
+                      <MaterialIcons name="add-a-photo" size={28} color="#94a3b8" />
+                      <Text className="text-[10px] font-black text-slate-400 mt-1">ADD</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        </View>
+              )}
 
-        <View className="h-[1px] bg-slate-200 mx-6 my-8" />
-
-        {/* 2. REVIEW DETAILS */}
-        <View className="px-6">
-          <Text className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">
-            Summary
-          </Text>
-
-          {/* CARD 1: IDENTITY */}
-          <View className="bg-white p-4 rounded-2xl border border-slate-200 mb-4 shadow-sm">
-            <View className="flex-row justify-between items-start mb-2">
-              <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider">Identity</Text>
-              <TouchableOpacity onPress={() => router.push('/(venueManagement)/venueHandling/createVenue/step-1')}>
-                <Text className="text-blue-600 text-xs font-bold">Edit</Text>
-              </TouchableOpacity>
-            </View>
-            <Text className="text-lg font-bold text-slate-900">{draftVenue.name || 'Unnamed Venue'}</Text>
-            <Text className="text-slate-500 text-sm mt-1">{draftVenue.address.street}, {draftVenue.address.city}</Text>
-            <View className="flex-row items-center mt-2">
-               <MaterialIcons name="phone" size={14} color="#64748b" />
-               <Text className="text-slate-500 text-xs ml-1 font-medium">{draftVenue.contactInfo.phone}</Text>
-            </View>
-          </View>
-
-          {/* CARD 2: SPORTS */}
-          <View className="bg-white p-4 rounded-2xl border border-slate-200 mb-4 shadow-sm">
-             <View className="flex-row justify-between items-start mb-2">
-              <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider">Activities</Text>
-              <TouchableOpacity onPress={() => router.push('/(venueManagement)/venueHandling/createVenue/step-3')}>
-                <Text className="text-blue-600 text-xs font-bold">Edit</Text>
-              </TouchableOpacity>
-            </View>
-            <View className="flex-row flex-wrap gap-2 mb-3">
-              {draftVenue.sports.map(s => (
-                <View key={s.id} className="bg-blue-50 px-2 py-1 rounded-md border border-blue-100">
-                  <Text className="text-xs font-bold text-blue-700">{s.name}</Text>
+              {/* Uploaded Images */}
+              {draftVenue.images.map((url, index) => (
+                <View key={index} className="w-[105px] h-[105px] rounded-[30px] overflow-hidden bg-slate-200 relative shadow-sm">
+                  <Image source={{ uri: url }} className="w-full h-full" />
+                  <TouchableOpacity 
+                    onPress={() => removeImage(index)}
+                    className="absolute top-1 right-1 bg-white/90 rounded-full p-1"
+                  >
+                    <Ionicons name="close-circle" size={20} color="#ef4444" />
+                  </TouchableOpacity>
                 </View>
               ))}
             </View>
-            <Text className="text-slate-500 text-xs font-medium">
-              + {draftVenue.amenities.length} Amenities Listed
-            </Text>
           </View>
 
-          {/* CARD 3: SCHEDULE */}
-          <View className="bg-white p-4 rounded-2xl border border-slate-200 mb-4 shadow-sm">
-             <View className="flex-row justify-between items-start mb-2">
-              <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider">Schedule</Text>
-              <TouchableOpacity onPress={() => router.push('/(venueManagement)/venueHandling/createVenue/step-4')}>
-                <Text className="text-blue-600 text-xs font-bold">Edit</Text>
-              </TouchableOpacity>
+          {/* SUMMARY REVIEW CARDS */}
+          <View className="space-y-4 pb-10">
+            {/* Basic Info */}
+            <View className="bg-white p-6 rounded-[30px] border border-slate-100 shadow-sm">
+              <View className="flex-row justify-between mb-4">
+                <Text className="text-[10px] font-bold text-slate-400 uppercase">Venue Identity</Text>
+                <TouchableOpacity onPress={() => router.push('./step-1')}>
+                  <Text className="text-blue-600 font-bold text-xs">Change</Text>
+                </TouchableOpacity>
+              </View>
+              <Text className="text-xl font-black text-slate-900">{draftVenue.name}</Text>
+              <Text className="text-slate-500 font-medium mt-1">{draftVenue.address.city}, {draftVenue.address.state}</Text>
             </View>
-            <View className="flex-row items-center mb-1">
-              <MaterialIcons name="schedule" size={16} color="#059669" />
-              <Text className="text-slate-900 font-bold ml-1">
-                {/* FIXED CALCULATION: Simply show array length */}
-                {draftVenue.timeSlots.length} Slots / Day
-              </Text>
-            </View>
-            {/* Show first active day as example */}
-            {Object.values(draftVenue.operatingHours).find(v => v.isOpen) && (
-              <Text className="text-slate-500 text-sm mt-1">
-                Open Hours: <Text className="font-medium">{Object.values(draftVenue.operatingHours).find(v => v.isOpen)?.open}</Text> to <Text className="font-medium">{Object.values(draftVenue.operatingHours).find(v => v.isOpen)?.close}</Text>
-              </Text>
-            )}
-            <Text className="text-slate-500 text-xs mt-2">
-              Price: ₹{draftVenue.timeSlots[0]?.price || 'N/A'} / slot
-            </Text>
-          </View>
 
+            {/* Activities Info */}
+            <View className="bg-white p-6 rounded-[30px] border border-slate-100 shadow-sm">
+              <View className="flex-row justify-between mb-4">
+                <Text className="text-[10px] font-bold text-slate-400 uppercase">Sports & Facilities</Text>
+                <TouchableOpacity onPress={() => router.push('./step-3')}>
+                  <Text className="text-blue-600 font-bold text-xs">Change</Text>
+                </TouchableOpacity>
+              </View>
+              <View className="flex-row flex-wrap gap-2">
+                {draftVenue.sports.map(s => (
+                  <View key={s.id} className="bg-slate-900 px-3 py-1 rounded-full">
+                    <Text className="text-[10px] font-bold text-white">{s.name}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Schedule Info */}
+            <View className="bg-white p-6 rounded-[30px] border border-slate-100 shadow-sm">
+              <View className="flex-row justify-between mb-4">
+                <Text className="text-[10px] font-bold text-slate-400 uppercase">Pricing & Slots</Text>
+                <TouchableOpacity onPress={() => router.push('./step-4')}>
+                  <Text className="text-blue-600 font-bold text-xs">Change</Text>
+                </TouchableOpacity>
+              </View>
+              <Text className="text-2xl font-black text-slate-900">₹{draftVenue.timeSlots[0]?.price || 0}</Text>
+              <Text className="text-slate-400 text-xs font-bold">Standard rate per 30-min slot</Text>
+            </View>
+          </View>
         </View>
       </ScrollView>
 
       {/* FOOTER */}
-      <View className="p-6 bg-white border-t border-slate-100 shadow-sm mb-6">
+      <View className="p-6 bg-white border-t border-slate-50 items-center" style={{ paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}>
         <TouchableOpacity
-          onPress={handleLaunch}
-          disabled={isSubmitting}
-          activeOpacity={0.9}
-          className={`w-full py-4 rounded-2xl items-center shadow-lg shadow-green-200 flex-row justify-center ${
-            isSubmitting ? 'bg-slate-700' : 'bg-green-600'
-          }`}
+          onPress={handleFinalLaunch}
+          disabled={isSubmitting || uploading}
+          className={`h-16 rounded-3xl items-center justify-center flex-row shadow-xl ${isSubmitting ? 'bg-slate-700' : 'bg-green-600'} ${isTablet ? 'w-96' : 'w-full'}`}
         >
           {isSubmitting ? (
-            <ActivityIndicator color="white" className="mr-2" />
+            <ActivityIndicator color="white" />
           ) : (
-            <MaterialIcons name="rocket-launch" size={20} color="white" style={{ marginRight: 8 }} />
+            <>
+              <Text className="text-white font-black text-lg mr-2">Launch Venue</Text>
+              <MaterialIcons name="rocket-launch" size={24} color="white" />
+            </>
           )}
-          <Text className="text-white font-bold text-lg">
-            {isSubmitting ? 'Creating Venue...' : 'Launch Venue'}
-          </Text>
         </TouchableOpacity>
       </View>
-
     </SafeAreaView>
-  )
+  );
 }

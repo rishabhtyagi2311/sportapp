@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { 
   View, 
   Text, 
@@ -8,347 +8,259 @@ import {
   Modal, 
   FlatList,
   Platform,
-  StatusBar
+  StatusBar,
+  Dimensions,
+  Alert
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-
-// 1. IMPORT MAIN STORE
 import { useVenueStore } from '@/store/venueStore'
 import { TimeSlot, WeeklyOperatingHours } from '@/types/venue'
-import { v4 as uuidv4 } from 'uuid' // Ensure uuid is installed or use a helper
+
+const { width } = Dimensions.get('window');
+const isTablet = width > 768;
 
 /* -------------------------------------------------------------------------- */
-/* HELPER: SLOT GENERATION LOGIC                                              */
+/* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
+
+const toMinutes = (time: string) => {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+};
+
+const formatTime = (totalMins: number) => {
+  const h = Math.floor(totalMins / 60);
+  const m = totalMins % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+};
 
 const generateSlots = (startStr: string, endStr: string, price: number): TimeSlot[] => {
-  const slots: TimeSlot[] = []
+  const slots: TimeSlot[] = [];
+  const startMins = toMinutes(startStr);
+  const endMins = toMinutes(endStr);
   
-  const toMinutes = (time: string) => {
-    const [h, m] = time.split(':').map(Number)
-    return h * 60 + m
-  }
+  if (startMins >= endMins) return [];
 
-  const startMins = toMinutes(startStr)
-  const endMins = toMinutes(endStr)
-  let currentMins = startMins
-
-  while (currentMins < endMins) {
-    // Format minutes back to HH:mm
-    const formatTime = (totalMins: number) => {
-      const h = Math.floor(totalMins / 60)
-      const m = totalMins % 60
-      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
-    }
-
-    // Stop if next slot exceeds closing time
-    if (currentMins + 30 > endMins) break
-
+  let currentMins = startMins;
+  while (currentMins + 30 <= endMins) {
     slots.push({
-      id: Math.random().toString(36).substr(2, 9), // Temp ID (replaced on save)
+      id: Math.random().toString(36).substr(2, 9),
       startTime: formatTime(currentMins),
       endTime: formatTime(currentMins + 30),
       isAvailable: true,
       price: price,
       priceType: 'per_slot',
-    })
-
-    currentMins += 30
+    });
+    currentMins += 30;
   }
-
-  return slots
-}
+  return slots;
+};
 
 const TIME_OPTIONS = Array.from({ length: 48 }).map((_, i) => {
-  const totalMins = i * 30
-  const h = Math.floor(totalMins / 60)
-  const m = totalMins % 60
-  const hh = h.toString().padStart(2, '0')
-  const mm = m.toString().padStart(2, '0')
-  return { value: `${hh}:${mm}`, label: `${hh}:${mm}` }
-})
+  const time = formatTime(i * 30);
+  return { value: time, label: time };
+});
 
 /* -------------------------------------------------------------------------- */
-/* SUB-COMPONENT: TIME PICKER MODAL                                           */
+/* COMPONENTS                                                                 */
 /* -------------------------------------------------------------------------- */
 
-const TimePickerModal = ({ 
-  visible, onClose, onSelect, title 
-}: { visible: boolean, onClose: () => void, onSelect: (t: string) => void, title: string }) => (
-  <Modal visible={visible} transparent animationType="slide">
-    <View className="flex-1 bg-black/60 justify-end">
-      <View className="bg-white rounded-t-3xl h-[50%] overflow-hidden">
-        <View className="p-4 border-b border-slate-100 flex-row justify-between items-center bg-slate-50">
-          <Text className="font-bold text-lg text-slate-900">{title}</Text>
-          <TouchableOpacity onPress={onClose} className="p-2 bg-slate-200 rounded-full">
-            <MaterialIcons name="close" size={20} color="#64748b" />
+const TimePickerModal = ({ visible, onClose, onSelect, title }: any) => (
+  <Modal visible={visible} transparent animationType="fade">
+    <View className="flex-1 bg-black/50 justify-end">
+      <View className="bg-white rounded-t-[40px] h-[45%] shadow-2xl">
+        <View className="p-6 border-b border-slate-100 flex-row justify-between items-center">
+          <Text className="font-black text-xl text-slate-900">{title}</Text>
+          <TouchableOpacity onPress={onClose} className="bg-slate-100 p-2 rounded-full">
+            <Ionicons name="close" size={24} color="#1e293b" />
           </TouchableOpacity>
         </View>
         <FlatList
           data={TIME_OPTIONS}
           keyExtractor={(item) => item.value}
-          contentContainerStyle={{ padding: 20 }}
           renderItem={({ item }) => (
             <TouchableOpacity 
-              onPress={() => { onSelect(item.value); onClose() }}
-              className="py-4 border-b border-slate-50 items-center active:bg-slate-50"
+              onPress={() => { onSelect(item.value); onClose(); }}
+              className="py-5 border-b border-slate-50 items-center"
             >
-              <Text className="text-xl font-medium text-slate-700">{item.label}</Text>
+              <Text className="text-xl font-bold text-slate-700">{item.label}</Text>
             </TouchableOpacity>
           )}
         />
       </View>
     </View>
   </Modal>
-)
-
-/* -------------------------------------------------------------------------- */
-/* MAIN COMPONENT                                                             */
-/* -------------------------------------------------------------------------- */
+);
 
 export default function Step4Schedule() {
-  const router = useRouter()
-  
-  // 1. STORE SELECTORS
-  const draftOperatingHours = useVenueStore((state) => state.draftVenue.operatingHours)
-  const updateDraftVenue = useVenueStore((state) => state.updateDraftVenue)
+  const router = useRouter();
+  const updateDraftVenue = useVenueStore((state) => state.updateDraftVenue);
+  const draftHours = useVenueStore((state) => state.draftVenue.operatingHours);
 
-  // 2. LOCAL STATE
-  const [openTime, setOpenTime] = useState('09:00')
-  const [closeTime, setCloseTime] = useState('22:00')
-  const [basePrice, setBasePrice] = useState('1000')
-  const [selectedDays, setSelectedDays] = useState<string[]>([
-    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
-  ])
-  const [showOpenPicker, setShowOpenPicker] = useState(false)
-  const [showClosePicker, setShowClosePicker] = useState(false)
+  const [openTime, setOpenTime] = useState('09:00');
+  const [closeTime, setCloseTime] = useState('22:00');
+  const [basePrice, setBasePrice] = useState('1000');
+  const [selectedDays, setSelectedDays] = useState<string[]>(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
+  const [showOpenPicker, setShowOpenPicker] = useState(false);
+  const [showClosePicker, setShowClosePicker] = useState(false);
 
-  // 3. INIT (Pre-fill logic if editing draft)
-  useEffect(() => {
-    // Check if we have data in the store to pre-fill
-    const firstActiveDay = Object.values(draftOperatingHours).find(d => d.isOpen)
-    if (firstActiveDay) {
-      setOpenTime(firstActiveDay.open)
-      setCloseTime(firstActiveDay.close)
-      
-      // Find which days are open
-      const activeDays = Object.entries(draftOperatingHours)
-        .filter(([_, val]) => val.isOpen)
-        .map(([key]) => key)
-      setSelectedDays(activeDays)
-    }
-  }, [])
-
-  // 4. LOGIC
   const DAYS = [
-    { key: 'monday', label: 'M' }, { key: 'tuesday', label: 'T' }, { key: 'wednesday', label: 'W' },
-    { key: 'thursday', label: 'T' }, { key: 'friday', label: 'F' }, { key: 'saturday', label: 'S' },
-    { key: 'sunday', label: 'S' },
-  ]
+    { key: 'monday', label: 'Mon' }, { key: 'tuesday', label: 'Tue' }, { key: 'wednesday', label: 'Wed' },
+    { key: 'thursday', label: 'Thu' }, { key: 'friday', label: 'Fri' }, { key: 'saturday', label: 'Sat' },
+    { key: 'sunday', label: 'Sun' },
+  ];
+
+  const estimatedSlotsPerDay = useMemo(() => 
+    generateSlots(openTime, closeTime, 0).length, 
+  [openTime, closeTime]);
 
   const toggleDay = (key: string) => {
-    setSelectedDays(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key])
-  }
-
-  // Calculate slots for preview
-  const estimatedSlotsPerDay = generateSlots(openTime, closeTime, 0).length
+    setSelectedDays(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key]);
+  };
 
   const handleNext = () => {
+    if (toMinutes(openTime) >= toMinutes(closeTime)) {
+      Alert.alert("Invalid Hours", "Closing time must be after opening time.");
+      return;
+    }
     if (selectedDays.length === 0) {
-      alert("Please select at least one operating day.")
-      return
-    }
-    if (!basePrice || isNaN(Number(basePrice))) {
-      alert("Please enter a valid base price.")
-      return
+      Alert.alert("Days Required", "Please select at least one working day.");
+      return;
     }
 
-    // A. Build Operating Hours Object
-    const newHours = { ...draftOperatingHours } as WeeklyOperatingHours
-    
-    // Reset all to closed first
-    Object.keys(newHours).forEach(k => {
-      // @ts-ignore
-      newHours[k] = { open: openTime, close: closeTime, isOpen: false }
-    })
-    // Set active days
-    selectedDays.forEach(day => {
-       // @ts-ignore
-      newHours[day] = { open: openTime, close: closeTime, isOpen: true }
-    })
+    const newHours = {} as WeeklyOperatingHours;
+    DAYS.forEach(day => {
+      newHours[day.key as keyof WeeklyOperatingHours] = {
+        open: openTime,
+        close: closeTime,
+        isOpen: selectedDays.includes(day.key)
+      };
+    });
 
-    // B. Generate Slot Array
-    const newSlots = generateSlots(openTime, closeTime, parseInt(basePrice))
+    const slots = generateSlots(openTime, closeTime, parseInt(basePrice || '0'));
 
-    // C. Update Store
     updateDraftVenue({
       operatingHours: newHours,
-      timeSlots: newSlots
-    })
+      timeSlots: slots
+    });
 
-    router.push('/(venueManagement)/venueHandling/createVenue/step-5')
-  }
-
-  /* -------------------------------------------------------------------------- */
-  /* RENDER                                                                     */
-  /* -------------------------------------------------------------------------- */
+    router.push('/(venueManagement)/venueHandling/createVenue/step-5');
+  };
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
       {/* HEADER */}
-      <View className="flex-row items-center px-4 py-4 bg-white border-b border-slate-100">
-        <TouchableOpacity 
-          onPress={() => router.back()} 
-          className="w-10 h-10 rounded-full bg-slate-50 items-center justify-center mr-3"
-        >
-          <Ionicons name="arrow-back" size={24} color="#1e293b" />
-        </TouchableOpacity>
-        <Text className="text-xl font-bold text-slate-900">Add New Venue</Text>
+      <View className="bg-white border-b border-slate-50">
+        <View className="flex-row items-center px-4 py-3 justify-between">
+          <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 items-center justify-center">
+            <Ionicons name="arrow-back" size={24} color="#1e293b" />
+          </TouchableOpacity>
+          <View className="flex-1 items-center">
+            <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Step 4 of 5</Text>
+            <Text className="text-slate-900 font-bold">Business Hours</Text>
+          </View>
+          <View className="w-10" />
+        </View>
+        <View className="h-1.5 w-full bg-slate-100 flex-row">
+          <View className="h-full bg-blue-600 w-4/5 rounded-r-full" />
+        </View>
       </View>
 
-      <ScrollView 
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <View className="px-6 pt-6 mb-2">
-          <Text className="text-sm font-bold text-blue-600 uppercase tracking-wider mb-2">Step 4 of 5</Text>
-          <Text className="text-3xl font-extrabold text-slate-900 mb-2">Schedule</Text>
-          <Text className="text-slate-500 text-base">Set your operating hours and standard pricing.</Text>
-        </View>
+      <ScrollView className="flex-1 bg-slate-50/30" showsVerticalScrollIndicator={false}>
+        <View className="self-center w-full max-w-2xl px-6 pt-8">
+          <Text className="text-3xl font-black text-slate-900 mb-2">Setup Timing</Text>
+          <Text className="text-slate-500 text-lg mb-8">When is your venue open for bookings?</Text>
 
-        {/* 1. TIMING SECTION */}
-        <View className="px-6 pt-6">
-          <Text className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">
-            Operating Hours
-          </Text>
-          
-          <View className="flex-row gap-4 mb-8">
-            {/* OPEN TIME */}
-            <TouchableOpacity 
-              onPress={() => setShowOpenPicker(true)}
-              activeOpacity={0.8}
-              className="flex-1 bg-white border border-slate-200 p-4 rounded-2xl shadow-sm"
-            >
-              <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Opens At</Text>
-              <View className="flex-row items-center justify-between">
-                <Text className="text-2xl font-bold text-slate-900">{openTime}</Text>
-                <MaterialIcons name="keyboard-arrow-down" size={24} color="#94a3b8" />
-              </View>
-            </TouchableOpacity>
-
-            {/* CLOSE TIME */}
-            <TouchableOpacity 
-              onPress={() => setShowClosePicker(true)}
-              activeOpacity={0.8}
-              className="flex-1 bg-white border border-slate-200 p-4 rounded-2xl shadow-sm"
-            >
-              <Text className="text-xs font-bold text-slate-400 uppercase mb-1">Closes At</Text>
-              <View className="flex-row items-center justify-between">
-                <Text className="text-2xl font-bold text-slate-900">{closeTime}</Text>
-                <MaterialIcons name="keyboard-arrow-down" size={24} color="#94a3b8" />
-              </View>
-            </TouchableOpacity>
+          {/* 1. TIMING CARDS */}
+          <View className="flex-row gap-3 mb-8">
+            {[ { t: 'Opens At', v: openTime, set: setShowOpenPicker }, { t: 'Closes At', v: closeTime, set: setShowClosePicker } ].map((item, idx) => (
+              <TouchableOpacity 
+                key={idx}
+                onPress={() => item.set(true)}
+                className="flex-1 bg-white border border-slate-100 p-5 rounded-[30px] shadow-sm items-center"
+              >
+                <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-1">{item.t}</Text>
+                <Text className="text-2xl font-black text-slate-900">{item.v}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        </View>
 
-        {/* 2. DAYS SECTION */}
-        <View className="px-6 mb-8">
-          <View className="flex-row justify-between items-center mb-4">
-            <Text className="text-sm font-bold text-slate-500 uppercase tracking-widest">
-              Working Days
-            </Text>
-            <TouchableOpacity onPress={() => setSelectedDays(DAYS.map(d => d.key))}>
-              <Text className="text-blue-600 font-bold text-xs">Select All</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View className="flex-row justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-            {DAYS.map((day) => {
-              const isSelected = selectedDays.includes(day.key)
-              return (
-                <TouchableOpacity
-                  key={day.key}
-                  onPress={() => toggleDay(day.key)}
-                  className={`w-10 h-10 rounded-full items-center justify-center ${
-                    isSelected ? 'bg-slate-900 shadow-md' : 'bg-slate-50'
-                  }`}
-                >
-                  <Text className={`font-bold ${isSelected ? 'text-white' : 'text-slate-400'}`}>
-                    {day.label}
-                  </Text>
-                </TouchableOpacity>
-              )
-            })}
-          </View>
-        </View>
-
-        {/* 3. PRICING SECTION */}
-        <View className="px-6 mb-8">
-          <Text className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">
-            Base Pricing
-          </Text>
-          
-          <View className="bg-white border border-green-200 rounded-2xl p-4 flex-row items-center shadow-sm">
-            <View className="bg-green-50 w-12 h-12 rounded-full items-center justify-center mr-4 border border-green-100">
-              <Text className="text-green-700 font-bold text-xl">₹</Text>
+          {/* 2. WORKING DAYS */}
+          <View className="mb-8">
+            <View className="flex-row justify-between items-end mb-4 px-1">
+              <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest">Working Days</Text>
+              <TouchableOpacity onPress={() => setSelectedDays(DAYS.map(d => d.key))}>
+                <Text className="text-blue-600 font-bold text-xs">Select All</Text>
+              </TouchableOpacity>
             </View>
-            <View className="flex-1">
-              <Text className="text-xs font-bold text-slate-400 uppercase">Price per 30 mins</Text>
-              <TextInput 
-                value={basePrice}
-                onChangeText={setBasePrice}
-                keyboardType="numeric"
-                className="text-2xl font-bold text-slate-900 p-0 h-8"
-                placeholder="0"
-              />
+            <View className="flex-row justify-between bg-white p-2 rounded-[25px] border border-slate-100 shadow-sm">
+              {DAYS.map((day) => {
+                const isSelected = selectedDays.includes(day.key);
+                return (
+                  <TouchableOpacity
+                    key={day.key}
+                    onPress={() => toggleDay(day.key)}
+                    className={`flex-1 aspect-square m-1 rounded-full items-center justify-center ${isSelected ? 'bg-slate-900' : 'bg-slate-50'}`}
+                  >
+                    <Text className={`text-[10px] font-black ${isSelected ? 'text-white' : 'text-slate-400'}`}>
+                      {day.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* 3. PRICING */}
+          <View className="mb-8">
+            <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 px-1">Standard Pricing</Text>
+            <View className="bg-white border border-slate-100 rounded-[30px] p-6 flex-row items-center shadow-sm">
+              <View className="bg-green-500 w-12 h-12 rounded-2xl items-center justify-center mr-4">
+                <MaterialCommunityIcons name="currency-inr" size={24} color="white" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[10px] font-bold text-slate-400 uppercase">Rate per 30 min slot</Text>
+                <TextInput 
+                  value={basePrice}
+                  onChangeText={setBasePrice}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  className="text-3xl font-black text-slate-900 p-0 m-0"
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* SUMMARY */}
+          <View className="bg-blue-600 rounded-[30px] p-6 flex-row items-center mb-10 shadow-lg shadow-blue-200">
+            <View className="bg-white/20 p-3 rounded-2xl">
+              <MaterialCommunityIcons name="calendar-clock" size={28} color="white" />
+            </View>
+            <View className="ml-4 flex-1">
+              <Text className="text-white font-black text-lg">{estimatedSlotsPerDay} Slots/Day</Text>
+              <Text className="text-blue-100 text-xs font-medium">Auto-generated across {selectedDays.length} working days.</Text>
             </View>
           </View>
         </View>
-
-        {/* SUMMARY INFO */}
-        <View className="mx-6 p-4 bg-blue-50 border border-blue-100 rounded-2xl flex-row items-start">
-          <MaterialCommunityIcons name="lightning-bolt" size={20} color="#3b82f6" />
-          <View className="ml-3 flex-1">
-            <Text className="text-blue-900 font-bold text-sm mb-1">Configuration Summary</Text>
-            <Text className="text-blue-700 text-xs leading-5">
-              We will generate <Text className="font-bold">{estimatedSlotsPerDay} slots</Text> for each selected day. You can manage individual slot availability later.
-            </Text>
-          </View>
-        </View>
-
       </ScrollView>
 
       {/* FOOTER */}
-      <View className="p-6 bg-white border-t border-slate-100 shadow-sm mb-6">
+      <View className="p-6 bg-white border-t border-slate-50 items-center" style={{ paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}>
         <TouchableOpacity
           onPress={handleNext}
-          activeOpacity={0.8}
-          className="bg-slate-900 w-full py-4 rounded-2xl items-center shadow-lg shadow-slate-300 flex-row justify-center"
+          className={`bg-slate-900 h-16 rounded-3xl items-center justify-center flex-row shadow-xl ${isTablet ? 'w-96' : 'w-full'}`}
         >
-          <Text className="text-white font-bold text-lg mr-2">Review & Create</Text>
-          <MaterialIcons name="arrow-forward" size={20} color="white" />
+          <Text className="text-white font-black text-lg mr-2">Preview Venue</Text>
+          <MaterialIcons name="arrow-forward" size={22} color="white" />
         </TouchableOpacity>
       </View>
 
-      {/* MODALS */}
-      <TimePickerModal 
-        visible={showOpenPicker} 
-        onClose={() => setShowOpenPicker(false)} 
-        onSelect={setOpenTime}
-        title="Select Opening Time"
-      />
-      <TimePickerModal 
-        visible={showClosePicker} 
-        onClose={() => setShowClosePicker(false)} 
-        onSelect={setCloseTime}
-        title="Select Closing Time"
-      />
-
+      <TimePickerModal visible={showOpenPicker} onClose={() => setShowOpenPicker(false)} onSelect={setOpenTime} title="Opening Time" />
+      <TimePickerModal visible={showClosePicker} onClose={() => setShowClosePicker(false)} onSelect={setCloseTime} title="Closing Time" />
     </SafeAreaView>
-  )
+  );
 }
