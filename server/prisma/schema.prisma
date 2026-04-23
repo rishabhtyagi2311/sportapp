@@ -65,6 +65,15 @@ model footballTeamMember {
   @@unique([footballProfileId, footballTeamId])
 }
 
+model PartnerIdentity {
+  id            String   @id @default(uuid())
+  firstName     String
+  lastName      String
+  contactNumber String   @unique
+  password      String   
+  venues        Venue[]  
+  createdAt     DateTime @default(now())
+}
 
 
 
@@ -74,7 +83,7 @@ model Venue {
   description     String   @db.Text
   isActive        Boolean  @default(true)
   
-  city            String   @index
+  city            String   
   state           String
   pincode         String
   
@@ -86,7 +95,9 @@ model Venue {
   amenities       Json     
   
   contactInfo     Json     
-  operatingHours  Json     
+  operatingHours  Json    
+  partnerId       String
+  partner         PartnerIdentity @relation(fields: [partnerId], references: [id]) 
   
   rating          Float    @default(0)
   createdAt       DateTime @default(now())
@@ -105,6 +116,7 @@ model TimeSlot {
   endTime     String   
   price       Float
   status      String   @default("available")
+  venue       Venue    @relation(fields: [venueId], references:[id], onDelete:Cascade)
   
   @@index([venueId, date, varietyId]) 
 }

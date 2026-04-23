@@ -120,34 +120,42 @@ export default function Step4Schedule() {
     setSelectedDays(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key]);
   };
 
-  const handleNext = () => {
-    if (toMinutes(openTime) >= toMinutes(closeTime)) {
-      Alert.alert("Invalid Hours", "Closing time must be after opening time.");
-      return;
-    }
-    if (selectedDays.length === 0) {
-      Alert.alert("Days Required", "Please select at least one working day.");
-      return;
-    }
+ const handleNext = () => {
+  if (toMinutes(openTime) >= toMinutes(closeTime)) {
+    Alert.alert("Invalid Hours", "Closing time must be after opening time.");
+    return;
+  }
+  if (selectedDays.length === 0) {
+    Alert.alert("Days Required", "Please select at least one working day.");
+    return;
+  }
 
-    const newHours = {} as WeeklyOperatingHours;
-    DAYS.forEach(day => {
-      newHours[day.key as keyof WeeklyOperatingHours] = {
-        open: openTime,
-        close: closeTime,
-        isOpen: selectedDays.includes(day.key)
-      };
-    });
+  
+  const newHours = {} as WeeklyOperatingHours;
+  DAYS.forEach(day => {
+    newHours[day.key as keyof WeeklyOperatingHours] = {
+      open: openTime,
+      close: closeTime,
+      isOpen: selectedDays.includes(day.key)
+    };
+  });
 
-    const slots = generateSlots(openTime, closeTime, parseInt(basePrice || '0'));
+  
+  updateDraftVenue({
+    operatingHours: newHours,
+   
+    timeSlots: [{
+      id: 'template',
+      startTime: openTime,
+      endTime: closeTime,
+      isAvailable: true,
+      price: parseInt(basePrice || '0'),
+      priceType: 'per_slot'
+    }]
+  });
 
-    updateDraftVenue({
-      operatingHours: newHours,
-      timeSlots: slots
-    });
-
-    router.push('/(venueManagement)/venueHandling/createVenue/step-5');
-  };
+  router.push('/(venueManagement)/venueHandling/createVenue/step-5');
+};
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>

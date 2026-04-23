@@ -12,12 +12,14 @@ import {
   Dimensions
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons'
+import { MaterialIcons, Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
+import axios from 'axios'
 
-// Store Import
+// API and Store Imports
 import { useVenueStore } from '@/store/venueStore'
+import { venueApiService } from '@/services/venueManagement/venue'
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
@@ -28,7 +30,7 @@ export default function Step5Review() {
   // Zustand Selectors
   const draftVenue = useVenueStore((state) => state.draftVenue)
   const updateDraftVenue = useVenueStore((state) => state.updateDraftVenue)
-  const submitDraftVenue = useVenueStore((state) => state.submitDraftVenue)
+  const resetDraftVenue = useVenueStore((state) => state.resetDraftVenue)
 
   // Local UI State
   const [uploading, setUploading] = useState(false)
@@ -54,50 +56,34 @@ export default function Step5Review() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [16, 9],
-      quality: 0.6, // Optimize size before upload
+      quality: 0.6, 
     });
 
     if (!result.canceled) {
       const asset = result.assets[0];
-      uploadImageToS3(asset.uri, asset.fileName || `venue_${Date.now()}.jpg`);
+      handleS3Upload(asset.uri, asset.fileName || `venue_${Date.now()}.jpg`);
     }
   };
 
-  const uploadImageToS3 = async (uri: string, fileName: string) => {
+  const handleS3Upload = async (uri: string, fileName: string) => {
     setUploading(true);
     try {
-      
-      const backendUrl = 'https://your-api-domain.com/api/v1/storage/presigned-url';
-      
-      const presignedResponse = await fetch(backendUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName, fileType: 'image/jpeg' })
+      // 1. Get pre-signed URL from our backend service
+      const { uploadUrl, publicUrl } = await venueApiService.getPresignedUrl(fileName, 'image/jpeg');
+
+      // 2. Convert URI to Blob (Crucial for direct S3 binary upload)
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      // 3. Upload directly to S3 using the Put URL
+      await venueApiService.uploadToS3(uploadUrl, blob, 'image/jpeg');
+
+      // 4. Save the permanent public URL in Zustand
+      updateDraftVenue({
+        images: [...draftVenue.images, publicUrl]
       });
-
-      const { uploadUrl, publicUrl } = await presignedResponse.json();
-
-      // 2. Convert URI to Blob (Crucial for React Native S3 uploads)
-      const imageBlobResponse = await fetch(uri);
-      const blob = await imageBlobResponse.blob();
-
-      // 3. PUT request directly to AWS S3
-      const s3UploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: blob,
-        headers: { 'Content-Type': 'image/jpeg' }
-      });
-
-      if (s3UploadResponse.status === 200) {
-        // 4. Update Zustand with the permanent S3 URL
-        updateDraftVenue({
-          images: [...draftVenue.images, publicUrl]
-        });
-      } else {
-        throw new Error("S3 Upload Failed");
-      }
     } catch (err) {
-      console.error("Upload Error:", err);
+      console.error("Upload Process Error:", err);
       Alert.alert("Upload Failed", "Could not upload image to cloud storage.");
     } finally {
       setUploading(false);
@@ -109,6 +95,10 @@ export default function Step5Review() {
     updateDraftVenue({ images: newImages });
   };
 
+  /* -------------------------------------------------------------------------- */
+  /* FINAL VENUE LAUNCH                                                         */
+  /* -------------------------------------------------------------------------- */
+
   const handleFinalLaunch = async () => {
     if (draftVenue.images.length === 0) {
       Alert.alert("Photos Missing", "Please add at least one photo of your venue.");
@@ -118,14 +108,22 @@ export default function Step5Review() {
     setIsSubmitting(true);
 
     try {
-      await submitDraftVenue();
+      // Send the entire draft object to the backend
+      await venueApiService.createVenue(draftVenue);
       
       Alert.alert(
         "Venue Launched! 🎉",
-        "Your venue is now live and available for bookings.",
-        [{ text: "Go to Dashboard", onPress: () => router.navigate("/(venueManagement)/venueHandling/landingDashboard") }]
+        "Your venue is now live and slots have been generated.",
+        [{ 
+          text: "Go to Dashboard", 
+          onPress: () => {
+            resetDraftVenue(); // Clear the wizard state
+            router.navigate("/(venueManagement)/venueHandling/landingDashboard");
+          }
+        }]
       );
     } catch (err) {
+      console.error("Venue Creation Error:", err);
       Alert.alert("Launch Failed", "There was an error saving your venue details.");
     } finally {
       setIsSubmitting(false);
@@ -198,7 +196,7 @@ export default function Step5Review() {
 
           {/* SUMMARY REVIEW CARDS */}
           <View className="space-y-4 pb-10">
-            {/* Basic Info */}
+            {/* Identity Info */}
             <View className="bg-white p-6 rounded-[30px] border border-slate-100 shadow-sm">
               <View className="flex-row justify-between mb-4">
                 <Text className="text-[10px] font-bold text-slate-400 uppercase">Venue Identity</Text>
@@ -210,7 +208,7 @@ export default function Step5Review() {
               <Text className="text-slate-500 font-medium mt-1">{draftVenue.address.city}, {draftVenue.address.state}</Text>
             </View>
 
-            {/* Activities Info */}
+            {/* Sports Info */}
             <View className="bg-white p-6 rounded-[30px] border border-slate-100 shadow-sm">
               <View className="flex-row justify-between mb-4">
                 <Text className="text-[10px] font-bold text-slate-400 uppercase">Sports & Facilities</Text>

@@ -4,31 +4,23 @@ import { immer } from 'zustand/middleware/immer'
 import { 
   Venue, 
   CreateVenueInput, 
-  TimeSlot, 
-  Sport, 
-  Amenity,
   OperatingHours,
   WeeklyOperatingHours 
 } from '@/types/venue'
-
-/* -------------------------------------------------------------------------- */
-/* HELPER: ID GENERATOR (Replaces uuid library)                               */
-/* -------------------------------------------------------------------------- */
-const generateId = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
+import { venueApiService } from '@/services/venueManagement/venue'
 
 /* -------------------------------------------------------------------------- */
 /* INITIAL DRAFT STATE                                                        */
 /* -------------------------------------------------------------------------- */
-
 const defaultDay: OperatingHours = { open: '09:00', close: '22:00', isOpen: true }
 const defaultWeek: WeeklyOperatingHours = {
-  monday: { ...defaultDay }, tuesday: { ...defaultDay }, wednesday: { ...defaultDay },
-  thursday: { ...defaultDay }, friday: { ...defaultDay }, saturday: { ...defaultDay }, sunday: { ...defaultDay }
+  monday: { ...defaultDay }, 
+  tuesday: { ...defaultDay }, 
+  wednesday: { ...defaultDay },
+  thursday: { ...defaultDay }, 
+  friday: { ...defaultDay }, 
+  saturday: { ...defaultDay }, 
+  sunday: { ...defaultDay }
 }
 
 const initialDraft: CreateVenueInput = {
@@ -48,12 +40,9 @@ const initialDraft: CreateVenueInput = {
 /* -------------------------------------------------------------------------- */
 /* STORE INTERFACE                                                            */
 /* -------------------------------------------------------------------------- */
-
 interface VenueState {
   /* ---------- DATA ---------- */
   venues: Venue[]
-  availableSports: Sport[]
-  availableAmenities: Amenity[]
   
   /* ---------- DRAFT STATE (For the Wizard) ---------- */
   draftVenue: CreateVenueInput
@@ -61,7 +50,6 @@ interface VenueState {
   /* ---------- UI STATE ---------- */
   isLoading: boolean
   error: string | null
-  selectedVenueId: string | null 
 
   /* ---------- ACTIONS: DRAFT ---------- */
   updateDraftVenue: (updates: Partial<CreateVenueInput>) => void
@@ -69,14 +57,10 @@ interface VenueState {
   updateDraftAddress: (updates: Partial<CreateVenueInput['address']>) => void
   resetDraftVenue: () => void
 
-  /* ---------- ACTIONS: VENUE CRUD ---------- */
-  setVenues: (venues: Venue[]) => void
-  submitDraftVenue: () => void // Moves draft to real list
-  deleteVenue: (id: string) => void
+  /* ---------- ACTIONS: API CRUD ---------- */
+  fetchMyVenues: () => Promise<void>
+  submitDraftVenue: () => Promise<void>
   
-  /* ---------- ACTIONS: SLOTS ---------- */
-  addTimeSlot: (venueId: string, slot: Omit<TimeSlot, 'id'>) => void
-
   /* ---------- GETTERS ---------- */
   getVenueById: (id: string) => Venue | undefined
 }
@@ -84,21 +68,17 @@ interface VenueState {
 /* -------------------------------------------------------------------------- */
 /* STORE IMPLEMENTATION                                                       */
 /* -------------------------------------------------------------------------- */
-
 export const useVenueStore = create<VenueState>()(
   devtools(
     immer((set, get) => ({
       
       /* STATE */
       venues: [],
-      availableSports: [],
-      availableAmenities: [],
       draftVenue: initialDraft, 
       isLoading: false,
       error: null,
-      selectedVenueId: null,
 
-      /* DRAFT ACTIONS */
+      /* DRAFT ACTIONS (WIZARD) */
       updateDraftVenue: (updates) => set((state) => {
         Object.assign(state.draftVenue, updates)
       }),
@@ -115,33 +95,42 @@ export const useVenueStore = create<VenueState>()(
         state.draftVenue = initialDraft
       }),
 
-      /* VENUE CRUD */
-      submitDraftVenue: () => set((state) => {
-        const newVenue: Venue = {
-          ...state.draftVenue,
-          id: generateId(), // <--- Fixed: Uses local helper
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          rating: 0,
-          reviewCount: 0,
+      /* API ACTIONS */
+      fetchMyVenues: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await venueApiService.getMyVenues();
+          // The backend returns { success: true, data: [...] }
+          if (response.success) {
+            set((state) => {
+              state.venues = response.data;
+              state.isLoading = false;
+            });
+          }
+        } catch (err: any) {
+          set({ 
+            error: err.response?.data?.message || "Failed to load venues", 
+            isLoading: false 
+          });
         }
-        state.venues.push(newVenue)
-        state.draftVenue = initialDraft // Reset after submit
-      }),
+      },
 
-      setVenues: (venues) => set((state) => { state.venues = venues }),
-      
-      deleteVenue: (id) => set((state) => {
-        state.venues = state.venues.filter(v => v.id !== id)
-      }),
-
-      /* SLOTS */
-      addTimeSlot: (venueId, slotInput) => set((state) => {
-        const venue = state.venues.find(v => v.id === venueId)
-        if (venue) {
-          venue.timeSlots.push({ ...slotInput, id: generateId() }) // <--- Fixed here too
+      submitDraftVenue: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await venueApiService.createVenue(get().draftVenue);
+          
+          if (response.success) {
+            // After successful creation, refresh the list and reset the wizard
+            await get().fetchMyVenues();
+            get().resetDraftVenue();
+          }
+        } catch (err: any) {
+          const errorMsg = err.response?.data?.message || "Error creating venue";
+          set({ error: errorMsg, isLoading: false });
+          throw new Error(errorMsg); 
         }
-      }),
+      },
 
       /* GETTERS */
       getVenueById: (id) => get().venues.find(v => v.id === id),
