@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  ScrollView, 
-  TextInput, 
-  Modal, 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  Modal,
   FlatList,
   Platform,
   StatusBar,
-  Dimensions,
   Alert
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -17,9 +16,9 @@ import { MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-ic
 import { useRouter } from 'expo-router'
 import { useVenueStore } from '@/store/venueStore'
 import { TimeSlot, WeeklyOperatingHours } from '@/types/venue'
-
-const { width } = Dimensions.get('window');
-const isTablet = width > 768;
+import { useResponsive } from '@/hooks/useResponsive'
+import FadeInView from '@/components/animated/FadeInView'
+import AnimatedPressable from '@/components/animated/AnimatedPressable'
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
@@ -96,6 +95,7 @@ const TimePickerModal = ({ visible, onClose, onSelect, title }: any) => (
 
 export default function Step4Schedule() {
   const router = useRouter();
+  const { isTablet } = useResponsive();
   const updateDraftVenue = useVenueStore((state) => state.updateDraftVenue);
   const draftHours = useVenueStore((state) => state.draftVenue.operatingHours);
 
@@ -105,6 +105,13 @@ export default function Step4Schedule() {
   const [selectedDays, setSelectedDays] = useState<string[]>(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
   const [showOpenPicker, setShowOpenPicker] = useState(false);
   const [showClosePicker, setShowClosePicker] = useState(false);
+
+  const [peakEnabled, setPeakEnabled] = useState(false);
+  const [peakStart, setPeakStart] = useState('18:00');
+  const [peakEnd, setPeakEnd] = useState('22:00');
+  const [peakPrice, setPeakPrice] = useState('1500');
+  const [showPeakStartPicker, setShowPeakStartPicker] = useState(false);
+  const [showPeakEndPicker, setShowPeakEndPicker] = useState(false);
 
   const DAYS = [
     { key: 'monday', label: 'Mon' }, { key: 'tuesday', label: 'Tue' }, { key: 'wednesday', label: 'Wed' },
@@ -129,8 +136,18 @@ export default function Step4Schedule() {
     Alert.alert("Days Required", "Please select at least one working day.");
     return;
   }
+  if (peakEnabled) {
+    if (toMinutes(peakStart) >= toMinutes(peakEnd)) {
+      Alert.alert("Invalid Peak Hours", "Peak end time must be after peak start time.");
+      return;
+    }
+    if (isNaN(parseInt(peakPrice || '')) || parseInt(peakPrice) <= 0) {
+      Alert.alert("Invalid Peak Price", "Please enter a valid peak-hour price.");
+      return;
+    }
+  }
 
-  
+
   const newHours = {} as WeeklyOperatingHours;
   DAYS.forEach(day => {
     newHours[day.key as keyof WeeklyOperatingHours] = {
@@ -140,10 +157,12 @@ export default function Step4Schedule() {
     };
   });
 
-  
+
   updateDraftVenue({
     operatingHours: newHours,
-   
+    peakPricing: peakEnabled
+      ? { enabled: true, startTime: peakStart, endTime: peakEnd, price: parseInt(peakPrice || '0') }
+      : undefined,
     timeSlots: [{
       id: 'template',
       startTime: openTime,
@@ -179,7 +198,7 @@ export default function Step4Schedule() {
       </View>
 
       <ScrollView className="flex-1 bg-slate-50/30" showsVerticalScrollIndicator={false}>
-        <View className="self-center w-full max-w-2xl px-6 pt-8">
+        <FadeInView className="self-center w-full max-w-2xl px-6 pt-8">
           <Text className="text-3xl font-black text-slate-900 mb-2">Setup Timing</Text>
           <Text className="text-slate-500 text-lg mb-8">When is your venue open for bookings?</Text>
 
@@ -243,6 +262,61 @@ export default function Step4Schedule() {
             </View>
           </View>
 
+          {/* 4. PEAK PRICING */}
+          <View className="mb-8">
+            <View className="flex-row justify-between items-end mb-4 px-1">
+              <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest">Peak Hour Pricing</Text>
+              <TouchableOpacity
+                onPress={() => setPeakEnabled(prev => !prev)}
+                className={`px-4 py-1.5 rounded-full ${peakEnabled ? 'bg-blue-600' : 'bg-slate-200'}`}
+              >
+                <Text className={`text-xs font-bold ${peakEnabled ? 'text-white' : 'text-slate-500'}`}>
+                  {peakEnabled ? 'Enabled' : 'Disabled'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {peakEnabled && (
+              <View className="bg-white border border-slate-100 rounded-[30px] p-6 shadow-sm">
+                <Text className="text-slate-500 text-sm mb-4">
+                  Slots that start within this window are priced separately from your standard rate.
+                </Text>
+
+                <View className="flex-row gap-3 mb-4">
+                  {[
+                    { t: 'Peak Starts', v: peakStart, set: setShowPeakStartPicker },
+                    { t: 'Peak Ends', v: peakEnd, set: setShowPeakEndPicker },
+                  ].map((item, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => item.set(true)}
+                      className="flex-1 bg-slate-50 border border-slate-100 p-4 rounded-2xl items-center"
+                    >
+                      <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-1">{item.t}</Text>
+                      <Text className="text-xl font-black text-slate-900">{item.v}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <View className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex-row items-center">
+                  <View className="bg-orange-500 w-10 h-10 rounded-xl items-center justify-center mr-3">
+                    <MaterialCommunityIcons name="fire" size={20} color="white" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-[10px] font-bold text-slate-400 uppercase">Peak rate per 30 min slot</Text>
+                    <TextInput
+                      value={peakPrice}
+                      onChangeText={setPeakPrice}
+                      keyboardType="numeric"
+                      placeholder="0"
+                      className="text-2xl font-black text-slate-900 p-0 m-0"
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
+          </View>
+
           {/* SUMMARY */}
           <View className="bg-blue-600 rounded-[30px] p-6 flex-row items-center mb-10 shadow-lg shadow-blue-200">
             <View className="bg-white/20 p-3 rounded-2xl">
@@ -253,22 +327,24 @@ export default function Step4Schedule() {
               <Text className="text-blue-100 text-xs font-medium">Auto-generated across {selectedDays.length} working days.</Text>
             </View>
           </View>
-        </View>
+        </FadeInView>
       </ScrollView>
 
       {/* FOOTER */}
       <View className="p-6 bg-white border-t border-slate-50 items-center" style={{ paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}>
-        <TouchableOpacity
+        <AnimatedPressable
           onPress={handleNext}
           className={`bg-slate-900 h-16 rounded-3xl items-center justify-center flex-row shadow-xl ${isTablet ? 'w-96' : 'w-full'}`}
         >
           <Text className="text-white font-black text-lg mr-2">Preview Venue</Text>
           <MaterialIcons name="arrow-forward" size={22} color="white" />
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
 
       <TimePickerModal visible={showOpenPicker} onClose={() => setShowOpenPicker(false)} onSelect={setOpenTime} title="Opening Time" />
       <TimePickerModal visible={showClosePicker} onClose={() => setShowClosePicker(false)} onSelect={setCloseTime} title="Closing Time" />
+      <TimePickerModal visible={showPeakStartPicker} onClose={() => setShowPeakStartPicker(false)} onSelect={setPeakStart} title="Peak Start Time" />
+      <TimePickerModal visible={showPeakEndPicker} onClose={() => setShowPeakEndPicker(false)} onSelect={setPeakEnd} title="Peak End Time" />
     </SafeAreaView>
   );
 }

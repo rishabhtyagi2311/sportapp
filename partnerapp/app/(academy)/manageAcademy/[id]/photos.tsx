@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -7,30 +7,40 @@ import {
   FlatList,
   Image,
   Alert,
-  Dimensions,
   ActivityIndicator,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useAcademyStore } from "@/store/academyStore";
-
-const { width } = Dimensions.get("window");
-const COLUMN_COUNT = 3;
-const ITEM_SIZE = width / COLUMN_COUNT - 8; 
+import { academyApiService } from "@/services/academyManagement/academy";
+import { AcademyPhoto } from "@/types";
+import { useResponsive } from "@/hooks/useResponsive";
+import FadeInView from "@/components/animated/FadeInView";
+import AnimatedPressable from "@/components/animated/AnimatedPressable";
 
 export default function AcademyPhotosScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
-  
-  // ✅ Get specific actions from the store
-  const academy = useAcademyStore((state) => 
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { width, isTablet } = useResponsive();
+  const columnCount = isTablet ? 5 : 3;
+  const itemSize = width / columnCount - 8;
+
+  const academy = useAcademyStore((state) =>
     state.academies.find((a) => a.id === id)
   );
+  const photos = useAcademyStore((state) => state.getPhotosByAcademy(id));
+  const fetchPhotos = useAcademyStore((state) => state.fetchPhotos);
   const addPhoto = useAcademyStore((state) => state.addPhoto);
   const removePhoto = useAcademyStore((state) => state.removePhoto);
 
   const [uploading, setUploading] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (id) fetchPhotos(id);
+    }, [id, fetchPhotos])
+  );
 
   // If academy is lost (e.g. reload), go back safely
   if (!academy) {
@@ -43,7 +53,7 @@ export default function AcademyPhotosScreen() {
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
+
     if (status !== 'granted') {
       Alert.alert("Permission Needed", "Sorry, we need camera roll permissions to make this work!");
       return;
@@ -57,47 +67,57 @@ export default function AcademyPhotosScreen() {
     });
 
     if (!result.canceled) {
-      setUploading(true);
-      
-      // Simulate network request
-      setTimeout(() => {
-        const newUri = result.assets[0].uri;
-        
-        // ✅ FIX 2: Use the dedicated store action (No useEffect needed)
-        if (typeof id === 'string') {
-            addPhoto(id, newUri);
-        }
-        
-        setUploading(false);
-      }, 1000);
+      const asset = result.assets[0];
+      handleUpload(asset.uri, asset.fileName || `academy_${Date.now()}.jpg`);
     }
   };
 
-  const handleDelete = (uriToDelete: string) => {
+  const handleUpload = async (uri: string, fileName: string) => {
+    setUploading(true);
+    try {
+      const { uploadUrl, publicUrl } = await academyApiService.getPresignedUrl(
+        fileName,
+        'image/jpeg',
+        academy.academyName
+      );
+
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      await academyApiService.uploadToS3(uploadUrl, blob, 'image/jpeg');
+
+      await addPhoto(academy.id, publicUrl);
+    } catch (err) {
+      console.error("Academy photo upload error:", err);
+      Alert.alert("Upload Failed", "Could not upload photo to cloud storage.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = (photo: AcademyPhoto) => {
     Alert.alert(
       "Delete Photo",
       "Are you sure you want to remove this photo?",
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
+        {
+          text: "Delete",
           style: "destructive",
           onPress: () => {
-             // ✅ FIX: Use dedicated store action
-             if (typeof id === 'string') {
-                removePhoto(id, uriToDelete);
-             }
+            removePhoto(academy.id, photo.id).catch(() =>
+              Alert.alert("Error", "Could not remove photo")
+            );
           }
         }
       ]
     );
   };
 
-  const renderPhotoItem = ({ item }: { item: string }) => (
-    <View className="m-1 relative shadow-sm">
+  const renderPhotoItem = ({ item, index }: { item: AcademyPhoto; index: number }) => (
+    <FadeInView delay={Math.min(index, 12) * 30} className="m-1 relative shadow-sm">
       <Image
-        source={{ uri: item }}
-        style={{ width: ITEM_SIZE, height: ITEM_SIZE, borderRadius: 12 }}
+        source={{ uri: item.url }}
+        style={{ width: itemSize, height: itemSize, borderRadius: 12 }}
         resizeMode="cover"
       />
       <TouchableOpacity
@@ -106,7 +126,7 @@ export default function AcademyPhotosScreen() {
       >
         <Ionicons name="trash-outline" size={16} color="white" />
       </TouchableOpacity>
-    </View>
+    </FadeInView>
   );
 
   return (
@@ -114,8 +134,8 @@ export default function AcademyPhotosScreen() {
       {/* Header */}
       <View className="bg-slate-900 pt-2 pb-4 px-4 shadow-md">
         <View className="flex-row items-center">
-          <TouchableOpacity 
-            onPress={() => router.back()} 
+          <TouchableOpacity
+            onPress={() => router.back()}
             className="p-2 bg-white/10 rounded-full mr-3"
           >
             <Ionicons name="arrow-back" size={24} color="white" />
@@ -131,18 +151,17 @@ export default function AcademyPhotosScreen() {
 
       <View className="flex-1 px-1">
         <FlatList
-          // ✅ Read directly from store (with fallback)
-          data={academy.photos || []}
-          keyExtractor={(item) => item}
-          numColumns={COLUMN_COUNT}
+          key={columnCount}
+          data={photos}
+          keyExtractor={(item) => item.id}
+          numColumns={columnCount}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingVertical: 16 }}
-          
+
           ListHeaderComponent={
             <View className="px-1 mb-6">
-              <TouchableOpacity
+              <AnimatedPressable
                 onPress={pickImage}
-                activeOpacity={0.8}
                 disabled={uploading}
                 className="w-full h-40 border-2 border-dashed border-blue-300 bg-blue-50 rounded-2xl items-center justify-center mb-4"
               >
@@ -166,19 +185,18 @@ export default function AcademyPhotosScreen() {
                     </Text>
                   </View>
                 )}
-              </TouchableOpacity>
+              </AnimatedPressable>
 
               <View className="flex-row items-center justify-between mb-2 px-1">
                 <Text className="text-slate-800 font-bold text-lg">
-                  All Photos ({academy.photos?.length || 0})
+                  All Photos ({photos.length})
                 </Text>
               </View>
             </View>
           }
-          
+
           renderItem={renderPhotoItem}
-          
-          // ✅ FIX 1: Use Ternary to return null instead of false
+
           ListEmptyComponent={
             !uploading ? (
               <View className="items-center justify-center py-10">

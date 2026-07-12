@@ -1,13 +1,15 @@
 import React from "react";
-import { View, Text } from "react-native";
+import { View, Text, TouchableOpacity } from "react-native";
 import { Student } from "../types";
 import { Ionicons } from "@expo/vector-icons";
 
 interface StudentCardProps {
   student: Student;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
-export default function StudentCard({ student }: StudentCardProps) {
+export default function StudentCard({ student, onEdit, onDelete }: StudentCardProps) {
   return (
     <View className="bg-white rounded-xl p-4 mb-4 shadow-sm border border-gray-200 flex-row items-center">
       {/* Avatar/Icon */}
@@ -29,6 +31,18 @@ export default function StudentCard({ student }: StudentCardProps) {
           Enrolled: {student.enrollmentDate}
         </Text>
       </View>
+
+      {onEdit && (
+        <TouchableOpacity onPress={onEdit} className="p-2">
+          <Ionicons name="create-outline" size={20} color="#3B82F6" />
+        </TouchableOpacity>
+      )}
+
+      {onDelete && (
+        <TouchableOpacity onPress={onDelete} className="p-2 -mr-2">
+          <Ionicons name="trash-outline" size={20} color="#ef4444" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

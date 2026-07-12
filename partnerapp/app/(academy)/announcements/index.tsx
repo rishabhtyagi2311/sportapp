@@ -15,12 +15,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAnnouncementStore, Announcement } from "@/store/announcementStore";
+import { useResponsive } from "@/hooks/useResponsive";
+import FadeInView from "@/components/animated/FadeInView";
+import AnimatedPressable from "@/components/animated/AnimatedPressable";
 
 // ✅ TODO: Replace with your actual image path
 const backgroundImage = require("@/assets/images/bgEnhancedCoverImage.png");
 
 export default function ManageAnnouncementsScreen() {
   const [text, setText] = useState("");
+  const { isTablet } = useResponsive();
   const { posts, addPost } = useAnnouncementStore();
 
   const handlePost = () => {
@@ -41,12 +45,12 @@ export default function ManageAnnouncementsScreen() {
     });
   };
 
-  const renderItem = ({ item }: { item: Announcement }) => (
+  const renderItem = ({ item, index }: { item: Announcement; index: number }) => (
     // List items remain slightly transparent to let the background shine through nicely
-    <View className="bg-white rounded-2xl p-5 mb-4 border border-solid border-slate-900 shadow-sm">
+    <FadeInView delay={Math.min(index, 8) * 40} className="bg-white rounded-2xl p-5 mb-4 border border-solid border-slate-900 shadow-sm">
       <View className="flex-row items-start justify-between mb-3">
         <View className="flex-row items-center space-x-3">
-         
+
           <Text className="text-black font-bold text-base tracking-wide">
             Message from the Academy
           </Text>
@@ -58,7 +62,7 @@ export default function ManageAnnouncementsScreen() {
       <Text className="text-black text-[15px] leading-7 pl-1">
         {item.content}
       </Text>
-    </View>
+    </FadeInView>
   );
 
   return (
@@ -98,7 +102,7 @@ export default function ManageAnnouncementsScreen() {
                 keyExtractor={(item) => item.id}
                 renderItem={renderItem}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 20 }}
+                contentContainerStyle={{ paddingBottom: 20, maxWidth: isTablet ? 768 : undefined, width: '100%', alignSelf: 'center' }}
                 ListHeaderComponent={
                   <Text className="text-slate-400 text-xs font-bold mb-4 uppercase tracking-widest pl-1">
                     Recent History
@@ -128,19 +132,12 @@ export default function ManageAnnouncementsScreen() {
             </View>
 
             {/* Sleeker "Pill-Shaped" Gradient Button */}
-            <TouchableOpacity
-              activeOpacity={0.8}
+            <AnimatedPressable
               onPress={handlePost}
-        
+              className="rounded-2xl flex w-14 ml-2 h-20 items-center justify-center bg-neutral-300"
             >
-              <View
-                  
-                  className="rounded-2xl  flex w-14 ml-2 h-20  items-center justify-center bg-neutral-300" // rounded-full makes it pill shaped
-              >
-                <Ionicons name="send" size={38} color="black" style={{ marginRight: 8 }} />
-                
-              </View>
-            </TouchableOpacity>
+              <Ionicons name="send" size={38} color="black" style={{ marginRight: 8 }} />
+            </AnimatedPressable>
           </View>
         </SafeAreaView>
       </KeyboardAvoidingView>

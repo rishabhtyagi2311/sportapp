@@ -1,26 +1,34 @@
-import React, { useMemo } from 'react'
-import { View, Text, SectionList, TouchableOpacity, StatusBar } from 'react-native'
+import React, { useEffect, useMemo } from 'react'
+import { View, Text, SectionList, TouchableOpacity, StatusBar, ActivityIndicator, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialIcons, Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { format, isToday, isTomorrow, parseISO } from 'date-fns'
 
 import { usePartnerBookingStore, PartnerBooking } from '@/store/partner-booking-store'
+import { useResponsive } from '@/hooks/useResponsive'
+import FadeInView from '@/components/animated/FadeInView'
+import AnimatedPressable from '@/components/animated/AnimatedPressable'
 
 export default function BookingListScreen() {
   const router = useRouter()
+  const { isTablet } = useResponsive()
   const { venueId } = useLocalSearchParams() as { venueId: string }
-  const bookings = usePartnerBookingStore(state => state.bookings)
+  const { bookings, isLoading, fetchBookings } = usePartnerBookingStore()
+
+  useEffect(() => {
+    if (venueId) fetchBookings(venueId)
+  }, [venueId])
 
   // 1. Group & Sort Logic
   const sections = useMemo(() => {
     // Filter by venue
     const venueBookings = bookings.filter(b => b.venueId === venueId)
-    
+
     // Sort by date + time
     venueBookings.sort((a, b) => {
-      const dateA = new Date(`${a.date}T${a.timeSlots[0].startTime}`)
-      const dateB = new Date(`${b.date}T${b.timeSlots[0].startTime}`)
+      const dateA = new Date(`${a.date}T${a.startTime}`)
+      const dateB = new Date(`${b.date}T${b.startTime}`)
       return dateA.getTime() - dateB.getTime()
     })
 
@@ -50,32 +58,34 @@ export default function BookingListScreen() {
     const isPending = item.status === 'pending'
     
     return (
-      <TouchableOpacity
-        onPress={() => router.push({ pathname: './bookingDetail', params: { bookingId: item.id } })}
-        className={`bg-white p-4 rounded-xl mb-3 border ${isCancelled ? 'border-red-100 bg-red-50/30' : 'border-slate-200'} shadow-sm`}
-      >
-        <View className="flex-row justify-between items-start mb-2">
-          <View className="bg-slate-100 px-2 py-1 rounded-md">
-            <Text className="text-xs font-bold text-slate-700">
-              {item.timeSlots[0].startTime} - {item.timeSlots[0].endTime}
-            </Text>
+      <FadeInView delay={30}>
+        <AnimatedPressable
+          onPress={() => router.push({ pathname: './bookingDetail', params: { bookingId: item.id } })}
+          className={`bg-white p-4 rounded-xl mb-3 border ${isCancelled ? 'border-red-100 bg-red-50/30' : 'border-slate-200'} shadow-sm`}
+        >
+          <View className="flex-row justify-between items-start mb-2">
+            <View className="bg-slate-100 px-2 py-1 rounded-md">
+              <Text className="text-xs font-bold text-slate-700">
+                {item.startTime} - {item.endTime}
+              </Text>
+            </View>
+            <View className={`px-2 py-1 rounded-full ${isCancelled ? 'bg-red-100' : isPending ? 'bg-orange-100' : 'bg-green-100'}`}>
+              <Text className={`text-[10px] font-bold uppercase ${isCancelled ? 'text-red-700' : isPending ? 'text-orange-700' : 'text-green-700'}`}>
+                {item.status}
+              </Text>
+            </View>
           </View>
-          <View className={`px-2 py-1 rounded-full ${isCancelled ? 'bg-red-100' : isPending ? 'bg-orange-100' : 'bg-green-100'}`}>
-            <Text className={`text-[10px] font-bold uppercase ${isCancelled ? 'text-red-700' : isPending ? 'text-orange-700' : 'text-green-700'}`}>
-              {item.status}
-            </Text>
-          </View>
-        </View>
 
-        <Text className={`text-lg font-bold ${isCancelled ? 'text-slate-400' : 'text-slate-900'}`}>
-          {item.guestDetails.name}
-        </Text>
-        
-        <View className="flex-row items-center mt-1">
-          <MaterialIcons name="phone" size={12} color="#94a3b8" />
-          <Text className="text-slate-500 text-xs ml-1">{item.guestDetails.phone}</Text>
-        </View>
-      </TouchableOpacity>
+          <Text className={`text-lg font-bold ${isCancelled ? 'text-slate-400' : 'text-slate-900'}`}>
+            {item.guestDetails.name}
+          </Text>
+
+          <View className="flex-row items-center mt-1">
+            <MaterialIcons name="phone" size={12} color="#94a3b8" />
+            <Text className="text-slate-500 text-xs ml-1">{item.guestDetails.phone}</Text>
+          </View>
+        </AnimatedPressable>
+      </FadeInView>
     )
   }
 
@@ -88,13 +98,15 @@ export default function BookingListScreen() {
           <Ionicons name="arrow-back" size={24} color="#1e293b" />
         </TouchableOpacity>
         <Text className="text-xl font-bold text-slate-900">Bookings</Text>
+        {isLoading && <ActivityIndicator color="#2563eb" size="small" style={{ marginLeft: 12 }} />}
       </View>
 
       <SectionList
         sections={sections}
         keyExtractor={item => item.id}
-        contentContainerStyle={{ padding: 20 }}
+        contentContainerStyle={{ padding: 20, maxWidth: isTablet ? 768 : undefined, width: '100%', alignSelf: 'center' }}
         stickySectionHeadersEnabled={false}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={() => fetchBookings(venueId)} />}
         renderItem={renderBookingCard}
         renderSectionHeader={({ section: { title } }) => (
           <Text className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 mt-2">

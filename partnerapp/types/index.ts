@@ -8,14 +8,17 @@ export type Academy = {
   coachName: string;
   contactNumber: string;
   facilities: string;
-  
-  Fee: string; // Note: You capitalize 'Fee' here, ensuring it matches your usage
+
+  fee: number;
+  feeStructure?: 'Monthly' | 'Quarterly' | 'Yearly';
+  isActive?: boolean;
   city: string;
   coaches?: Coach[];
   headCoach?: string;
-  
-  // ✅ Added for the Gallery feature
-  photos?: string[]; 
+  studentCount?: number;
+  // Cover photo only (most recent upload) — for list/card display.
+  // The full gallery (with photo ids, for delete) is fetched separately via AcademyPhoto.
+  photos?: string[];
 };
 
 export type Coach = {
@@ -24,6 +27,12 @@ export type Coach = {
   specialization: string;
   experience: string;
   contact: string;
+};
+
+export type AcademyPhoto = {
+  id: string;
+  academyId: string;
+  url: string;
 };
 
 export type Student = {

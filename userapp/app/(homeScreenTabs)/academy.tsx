@@ -27,7 +27,7 @@ export default function AcademyMainScreen() {
   const scrollX = useRef(new Animated.Value(0)).current;
   const mainBanner = require("@/assets/images/heroBannerAcademy.png");
 
-  // 🔹 1) CORE DATA - Removed infinite loop complexity
+
   const carouselData = [
     {
       id: "hero",

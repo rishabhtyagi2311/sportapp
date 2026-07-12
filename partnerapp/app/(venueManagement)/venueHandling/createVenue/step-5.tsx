@@ -1,15 +1,14 @@
 import React, { useState } from 'react'
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  ScrollView, 
-  Image, 
-  Alert, 
-  ActivityIndicator, 
-  Platform, 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  Alert,
+  ActivityIndicator,
+  Platform,
   StatusBar,
-  Dimensions
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialIcons, Ionicons } from '@expo/vector-icons'
@@ -20,17 +19,18 @@ import axios from 'axios'
 // API and Store Imports
 import { useVenueStore } from '@/store/venueStore'
 import { venueApiService } from '@/services/venueManagement/venue'
-
-const { width } = Dimensions.get('window');
-const isTablet = width > 768;
+import { useResponsive } from '@/hooks/useResponsive'
+import FadeInView from '@/components/animated/FadeInView'
+import AnimatedPressable from '@/components/animated/AnimatedPressable'
 
 export default function Step5Review() {
   const router = useRouter()
-  
+  const { isTablet } = useResponsive()
+
   // Zustand Selectors
   const draftVenue = useVenueStore((state) => state.draftVenue)
   const updateDraftVenue = useVenueStore((state) => state.updateDraftVenue)
-  const resetDraftVenue = useVenueStore((state) => state.resetDraftVenue)
+  const submitDraftVenue = useVenueStore((state) => state.submitDraftVenue)
 
   // Local UI State
   const [uploading, setUploading] = useState(false)
@@ -69,7 +69,7 @@ export default function Step5Review() {
     setUploading(true);
     try {
       // 1. Get pre-signed URL from our backend service
-      const { uploadUrl, publicUrl } = await venueApiService.getPresignedUrl(fileName, 'image/jpeg');
+      const { uploadUrl, publicUrl } = await venueApiService.getPresignedUrl(fileName, 'image/jpeg', draftVenue.name);
 
       // 2. Convert URI to Blob (Crucial for direct S3 binary upload)
       const response = await fetch(uri);
@@ -108,16 +108,15 @@ export default function Step5Review() {
     setIsSubmitting(true);
 
     try {
-      // Send the entire draft object to the backend
-      await venueApiService.createVenue(draftVenue);
-      
+      // Creates the venue, refreshes venueStore.venues, and resets the draft
+      await submitDraftVenue();
+
       Alert.alert(
         "Venue Launched! 🎉",
         "Your venue is now live and slots have been generated.",
-        [{ 
-          text: "Go to Dashboard", 
+        [{
+          text: "Go to Dashboard",
           onPress: () => {
-            resetDraftVenue(); // Clear the wizard state
             router.navigate("/(venueManagement)/venueHandling/landingDashboard");
           }
         }]
@@ -152,7 +151,7 @@ export default function Step5Review() {
       </View>
 
       <ScrollView className="flex-1 bg-slate-50/30" showsVerticalScrollIndicator={false}>
-        <View className="self-center w-full max-w-2xl px-6 pt-8">
+        <FadeInView className="self-center w-full max-w-2xl px-6 pt-8">
           <Text className="text-3xl font-black text-slate-900 mb-2">Final Review</Text>
           <Text className="text-slate-500 text-lg mb-8">Add photos and verify your details.</Text>
 
@@ -237,12 +236,12 @@ export default function Step5Review() {
               <Text className="text-slate-400 text-xs font-bold">Standard rate per 30-min slot</Text>
             </View>
           </View>
-        </View>
+        </FadeInView>
       </ScrollView>
 
       {/* FOOTER */}
       <View className="p-6 bg-white border-t border-slate-50 items-center" style={{ paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}>
-        <TouchableOpacity
+        <AnimatedPressable
           onPress={handleFinalLaunch}
           disabled={isSubmitting || uploading}
           className={`h-16 rounded-3xl items-center justify-center flex-row shadow-xl ${isSubmitting ? 'bg-slate-700' : 'bg-green-600'} ${isTablet ? 'w-96' : 'w-full'}`}
@@ -255,7 +254,7 @@ export default function Step5Review() {
               <MaterialIcons name="rocket-launch" size={24} color="white" />
             </>
           )}
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
     </SafeAreaView>
   );

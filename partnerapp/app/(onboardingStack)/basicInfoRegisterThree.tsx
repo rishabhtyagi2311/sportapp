@@ -10,22 +10,32 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   ImageBackground,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useForm, Controller } from "react-hook-form";
 import { useRouter } from "expo-router";
 import signUpStore from "@/store/signUpStore";
+import { useAuthStore } from "@/store/authStore";
+import { useResponsive } from "@/hooks/useResponsive";
+import AnimatedPressable from "@/components/animated/AnimatedPressable";
 
 
 
 type FormData = {
   city: string;
   dob: string;
+  password: string;
+  confirmPassword: string;
 };
 
 export default function InfoRegisterScreen() {
   const router = useRouter();
-  const {firstName, lastName, email, contact, setDob, setCity} = signUpStore()
-  
+  const { isTablet } = useResponsive();
+  const {firstName, lastName, contact, email, setDob, setCity} = signUpStore()
+  const register = useAuthStore((state) => state.register)
+  const [submitting, setSubmitting] = useState(false)
+
   const {
     control,
     handleSubmit,
@@ -34,27 +44,37 @@ export default function InfoRegisterScreen() {
     defaultValues: {
       city: "",
       dob: "",
+      password: "",
+      confirmPassword: "",
     },
   });
 
   const onSubmit = async (data: FormData) => {
-    
+    if (data.password !== data.confirmPassword) {
+      Alert.alert("Passwords don't match", "Please re-enter matching passwords.")
+      return
+    }
+
     setCity(data.city)
     setDob(data.dob)
 
-  //   const response =  await onBoardingService.basicInfoRegister(
-  //   firstName,lastName,email, contact, data.city, data.dob
-  //  )
-  //  console.log(response);
-  //   if(response!== null)
-  //   {
-  //     router.push("./../(homeScreenTabs)");
-  //   }
-  //   else{
-  //     alert("Server Issue, Try again ")
-  //   }
-
-   router.push("./../(homeScreenTabs)");
+    setSubmitting(true)
+    try {
+      await register({
+        firstName,
+        lastName,
+        contactNumber: contact,
+        password: data.password,
+        email: email || undefined,
+        city: data.city,
+        dob: data.dob,
+      })
+      router.push("./../(homeScreenTabs)");
+    } catch (err: any) {
+      Alert.alert("Registration Failed", err.message || "Please try again.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -72,14 +92,15 @@ export default function InfoRegisterScreen() {
             <View className="flex-1 justify-end">
               <View
                 className="bg-white border-black border-4"
-                style={{ height: "50%", borderTopRightRadius: 180 }}
+                style={{ height: "78%", borderTopRightRadius: 180 }}
               >
                 <ScrollView
                   contentContainerStyle={{ paddingBottom: 30 }}
                   keyboardShouldPersistTaps="handled"
                 >
+                <View className={isTablet ? 'self-center w-full max-w-md' : 'w-full'}>
                   <Text className="text-black text-2xl font-extrabold mt-8 ml-8 mb-2">
-                    You are Almost there. 
+                    You are Almost there.
                   </Text>
                   {/* City Input */}
                   <Text className="text-black text-xl  mt-8 ml-8 mb-2">
@@ -164,17 +185,80 @@ export default function InfoRegisterScreen() {
                     )}
                   </View>
 
+                  {/* Password Input */}
+                  <View className="px-4 mt-6">
+                    <Text className="text-black text-xl mb-2 ml-4">
+                      Create a Password
+                    </Text>
+                    <Controller
+                      control={control}
+                      name="password"
+                      rules={{
+                        required: "Password is required",
+                        minLength: { value: 6, message: "Password must be at least 6 characters" },
+                      }}
+                      render={({ field: { onChange, value } }) => (
+                        <TextInput
+                          className="border-2 border-black rounded-2xl bg-white px-4 py-3 text-base font-medium text-gray-800 mx-4"
+                          placeholder="Password"
+                          placeholderTextColor="#9ca3af"
+                          secureTextEntry
+                          value={value}
+                          onChangeText={onChange}
+                        />
+                      )}
+                    />
+                    {errors.password && (
+                      <Text className="text-red-800 font-medium ml-2 mt-1">
+                        {errors.password.message}
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Confirm Password Input */}
+                  <View className="px-4 mt-6">
+                    <Text className="text-black text-xl mb-2 ml-4">
+                      Confirm Password
+                    </Text>
+                    <Controller
+                      control={control}
+                      name="confirmPassword"
+                      rules={{ required: "Please confirm your password" }}
+                      render={({ field: { onChange, value } }) => (
+                        <TextInput
+                          className="border-2 border-black rounded-2xl bg-white px-4 py-3 text-base font-medium text-gray-800 mx-4"
+                          placeholder="Confirm Password"
+                          placeholderTextColor="#9ca3af"
+                          secureTextEntry
+                          value={value}
+                          onChangeText={onChange}
+                        />
+                      )}
+                    />
+                    {errors.confirmPassword && (
+                      <Text className="text-red-800 font-medium ml-2 mt-1">
+                        {errors.confirmPassword.message}
+                      </Text>
+                    )}
+                  </View>
+
                   {/* Submit Button */}
                   <View className="w-full flex items-center mt-8">
-                    <TouchableOpacity
+                    <AnimatedPressable
                       className="bg-black h-14 rounded-3xl flex items-center justify-center w-10/12"
                       onPress={handleSubmit(onSubmit)}
+                      disabled={submitting}
                     >
-                      <Text className="text-white text-2xl font-bold">
-                        Proceed
-                      </Text>
-                    </TouchableOpacity>
+                      {submitting ? (
+                        <ActivityIndicator color="white" />
+                      ) : (
+                        <Text className="text-white text-2xl font-bold">
+                          Proceed
+                        </Text>
+                      )}
+                    </AnimatedPressable>
                   </View>
+                </View>
                 </ScrollView>
               </View>
             </View>

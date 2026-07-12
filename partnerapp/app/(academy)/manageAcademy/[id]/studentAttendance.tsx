@@ -1,22 +1,34 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAcademyStore } from "@/store/academyStore";
+import { useResponsive } from "@/hooks/useResponsive";
+import FadeInView from "@/components/animated/FadeInView";
 
 export default function StudentAttendanceScreen() {
   const { studentId } = useLocalSearchParams<{ studentId: string }>();
   const router = useRouter();
+  const { isTablet } = useResponsive();
 
   /* ✅ Correct Zustand subscription */
   const attendance = useAcademyStore((state) => state.attendance);
+  const fetchStudentAttendance = useAcademyStore((state) => state.fetchStudentAttendance);
+  const isLoading = useAcademyStore((state) => state.isLoading);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (studentId) fetchStudentAttendance(studentId);
+    }, [studentId, fetchStudentAttendance])
+  );
 
   if (!studentId) {
     return (
@@ -61,12 +73,14 @@ export default function StudentAttendanceScreen() {
         <TouchableOpacity onPress={() => router.back()} className="mr-3">
           <Ionicons name="arrow-back" size={22} color="#0f172a" />
         </TouchableOpacity>
-        <Text className="text-lg font-bold text-slate-900">
+        <Text className="text-lg font-bold text-slate-900 flex-1">
           Student Attendance
         </Text>
+        {isLoading && <ActivityIndicator color="#0f172a" size="small" />}
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16 }}>
+        <FadeInView className={isTablet ? 'self-center w-full max-w-xl' : 'w-full'}>
         {/* Month / Year Pickers */}
         <View className="flex-row mb-4">
           <View className="flex-1 bg-slate-900 rounded-lg border border-gray-300 mr-2">
@@ -143,6 +157,7 @@ export default function StudentAttendanceScreen() {
             No attendance marked for this student yet
           </Text>
         )}
+        </FadeInView>
       </ScrollView>
     </SafeAreaView>
   );

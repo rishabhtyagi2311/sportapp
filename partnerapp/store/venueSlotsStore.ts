@@ -2,18 +2,20 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import { TimeSlot } from '@/types/venue'
+import { VenueSlot } from '@/types/venue'
 import { venueApiService } from '@/services/venueManagement/venue'
 
 interface SlotState {
   selectedDate: string // YYYY-MM-DD
-  slots: TimeSlot[]
+  slots: VenueSlot[]
   isLoading: boolean
   error: string | null
 
   // Actions
   setSelectedDate: (date: string) => void
   loadSlots: (venueId: string, date: string) => Promise<void>
+  generateSlots: (venueId: string, startDate: string) => Promise<void>
+  updateSlotPrice: (slotId: string, price: number) => Promise<void>
 }
 
 export const useSlotStore = create<SlotState>()(
@@ -39,6 +41,31 @@ export const useSlotStore = create<SlotState>()(
           set({ error: err.message || "Failed to load slots" });
         } finally {
           set({ isLoading: false });
+        }
+      },
+
+      generateSlots: async (venueId, startDate) => {
+        set({ isLoading: true, error: null });
+        try {
+          await venueApiService.generateSlots(venueId, { startDate });
+          const response = await venueApiService.getSlots(venueId, startDate);
+          if (response.success) {
+            set({ slots: response.data });
+          }
+        } catch (err: any) {
+          set({ error: err.message || "Failed to generate slots" });
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      updateSlotPrice: async (slotId, price) => {
+        const response = await venueApiService.updateSlot(slotId, { price });
+        if (response.success) {
+          set((state) => {
+            const slot = state.slots.find((s) => s.id === slotId);
+            if (slot) slot.price = price;
+          });
         }
       }
     }))

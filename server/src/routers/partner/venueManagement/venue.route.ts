@@ -4,9 +4,10 @@ import { authenticatePartner } from '../../../middlewares/auth.middleware';
 
 const router = Router();
 
-router.get('/my-venues', authenticatePartner, VenueController.getMyVenues);
-
-// Venue creation also needs this to know which partner to link to
-router.post('/', authenticatePartner, VenueController.create);
+router.get('/venues', authenticatePartner, VenueController.getMyVenues);
+router.post('/venues', authenticatePartner, VenueController.create);
+router.get('/venues/:venueId', authenticatePartner, VenueController.getById);
+router.put('/venues/:venueId', authenticatePartner, VenueController.update);
+router.delete('/venues/:venueId', authenticatePartner, VenueController.remove);
 
 export default router;

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,19 +11,52 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
-import { useLocalSearchParams, router } from "expo-router";
+import { useLocalSearchParams, router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAcademyStore } from "@/store/academyStore";
 import StudentCard from "@/components/StudentCard";
-
-/* ---------------- Utils ---------------- */
-const generateStudentId = () =>
-  `student_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+import { Student } from "@/types";
+import { useResponsive } from "@/hooks/useResponsive";
+import FadeInView from "@/components/animated/FadeInView";
+import AnimatedPressable from "@/components/animated/AnimatedPressable";
 
 export default function StudentsScreen() {
   /* ---------------- Params ---------------- */
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { isTablet } = useResponsive();
+
+  /* ---------------- Store (SAFE SUBSCRIPTIONS) ---------------- */
+  const allStudents = useAcademyStore((state) => state.students);
+  const isLoading = useAcademyStore((state) => state.isLoading);
+  const fetchStudents = useAcademyStore((state) => state.fetchStudents);
+  const addStudent = useAcademyStore((state) => state.addStudent);
+  const updateStudent = useAcademyStore((state) => state.updateStudent);
+  const removeStudent = useAcademyStore((state) => state.removeStudent);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (id) fetchStudents(id);
+    }, [id, fetchStudents])
+  );
+
+  /* ---------------- Derived State (SAFE) ---------------- */
+  const students = useMemo(
+    () => allStudents.filter((s) => s.academyId === id),
+    [allStudents, id]
+  );
+
+  /* ---------------- Local State ---------------- */
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [studentForm, setStudentForm] = useState({
+    name: "",
+    age: "",
+    fatherName: "",
+    fatherContact: "",
+  });
 
   if (!id) {
     return (
@@ -33,56 +66,72 @@ export default function StudentsScreen() {
     );
   }
 
-  /* ---------------- Store (SAFE SUBSCRIPTIONS) ---------------- */
-  const allStudents = useAcademyStore((state) => state.students);
-  const addStudent = useAcademyStore((state) => state.addStudent);
-
-  /* ---------------- Derived State (SAFE) ---------------- */
-  const students = useMemo(
-    () => allStudents.filter((s) => s.academyId === id),
-    [allStudents, id]
-  );
-
-  /* ---------------- Local State ---------------- */
-  const [showAddStudent, setShowAddStudent] = useState(false);
-  const [newStudent, setNewStudent] = useState({
-    name: "",
-    age: "",
-    fatherName: "",
-    fatherContact: "",
-  });
-
   /* ---------------- Handlers ---------------- */
-  const handleAddStudent = () => {
-    if (!newStudent.name || !newStudent.age || !newStudent.fatherName) {
+  const openAddModal = () => {
+    setEditingStudentId(null);
+    setStudentForm({ name: "", age: "", fatherName: "", fatherContact: "" });
+    setModalVisible(true);
+  };
+
+  const openEditModal = (student: Student) => {
+    setEditingStudentId(student.id);
+    setStudentForm({
+      name: student.name,
+      age: String(student.age),
+      fatherName: student.fatherName,
+      fatherContact: student.fatherContact,
+    });
+    setModalVisible(true);
+  };
+
+  const handleSubmit = async () => {
+    if (!studentForm.name || !studentForm.age || !studentForm.fatherName) {
       Alert.alert("Error", "Please fill all required fields.");
       return;
     }
 
-    if (!/^\d{10}$/.test(newStudent.fatherContact)) {
+    if (!/^\d{10}$/.test(studentForm.fatherContact)) {
       Alert.alert("Error", "Father's contact must be exactly 10 digits.");
       return;
     }
 
-    addStudent({
-      id: generateStudentId(),
-      name: newStudent.name,
-      age: Number(newStudent.age),
-      fatherName: newStudent.fatherName,
-      fatherContact: newStudent.fatherContact,
-      academyId: id,
-      enrollmentDate: new Date().toISOString().split("T")[0],
-    });
+    const payload = {
+      name: studentForm.name,
+      age: Number(studentForm.age),
+      fatherName: studentForm.fatherName,
+      fatherContact: studentForm.fatherContact,
+    };
 
-    setNewStudent({
-      name: "",
-      age: "",
-      fatherName: "",
-      fatherContact: "",
-    });
+    setSubmitting(true);
+    try {
+      if (editingStudentId) {
+        await updateStudent(id, editingStudentId, payload);
+        Alert.alert("Success", "Student updated successfully!");
+      } else {
+        await addStudent(id, payload);
+        Alert.alert("Success", "Student added successfully!");
+      }
+      setModalVisible(false);
+    } catch (err: any) {
+      Alert.alert("Error", err.response?.data?.message || "Could not save student");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-    setShowAddStudent(false);
-    Alert.alert("Success", "Student added successfully!");
+  const handleRemoveStudent = (studentId: string) => {
+    Alert.alert("Remove Student", "Are you sure you want to remove this student?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: () => {
+          removeStudent(id, studentId).catch((err: any) =>
+            Alert.alert("Error", err.response?.data?.message || "Could not remove student")
+          );
+        },
+      },
+    ]);
   };
 
   /* ---------------- UI ---------------- */
@@ -98,7 +147,9 @@ export default function StudentsScreen() {
           Students
         </Text>
 
-        <TouchableOpacity onPress={() => setShowAddStudent(true)}>
+        {isLoading && <ActivityIndicator color="white" size="small" style={{ marginRight: 12 }} />}
+
+        <TouchableOpacity onPress={openAddModal}>
           <Ionicons name="add-circle" size={36} color="white" />
         </TouchableOpacity>
       </View>
@@ -107,9 +158,17 @@ export default function StudentsScreen() {
       <FlatList
         data={students}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <StudentCard student={item} />}
+        renderItem={({ item, index }) => (
+          <FadeInView delay={Math.min(index, 8) * 50}>
+            <StudentCard
+              student={item}
+              onEdit={() => openEditModal(item)}
+              onDelete={() => handleRemoveStudent(item.id)}
+            />
+          </FadeInView>
+        )}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={{ padding: 16, maxWidth: isTablet ? 768 : undefined, width: '100%', alignSelf: 'center' }}
         ListEmptyComponent={
           <Text className="text-center text-gray-500 mt-10">
             No students added yet
@@ -117,12 +176,12 @@ export default function StudentsScreen() {
         }
       />
 
-      {/* Add Student Modal */}
+      {/* Add / Edit Student Modal */}
       <Modal
-        visible={showAddStudent}
+        visible={modalVisible}
         animationType="fade"
         transparent
-        onRequestClose={() => setShowAddStudent(false)}
+        onRequestClose={() => setModalVisible(false)}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -130,16 +189,16 @@ export default function StudentsScreen() {
         >
           <View className="bg-white w-11/12 rounded-xl p-5">
             <Text className="text-lg font-bold text-slate-900 mb-4 text-center">
-              Add New Student
+              {editingStudentId ? "Edit Student" : "Add New Student"}
             </Text>
 
             <ScrollView showsVerticalScrollIndicator={false}>
               <TextInput
                 placeholder="Student Name"
                 placeholderTextColor="#9CA3AF"
-                value={newStudent.name}
+                value={studentForm.name}
                 onChangeText={(text) =>
-                  setNewStudent({ ...newStudent, name: text })
+                  setStudentForm({ ...studentForm, name: text })
                 }
                 className="border border-gray-300 rounded-lg p-3 mb-3"
               />
@@ -147,9 +206,9 @@ export default function StudentsScreen() {
               <TextInput
                 placeholder="Age"
                 placeholderTextColor="#9CA3AF"
-                value={newStudent.age}
+                value={studentForm.age}
                 onChangeText={(text) =>
-                  setNewStudent({ ...newStudent, age: text })
+                  setStudentForm({ ...studentForm, age: text })
                 }
                 keyboardType="numeric"
                 className="border border-gray-300 rounded-lg p-3 mb-3"
@@ -158,9 +217,9 @@ export default function StudentsScreen() {
               <TextInput
                 placeholder="Father's Name"
                 placeholderTextColor="#9CA3AF"
-                value={newStudent.fatherName}
+                value={studentForm.fatherName}
                 onChangeText={(text) =>
-                  setNewStudent({ ...newStudent, fatherName: text })
+                  setStudentForm({ ...studentForm, fatherName: text })
                 }
                 className="border border-gray-300 rounded-lg p-3 mb-3"
               />
@@ -168,9 +227,9 @@ export default function StudentsScreen() {
               <TextInput
                 placeholder="Father's Contact (10 digits)"
                 placeholderTextColor="#9CA3AF"
-                value={newStudent.fatherContact}
+                value={studentForm.fatherContact}
                 onChangeText={(text) =>
-                  setNewStudent({ ...newStudent, fatherContact: text })
+                  setStudentForm({ ...studentForm, fatherContact: text })
                 }
                 keyboardType="phone-pad"
                 maxLength={10}
@@ -180,7 +239,8 @@ export default function StudentsScreen() {
               {/* Buttons */}
               <View className="flex-row justify-end mt-4">
                 <TouchableOpacity
-                  onPress={() => setShowAddStudent(false)}
+                  onPress={() => setModalVisible(false)}
+                  disabled={submitting}
                   className="mr-6"
                 >
                   <Text className="text-gray-600 font-medium">
@@ -188,14 +248,19 @@ export default function StudentsScreen() {
                   </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={handleAddStudent}
-                  className="bg-blue-600 px-5 py-2 rounded-lg"
+                <AnimatedPressable
+                  onPress={handleSubmit}
+                  disabled={submitting}
+                  className="bg-blue-600 px-5 py-2 rounded-lg items-center justify-center"
                 >
-                  <Text className="text-white font-semibold">
-                    Save
-                  </Text>
-                </TouchableOpacity>
+                  {submitting ? (
+                    <ActivityIndicator color="white" size="small" />
+                  ) : (
+                    <Text className="text-white font-semibold">
+                      Save
+                    </Text>
+                  )}
+                </AnimatedPressable>
               </View>
             </ScrollView>
           </View>

@@ -1,16 +1,21 @@
-import React from 'react'
-import { View, Text, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native'
+import React, { useState } from 'react'
+import { View, Text, ScrollView, TouchableOpacity, Alert, Linking, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { usePartnerBookingStore } from '@/store/partner-booking-store'
+import { useResponsive } from '@/hooks/useResponsive'
+import FadeInView from '@/components/animated/FadeInView'
+import AnimatedPressable from '@/components/animated/AnimatedPressable'
 
 export default function BookingDetailsScreen() {
   const router = useRouter()
+  const { isTablet } = useResponsive()
   const { bookingId } = useLocalSearchParams() as { bookingId: string }
-  
+
   const booking = usePartnerBookingStore(state => state.getBookingById(bookingId))
   const cancelBooking = usePartnerBookingStore(state => state.cancelBooking)
+  const [cancelling, setCancelling] = useState(false)
 
   if (!booking) return <View className="flex-1 bg-white items-center justify-center"><Text>Booking not found</Text></View>
 
@@ -26,12 +31,19 @@ export default function BookingDetailsScreen() {
       "Are you sure you want to cancel this booking? This action cannot be undone.",
       [
         { text: "No", style: "cancel" },
-        { 
-          text: "Yes, Cancel", 
-          style: "destructive", 
-          onPress: () => {
-            cancelBooking(booking.id)
-            router.back()
+        {
+          text: "Yes, Cancel",
+          style: "destructive",
+          onPress: async () => {
+            setCancelling(true)
+            try {
+              await cancelBooking(booking.venueId, booking.id)
+              router.back()
+            } catch (err: any) {
+              Alert.alert("Error", err.response?.data?.message || "Could not cancel this booking")
+            } finally {
+              setCancelling(false)
+            }
           }
         }
       ]
@@ -50,7 +62,8 @@ export default function BookingDetailsScreen() {
       </View>
 
       <ScrollView className="flex-1 bg-slate-50">
-        
+        <FadeInView className={isTablet ? 'self-center w-full max-w-xl' : 'w-full'}>
+
         {/* 1. STATUS BANNER */}
         <View className={`px-6 py-8 items-center ${isCancelled ? 'bg-red-50' : 'bg-green-50'}`}>
           <MaterialIcons 
@@ -94,7 +107,7 @@ export default function BookingDetailsScreen() {
             <View className="flex-row items-center">
               <MaterialIcons name="schedule" size={20} color="#64748b" />
               <Text className="ml-3 text-base font-medium text-slate-700">
-                {booking.timeSlots[0].startTime} - {booking.timeSlots[0].endTime}
+                {booking.startTime} - {booking.endTime}
               </Text>
             </View>
 
@@ -122,17 +135,19 @@ export default function BookingDetailsScreen() {
           </View>
         </View>
 
+        </FadeInView>
       </ScrollView>
 
       {/* FOOTER ACTION */}
       {!isCancelled && (
-        <View className="p-5 bg-white border-t border-slate-100">
-          <TouchableOpacity 
+        <View className="p-5 bg-white border-t border-slate-100 items-center">
+          <AnimatedPressable
             onPress={handleCancel}
-            className="w-full bg-white border border-red-200 py-4 rounded-xl items-center"
+            disabled={cancelling}
+            className={`bg-white border border-red-200 py-4 rounded-xl items-center ${isTablet ? 'w-96' : 'w-full'}`}
           >
-            <Text className="text-red-600 font-bold text-lg">Cancel Booking</Text>
-          </TouchableOpacity>
+            {cancelling ? <ActivityIndicator color="#dc2626" /> : <Text className="text-red-600 font-bold text-lg">Cancel Booking</Text>}
+          </AnimatedPressable>
         </View>
       )}
 

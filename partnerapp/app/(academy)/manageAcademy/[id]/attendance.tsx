@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -6,32 +6,52 @@ import {
   FlatList,
   ScrollView,
   SafeAreaView,
+  ActivityIndicator,
 } from "react-native";
-import { useLocalSearchParams, router } from "expo-router";
+import { useLocalSearchParams, router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { addDays, format, isSameDay, subDays } from "date-fns";
 import { useAcademyStore } from "@/store/academyStore";
 import AttendanceCard from "@/components/AttendanceCard";
+import { useResponsive } from "@/hooks/useResponsive";
+import FadeInView from "@/components/animated/FadeInView";
+import AnimatedPressable from "@/components/animated/AnimatedPressable";
 
 export default function AttendanceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { isTablet } = useResponsive();
 
   const {
     markAttendance,
     getAttendanceStatus,
     getStudentsByAcademy,
+    fetchStudents,
+    fetchAcademyAttendance,
+    isLoading,
   } = useAcademyStore();
-
-  if (!id) return null;
 
   const [selectedTab, setSelectedTab] =
     useState<"mark" | "history">("mark");
+  const [selectedDay, setSelectedDay] = useState(new Date());
 
-  const selectedDate = new Date().toISOString().split("T")[0];
+  const selectedDate = format(selectedDay, "yyyy-MM-dd");
+  const isToday = isSameDay(selectedDay, new Date());
+
+  useFocusEffect(
+    useCallback(() => {
+      if (id) {
+        fetchStudents(id);
+        fetchAcademyAttendance(id, selectedDate);
+      }
+    }, [id, fetchStudents, fetchAcademyAttendance, selectedDate])
+  );
+
+  if (!id) return null;
 
   const students = getStudentsByAcademy(id);
 
   const handleMarkAttendance = (studentId: string, present: boolean) => {
-    markAttendance(studentId, selectedDate, present);
+    markAttendance(studentId, selectedDate, present).catch(() => {});
   };
 
   return (
@@ -42,9 +62,10 @@ export default function AttendanceScreen() {
           <TouchableOpacity onPress={() => router.back()} className="mr-3">
             <Ionicons name="arrow-back" size={28} color="white" />
           </TouchableOpacity>
-          <Text className="text-2xl font-bold text-white">
+          <Text className="text-2xl font-bold text-white flex-1">
             Attendance
           </Text>
+          {isLoading && <ActivityIndicator color="white" size="small" />}
         </View>
 
         {/* Tabs */}
@@ -74,47 +95,70 @@ export default function AttendanceScreen() {
 
         {selectedTab === "mark" ? (
           <>
-            <View className="px-4 py-3 bg-gray-50 items-center">
-              <Text className="font-semibold">
-                Date: {selectedDate}
-              </Text>
+            <View className="flex-row items-center justify-between px-4 py-3 bg-gray-50">
+              <TouchableOpacity onPress={() => setSelectedDay((d) => subDays(d, 1))} className="p-2">
+                <Ionicons name="chevron-back" size={22} color="#334155" />
+              </TouchableOpacity>
+
+              <View className="items-center">
+                <Text className="font-semibold text-slate-900">
+                  {format(selectedDay, "EEEE, MMM d")}
+                </Text>
+                {!isToday && (
+                  <TouchableOpacity onPress={() => setSelectedDay(new Date())}>
+                    <Text className="text-xs text-blue-600 font-medium mt-0.5">Jump to Today</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setSelectedDay((d) => addDays(d, 1))}
+                disabled={isToday}
+                className="p-2"
+              >
+                <Ionicons name="chevron-forward" size={22} color={isToday ? "#cbd5e1" : "#334155"} />
+              </TouchableOpacity>
             </View>
 
             <FlatList
               data={students}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <AttendanceCard
-                  student={item}
-                  attendanceStatus={getAttendanceStatus(
-                    item.id,
-                    selectedDate
-                  )}
-                  onMarkAttendance={(present) =>
-                    handleMarkAttendance(item.id, present)
-                  }
-                />
+              contentContainerStyle={{ maxWidth: isTablet ? 768 : undefined, width: '100%', alignSelf: 'center' }}
+              renderItem={({ item, index }) => (
+                <FadeInView delay={Math.min(index, 8) * 50}>
+                  <AttendanceCard
+                    student={item}
+                    attendanceStatus={getAttendanceStatus(
+                      item.id,
+                      selectedDate
+                    )}
+                    onMarkAttendance={(present) =>
+                      handleMarkAttendance(item.id, present)
+                    }
+                  />
+                </FadeInView>
               )}
             />
           </>
         ) : (
-          <ScrollView className="p-4">
-            {students.map((s) => (
-              <TouchableOpacity
-                key={s.id}
-                className="bg-white rounded-xl border p-4 mb-3"
-                onPress={() =>
-                  router.push({
-                    pathname: "/manageAcademy/[id]/studentAttendance",
-                    params: { id, studentId: s.id },
-                  })
-                }
-              >
-                <Text className="text-lg font-bold">{s.name}</Text>
-                <Text className="text-sm text-gray-600">
-                  Father: {s.fatherName}
-                </Text>
-              </TouchableOpacity>
+          <ScrollView className="p-4" contentContainerStyle={isTablet ? { maxWidth: 768, width: '100%', alignSelf: 'center' } : undefined}>
+            {students.map((s, index) => (
+              <FadeInView key={s.id} delay={Math.min(index, 8) * 50}>
+                <AnimatedPressable
+                  className="bg-white rounded-xl border p-4 mb-3"
+                  onPress={() =>
+                    router.push({
+                      pathname: "/manageAcademy/[id]/studentAttendance",
+                      params: { id, studentId: s.id },
+                    })
+                  }
+                >
+                  <Text className="text-lg font-bold">{s.name}</Text>
+                  <Text className="text-sm text-gray-600">
+                    Father: {s.fatherName}
+                  </Text>
+                </AnimatedPressable>
+              </FadeInView>
             ))}
           </ScrollView>
         )}

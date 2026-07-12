@@ -1,0 +1,28 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const academy_controller_1 = require("../../../controllers/partner/academyManagement/academy.controller");
+const auth_middleware_1 = require("../../../middlewares/auth.middleware");
+const router = (0, express_1.Router)();
+router.get('/academies', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.getMyAcademies);
+router.post('/academies', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.create);
+router.get('/academies/:academyId', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.getById);
+router.put('/academies/:academyId', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.update);
+router.delete('/academies/:academyId', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.remove);
+router.post('/academies/:academyId/coaches', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.addCoach);
+router.put('/academies/:academyId/coaches/:coachId', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.updateCoach);
+router.delete('/academies/:academyId/coaches/:coachId', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.removeCoach);
+router.post('/academies/:academyId/students', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.addStudent);
+router.get('/academies/:academyId/students', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.getStudents);
+router.put('/academies/:academyId/students/:studentId', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.updateStudent);
+router.delete('/academies/:academyId/students/:studentId', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.removeStudent);
+router.get('/academies/:academyId/attendance', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.getAcademyAttendance);
+router.post('/students/:studentId/attendance', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.markAttendance);
+router.get('/students/:studentId/attendance', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.getStudentAttendance);
+router.post('/academies/:academyId/photos', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.addPhoto);
+router.get('/academies/:academyId/photos', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.getPhotos);
+router.delete('/academies/:academyId/photos/:photoId', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.removePhoto);
+router.post('/students/:studentId/certificates', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.createCertificate);
+router.get('/academies/:academyId/certificates', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.getAcademyCertificates);
+exports.default = router;
+//# sourceMappingURL=academy.route.js.map

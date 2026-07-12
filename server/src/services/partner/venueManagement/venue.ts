@@ -1,78 +1,56 @@
 import { prisma as globalClient } from "../../../index";
+import { generateSlotsForRange } from "./slotGenerator";
 
 /**
  * Professional Venue Service
  * Handles Venue lifecycle and automated TimeSlot generation
  */
 export class VenueService {
-  
+
   /**
-   * REUSABLE SLOT GENERATOR
-   * Can be called during Venue creation or by a nightly Cron Job.
-   * @param txClient - Uses the transaction client if provided, otherwise the global client.
+   * Reshapes the flat Prisma Venue row (+ address/images/_count relations)
+   * into the nested shape the frontend `Venue` type expects. The DB keeps
+   * city/state/pincode on the venue row and street/lat/lng on a separate
+   * Address row; the client always wants one nested `address` object.
    */
-  static async generateSlotsForRange(
-    venueId: string,
-    sports: any[],
-    operatingHours: any,
-    basePrice: number,
-    daysCount: number = 30,
-    txClient?: any 
-  ) {
-    const client = txClient || globalClient;
-    const slots: any[] = [];
-    const today = new Date();
-
-    for (const sport of sports) {
-      for (const variety of sport.varieties) {
-        for (let i = 0; i < daysCount; i++) {
-          const targetDate = new Date(today);
-          targetDate.setDate(today.getDate() + i);
-          targetDate.setHours(0, 0, 0, 0); // Normalize to midnight for consistent querying
-
-          const dayName = targetDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
-          const dayConfig = operatingHours[dayName];
-
-          // Business Rule: Only generate slots if the venue is marked as Open (Working Day)
-          if (dayConfig && dayConfig.isOpen) {
-            let currentMins = this.timeToMins(dayConfig.open);
-            const endMins = this.timeToMins(dayConfig.close);
-
-            while (currentMins + 30 <= endMins) {
-              slots.push({
-                venueId,
-                varietyId: variety.id,
-                varietyName: variety.name,
-                date: targetDate,
-                startTime: this.minsToTime(currentMins),
-                endTime: this.minsToTime(currentMins + 30),
-                price: basePrice,
-                status: 'available',
-              });
-              currentMins += 30;
-            }
-          }
-        }
-      }
-    }
-
-    if (slots.length > 0) {
-      // Create many is used for high-performance bulk insertion
-      await client.timeSlot.createMany({ 
-        data: slots,
-        skipDuplicates: true 
-      });
-    }
+  static mapVenueForClient(venue: any) {
+    return {
+      id: venue.id,
+      name: venue.name,
+      description: venue.description,
+      address: {
+        street: venue.address?.street || '',
+        city: venue.city,
+        state: venue.state,
+        pincode: venue.pincode,
+        ...(venue.address?.lat != null && venue.address?.lng != null
+          ? { coordinates: { latitude: venue.address.lat, longitude: venue.address.lng } }
+          : {}),
+      },
+      contactInfo: venue.contactInfo,
+      sports: venue.sports,
+      amenities: venue.amenities,
+      images: (venue.images || []).map((img: any) => img.url),
+      rating: venue.rating,
+      reviewCount: 0,
+      operatingHours: venue.operatingHours,
+      peakPricing: venue.peakPricing || null,
+      timeSlots: venue.timeSlots || [],
+      timeSlotCount: venue._count?.timeSlots ?? venue.timeSlots?.length ?? 0,
+      policies: {
+        cancellationPolicy: '',
+        advanceBookingDays: 30,
+        minimumBookingHours: 1,
+      },
+      isActive: venue.isActive,
+      createdAt: venue.createdAt?.toISOString?.() ?? venue.createdAt,
+      updatedAt: venue.updatedAt?.toISOString?.() ?? venue.updatedAt,
+    };
   }
 
-  /**
-   * CREATE VENUE (Atomic Transaction)
-   * Ensures Venue, Address, Images, and initial Slots are created together.
-   */
   static async createVenue(data: any, partnerId: string) {
-    return await globalClient.$transaction(async (tx) => {
-      // 1. Create the Venue record linked to the Partner
-      const venue = await tx.venue.create({
+    const venue = await globalClient.$transaction(async (tx) => {
+      const created = await tx.venue.create({
         data: {
           name: data.name,
           description: data.description,
@@ -81,15 +59,10 @@ export class VenueService {
           pincode: data.address.pincode,
           contactInfo: data.contactInfo,
           operatingHours: data.operatingHours,
+          peakPricing: data.peakPricing || undefined,
           sports: data.sports,
           amenities: data.amenities,
-          
-          // Connect to the authenticated PartnerIdentity
-          partner: {
-            connect: { id: partnerId }
-          },
-
-          // Create Address (1:1 Relation)
+          partner: { connect: { id: partnerId } },
           address: {
             create: {
               street: data.address.street,
@@ -97,53 +70,106 @@ export class VenueService {
               lng: data.address.coordinates?.longitude,
             },
           },
-
-          // Create Images (1:N Relation)
           images: {
-            create: data.images.map((url: string) => ({ url })),
+            create: (data.images || []).map((url: string) => ({ url })),
           },
         },
+        include: { address: true, images: true },
       });
 
-      // 2. Extract base price from the template slot provided by frontend
-      const basePrice = data.timeSlots[0]?.price || 1000;
-      
-      // 3. Kick off initial slot generation within the SAME transaction
-      await this.generateSlotsForRange(
-        venue.id,
-        data.sports,
-        data.operatingHours,
+      const basePrice = data.timeSlots?.[0]?.price || 1000;
+
+      await generateSlotsForRange(tx, {
+        venueId: created.id,
+        sports: data.sports,
+        operatingHours: data.operatingHours,
         basePrice,
-        30,
-        tx 
-      );
+        daysCount: 30,
+        peakPricing: data.peakPricing || null,
+      });
 
-      return venue;
+      return created;
     });
+
+    return this.mapVenueForClient(venue);
   }
 
-  /**
-   * FETCH VENUES BY PARTNER
-   */
   static async getVenuesByPartner(partnerId: string) {
-    return await globalClient.venue.findMany({
+    const venues = await globalClient.venue.findMany({
       where: { partnerId },
-      include: { 
-        address: true, 
-        images: true 
-      },
-      orderBy: { createdAt: 'desc' }
+      include: { address: true, images: true, _count: { select: { timeSlots: true } } },
+      orderBy: { createdAt: 'desc' },
     });
+
+    return venues.map((venue) => this.mapVenueForClient(venue));
   }
 
-  /* --- PRIVATE HELPERS --- */
+  static async getVenueById(venueId: string, partnerId: string) {
+    const venue = await globalClient.venue.findFirst({
+      where: { id: venueId, partnerId },
+      include: { address: true, images: true, timeSlots: true },
+    });
 
-  private static timeToMins(t: string): number {
-    const [h, m] = t.split(':').map(Number);
-    return h * 60 + m;
+    return venue ? this.mapVenueForClient(venue) : null;
   }
 
-  private static minsToTime(m: number): string {
-    return `${Math.floor(m / 60).toString().padStart(2, '0')}:${(m % 60).toString().padStart(2, '0')}`;
+  static async updateVenue(venueId: string, partnerId: string, data: any) {
+    const existingVenue = await globalClient.venue.findFirst({ where: { id: venueId, partnerId } });
+
+    if (!existingVenue) {
+      throw new Error('Venue not found or not owned by partner');
+    }
+
+    const venue = await globalClient.venue.update({
+      where: { id: venueId },
+      data: {
+        name: data.name,
+        description: data.description,
+        isActive: data.isActive,
+        city: data.address?.city,
+        state: data.address?.state,
+        pincode: data.address?.pincode,
+        contactInfo: data.contactInfo,
+        operatingHours: data.operatingHours,
+        peakPricing: data.peakPricing,
+        sports: data.sports,
+        amenities: data.amenities,
+        ...(data.address
+          ? {
+              address: {
+                upsert: {
+                  create: {
+                    street: data.address.street || '',
+                    lat: data.address.coordinates?.latitude,
+                    lng: data.address.coordinates?.longitude,
+                  },
+                  update: {
+                    ...(data.address.street !== undefined ? { street: data.address.street } : {}),
+                    ...(data.address.coordinates?.latitude !== undefined
+                      ? { lat: data.address.coordinates.latitude }
+                      : {}),
+                    ...(data.address.coordinates?.longitude !== undefined
+                      ? { lng: data.address.coordinates.longitude }
+                      : {}),
+                  },
+                },
+              },
+            }
+          : {}),
+      },
+      include: { address: true, images: true },
+    });
+
+    return this.mapVenueForClient(venue);
+  }
+
+  static async deleteVenue(venueId: string, partnerId: string) {
+    const existingVenue = await globalClient.venue.findFirst({ where: { id: venueId, partnerId } });
+
+    if (!existingVenue) {
+      throw new Error('Venue not found or not owned by partner');
+    }
+
+    await globalClient.venue.delete({ where: { id: venueId } });
   }
 }

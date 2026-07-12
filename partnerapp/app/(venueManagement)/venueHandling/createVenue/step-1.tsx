@@ -1,25 +1,25 @@
 import React, { useState } from 'react'
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  ScrollView, 
-  KeyboardAvoidingView, 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  KeyboardAvoidingView,
   Platform,
   StatusBar,
-  Dimensions
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useVenueStore } from '@/store/venueStore'
-
-const { width } = Dimensions.get('window');
-const isTablet = width > 768;
+import { useResponsive } from '@/hooks/useResponsive'
+import FadeInView from '@/components/animated/FadeInView'
+import AnimatedPressable from '@/components/animated/AnimatedPressable'
 
 export default function Step1Essentials() {
   const router = useRouter()
+  const { isTablet } = useResponsive()
   const [activeField, setActiveField] = useState<string | null>(null)
   
   const draftName = useVenueStore((state) => state.draftVenue.name)
@@ -96,7 +96,7 @@ export default function Step1Essentials() {
           keyboardShouldPersistTaps="handled"
         >
           {/* CONTENT WRAPPER (Restricts width on Tablets) */}
-          <View className="self-center w-full max-w-2xl">
+          <FadeInView className="self-center w-full max-w-2xl">
             <View className="mb-10">
               <Text className="text-4xl font-black text-slate-900 tracking-tight mb-2">
                 Let's start with the basics
@@ -185,7 +185,7 @@ export default function Step1Essentials() {
                 </View>
               ) : null}
             </View>
-          </View>
+          </FadeInView>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -194,14 +194,13 @@ export default function Step1Essentials() {
         className="absolute bottom-0 left-0 right-0 p-6 bg-white border-t border-slate-100 items-center"
         style={{ paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}
       >
-        <TouchableOpacity
+        <AnimatedPressable
           onPress={handleNext}
-          activeOpacity={0.8}
           className={`bg-slate-900 rounded-2xl items-center flex-row justify-center h-16 ${isTablet ? 'w-80' : 'w-full'}`}
         >
           <Text className="text-white font-black text-lg mr-2">Continue</Text>
           <MaterialIcons name="arrow-forward" size={22} color="white" />
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
     </SafeAreaView>
   )

@@ -1,113 +1,69 @@
-// types/venue.ts
+import { z } from "zod";
 
-/* -------------------------------------------------------------------------- */
-/* SUB-ENTITIES                                */
-/* -------------------------------------------------------------------------- */
+const coordinatesSchema = z.object({
+  latitude: z.number(),
+  longitude: z.number(),
+});
 
-export interface Amenity {
-  id: string;
-  name: string;
-  category: 'basic' | 'sports_equipment' | 'facilities' | 'services';
-  icon?: string;
-  description?: string;
-}
+const addressSchema = z.object({
+  street: z.string(),
+  city: z.string(),
+  state: z.string(),
+  pincode: z.string(),
+  coordinates: coordinatesSchema.optional(),
+});
 
-export interface SportVariety {
-  id: string;
-  name: string; // e.g., "6x6 Turf", "Full Court"
-  specifications?: Record<string, any>;
-  basePrice?: number;
-  isAvailable: boolean;
-}
+const contactInfoSchema = z.object({
+  phone: z.string(),
+  email: z.string().optional(),
+  whatsapp: z.string().optional(),
+});
 
-export interface Sport {
-  id: string;
-  name: string;
-  category: 'indoor' | 'outdoor' | 'N/A';
-  varieties: SportVariety[];
-}
+const operatingDaySchema = z.object({
+  open: z.string(),
+  close: z.string(),
+  isOpen: z.boolean(),
+});
 
-export interface TimeSlot {
-  id: string;
-  sportId?: string;       // Optional: Link slot to specific sport
-  sportVarietyId?: string;// Optional: Link slot to specific variety
-  startTime: string;      // HH:mm
-  endTime: string;        // HH:mm
-  isAvailable: boolean;
-  price: number;
-  priceType: 'per_hour' | 'per_slot' | 'per_person';
-}
+const operatingHoursSchema = z.object({
+  monday: operatingDaySchema,
+  tuesday: operatingDaySchema,
+  wednesday: operatingDaySchema,
+  thursday: operatingDaySchema,
+  friday: operatingDaySchema,
+  saturday: operatingDaySchema,
+  sunday: operatingDaySchema,
+});
 
-export interface OperatingHours {
-  open: string;
-  close: string;
-  isOpen: boolean;
-}
+const peakPricingSchema = z.object({
+  enabled: z.boolean(),
+  startTime: z.string(),
+  endTime: z.string(),
+  price: z.number().nonnegative(),
+});
 
-export type WeeklyOperatingHours = {
-  [key in 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday']: OperatingHours;
-};
+export const createVenueSchema = z.object({
+  name: z.string().min(3),
+  description: z.string(),
+  address: addressSchema,
+  contactInfo: contactInfoSchema,
+  operatingHours: operatingHoursSchema,
+  peakPricing: peakPricingSchema.optional(),
+  sports: z.array(z.any()),
+  amenities: z.array(z.any()),
+  images: z.array(z.string()),
+  timeSlots: z.array(z.any()),
+  isActive: z.boolean().optional(),
+});
 
-/* -------------------------------------------------------------------------- */
-/* MAIN ENTITY                                 */
-/* -------------------------------------------------------------------------- */
-
-export interface VenueAddress {
-  street: string;
-  city: string;
-  state: string;
-  pincode: string;
-  coordinates?: {
-    latitude: number;
-    longitude: number;
-  };
-}
-
-export interface Venue {
-  id: string;
-  name: string;
-  address: VenueAddress;
-  contactInfo: {
-    phone: string;
-    email?: string;
-    whatsapp?: string;
-  };
-  
-  // Relations
-  sports: Sport[];        // Sports available at this venue
-  amenities: Amenity[];   // Amenities available at this venue
-  
-  // Content
-  images: string[];
-  rating: number;
-  reviewCount: number;
-  
-  // Logic
-  operatingHours: WeeklyOperatingHours;
-  timeSlots: TimeSlot[];
-  policies: {
-    cancellationPolicy: string;
-    advanceBookingDays: number;
-    minimumBookingHours: number;
-  };
-  
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-  description : string;
-}
-
-/* -------------------------------------------------------------------------- */
-/* FILTERS                                   */
-/* -------------------------------------------------------------------------- */
-
-export interface VenueFilters {
-  searchQuery?: string;
-  sports?: string[];
-  amenities?: string[];
-  city?: string;
-  rating?: number;
-  isActive?: boolean;
-}
-
-export type CreateVenueInput = Omit<Venue, 'id' | 'createdAt' | 'updatedAt' | 'rating' | 'reviewCount'>;
+export const updateVenueSchema = z.object({
+  name: z.string().min(3).optional(),
+  description: z.string().optional(),
+  isActive: z.boolean().optional(),
+  address: addressSchema.partial().optional(),
+  contactInfo: contactInfoSchema.optional(),
+  operatingHours: operatingHoursSchema.optional(),
+  peakPricing: peakPricingSchema.optional(),
+  sports: z.array(z.any()).optional(),
+  amenities: z.array(z.any()).optional(),
+});

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ScrollView,
   View,
@@ -12,29 +12,42 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 // ✅ 1. Import useRouter hook instead of global router
-import { useLocalSearchParams, useRouter } from "expo-router"; 
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAcademyStore } from "@/store/academyStore";
 import NavigationCard from "@/components/NavigationCard";
 import { Coach } from "@/types";
-import { v4 as uuidv4 } from "uuid";
+import { useResponsive } from "@/hooks/useResponsive";
+import FadeInView from "@/components/animated/FadeInView";
 
 export default function AcademyDetailScreen() {
-  const { id } = useLocalSearchParams();
-  
+  const { id } = useLocalSearchParams<{ id: string }>();
+
   // ✅ 2. Initialize the router hook here
   const router = useRouter();
+  const { isTablet } = useResponsive();
 
   const academies = useAcademyStore((state) => state.academies);
+  const fetchMyAcademies = useAcademyStore((state) => state.fetchMyAcademies);
   const addCoach = useAcademyStore((state) => state.addCoach);
+  const updateCoach = useAcademyStore((state) => state.updateCoach);
   const removeCoach = useAcademyStore((state) => state.removeCoach);
   const academy = academies.find((a) => a.id === id);
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingCoachId, setEditingCoachId] = useState<string | null>(null);
   const [coachForm, setCoachForm] = useState<Partial<Coach>>({});
   const [error, setError] = useState("");
+  const [savingCoach, setSavingCoach] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyAcademies();
+    }, [fetchMyAcademies])
+  );
 
   if (!academy) {
     return (
@@ -44,20 +57,21 @@ export default function AcademyDetailScreen() {
     );
   }
 
-  const handleAddCoach = () => {
-    const newCoach: Coach = {
-      id: Date.now().toString(),
-      name: coachForm.name!,
-      specialization: coachForm.specialization!,
-      experience: coachForm.experience || "",
-      contact: coachForm.contact || "",
-    };
-    addCoach(academy.id, newCoach);
+  const openAddCoachModal = () => {
+    setEditingCoachId(null);
     setCoachForm({});
-    setModalVisible(false);
+    setError("");
+    setModalVisible(true);
   };
 
-  const validateAndSave = () => {
+  const openEditCoachModal = (coach: Coach) => {
+    setEditingCoachId(coach.id);
+    setCoachForm(coach);
+    setError("");
+    setModalVisible(true);
+  };
+
+  const validateAndSave = async () => {
     if (!coachForm.name || !coachForm.specialization) {
       setError("Please fill in name and specialization.");
       return;
@@ -67,7 +81,26 @@ export default function AcademyDetailScreen() {
       return;
     }
     setError("");
-    handleAddCoach();
+    setSavingCoach(true);
+    try {
+      const payload = {
+        name: coachForm.name,
+        specialization: coachForm.specialization,
+        experience: coachForm.experience || "",
+        contact: coachForm.contact || "",
+      };
+      if (editingCoachId) {
+        await updateCoach(academy.id, editingCoachId, payload);
+      } else {
+        await addCoach(academy.id, payload);
+      }
+      setCoachForm({});
+      setModalVisible(false);
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Could not save coach");
+    } finally {
+      setSavingCoach(false);
+    }
   };
 
   const handleDeleteCoach = (coachId: string) => {
@@ -79,7 +112,11 @@ export default function AcademyDetailScreen() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => removeCoach(academy.id, coachId),
+          onPress: () => {
+            removeCoach(academy.id, coachId).catch((err: any) =>
+              Alert.alert("Error", err.response?.data?.message || "Could not delete coach")
+            );
+          },
         },
       ]
     );
@@ -108,9 +145,10 @@ export default function AcademyDetailScreen() {
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 16 }}>
-          
+        <View className={isTablet ? 'self-center w-full max-w-2xl' : 'w-full'}>
+
           {/* ✅ 1. Navigation Cards (Moved to Top) */}
-          <View className="flex-row justify-between mb-6">
+          <FadeInView direction="none" className="flex-row flex-wrap justify-between mb-6" style={{ rowGap: 12 }}>
             <NavigationCard
               icon="people"
               title="Students"
@@ -121,16 +159,20 @@ export default function AcademyDetailScreen() {
               title="Attendance"
               onPress={() => router.push(`/manageAcademy/${id}/attendance`)}
             />
-            {/* Renamed Certificates to Photos */}
             <NavigationCard
-              icon="images" 
+              icon="images"
               title="Photos"
               onPress={() => router.push(`/manageAcademy/${id}/photos`)}
             />
-          </View>
+            <NavigationCard
+              icon="ribbon"
+              title="Certificates"
+              onPress={() => router.push(`/manageAcademy/${id}/certificates`)}
+            />
+          </FadeInView>
 
           {/* ✅ 2. Basic Info */}
-          <View className="bg-white rounded-xl p-4 mb-4 shadow-sm border border-gray-100">
+          <FadeInView delay={80} className="bg-white rounded-xl p-4 mb-4 shadow-sm border border-gray-100">
             <Text className="text-lg font-bold text-gray-900 mb-3">
               Basic Information
             </Text>
@@ -163,17 +205,17 @@ export default function AcademyDetailScreen() {
                 Fees:
               </Text>
               <Text className="text-sm text-gray-900 flex-1">
-                ₹{academy.Fee}{" per month"}
+                ₹{academy.fee}{" per month"}
               </Text>
             </View>
-          </View>
+          </FadeInView>
 
           {/* ✅ 3. Coaches */}
-          <View className="bg-white rounded-xl p-4 mb-4 shadow-sm border border-gray-100">
+          <FadeInView delay={130} className="bg-white rounded-xl p-4 mb-4 shadow-sm border border-gray-100">
             <View className="flex-row items-center justify-between mb-3">
               <Text className="text-lg font-bold text-gray-900">Coaches</Text>
               <TouchableOpacity
-                onPress={() => setModalVisible(true)}
+                onPress={openAddCoachModal}
                 className="flex-row items-center"
               >
                 <Ionicons name="add-circle" size={22} color="#3B82F6" />
@@ -186,7 +228,7 @@ export default function AcademyDetailScreen() {
                 key={coach.id}
                 className="bg-gray-100 rounded-lg p-3 mb-2 flex-row justify-between items-center"
               >
-                <View>
+                <View className="flex-1">
                   <Text className="text-base font-bold text-gray-900 mb-1">
                     {coach.name}
                   </Text>
@@ -200,7 +242,10 @@ export default function AcademyDetailScreen() {
                     Contact: {coach.contact}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => handleDeleteCoach(coach.id)}>
+                <TouchableOpacity onPress={() => openEditCoachModal(coach)} className="p-2">
+                  <Ionicons name="create-outline" size={20} color="#3B82F6" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDeleteCoach(coach.id)} className="p-2">
                   <Ionicons name="trash" size={20} color="red" />
                 </TouchableOpacity>
               </View>
@@ -209,19 +254,20 @@ export default function AcademyDetailScreen() {
             {academy.coaches?.length === 0 && (
               <Text className="text-sm text-gray-500">No coaches added yet.</Text>
             )}
-          </View>
+          </FadeInView>
 
           {/* ✅ 4. Facilities */}
-          <View className="bg-white rounded-xl p-4 mb-4 shadow-sm border border-gray-100">
+          <FadeInView delay={180} className="bg-white rounded-xl p-4 mb-4 shadow-sm border border-gray-100">
             <Text className="text-lg font-bold text-gray-900 mb-3">Facilities</Text>
             <Text className="text-sm text-gray-900 leading-5">
               {academy.facilities}
             </Text>
-          </View>
+          </FadeInView>
 
+        </View>
         </ScrollView>
 
-        {/* Add Coach Modal (Unchanged) */}
+        {/* Add / Edit Coach Modal */}
         <Modal
           transparent
           animationType="slide"
@@ -240,7 +286,7 @@ export default function AcademyDetailScreen() {
                 >
                   <View className="bg-white w-full rounded-2xl p-6 shadow-lg">
                     <Text className="text-xl font-bold text-slate-900 text-center mb-6">
-                      Add New Coach
+                      {editingCoachId ? "Edit Coach" : "Add New Coach"}
                     </Text>
 
                     <TextInput
@@ -289,15 +335,21 @@ export default function AcademyDetailScreen() {
                     <View className="flex-row justify-end mt-4">
                       <TouchableOpacity
                         onPress={() => setModalVisible(false)}
+                        disabled={savingCoach}
                         className="px-4 py-2 mr-3 rounded-lg"
                       >
                         <Text className="text-slate-600 font-medium">Cancel</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={validateAndSave}
-                        className="bg-blue-600 px-5 py-2 rounded-lg"
+                        disabled={savingCoach}
+                        className="bg-blue-600 px-5 py-2 rounded-lg items-center justify-center"
                       >
-                        <Text className="text-white font-semibold">Save</Text>
+                        {savingCoach ? (
+                          <ActivityIndicator color="white" size="small" />
+                        ) : (
+                          <Text className="text-white font-semibold">Save</Text>
+                        )}
                       </TouchableOpacity>
                     </View>
                   </View>

@@ -24,6 +24,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import signUpStore from "@/store/signUpStore";
+import { useResponsive } from "@/hooks/useResponsive";
+import AnimatedPressable from "@/components/animated/AnimatedPressable";
 
 type FormData = {
   phone: string;
@@ -33,6 +35,7 @@ export default function InfoRegisterScreen() {
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.5);
   const router = useRouter();
+  const { isTablet } = useResponsive();
   const {setContact} = signUpStore();
 
   const {
@@ -106,7 +109,7 @@ export default function InfoRegisterScreen() {
                    An OTP will be sent for verification
                   </Text>
 
-                  <View className="px-4">
+                  <View className={isTablet ? 'px-4 self-center w-full max-w-md' : 'px-4'}>
                     {/* Country Code + Phone Input */}
                     <View className="flex-row w-full mb-8">
                       {/* Static India Country Code */}
@@ -156,12 +159,12 @@ export default function InfoRegisterScreen() {
                   </View>
 
                   <View className="w-full flex items-center mt-4">
-                    <TouchableOpacity
+                    <AnimatedPressable
                       className="bg-black h-14 rounded-3xl flex items-center justify-center w-10/12"
                       onPress={handleSubmit(onSubmit)}
                     >
                       <Text className="text-white text-2xl font-bold">Proceed</Text>
-                    </TouchableOpacity>
+                    </AnimatedPressable>
                   </View>
                 </ScrollView>
               </View>

@@ -1,16 +1,15 @@
 import React, { useState } from 'react'
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  ScrollView, 
-  KeyboardAvoidingView, 
-  Platform, 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
   StatusBar,
   ActivityIndicator,
   Linking,
-  Dimensions,
   Alert
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -20,11 +19,13 @@ import * as Location from 'expo-location'
 
 // Store Import
 import { useVenueStore } from '@/store/venueStore'
-
-const { width } = Dimensions.get('window');
+import { useResponsive } from '@/hooks/useResponsive'
+import FadeInView from '@/components/animated/FadeInView'
+import AnimatedPressable from '@/components/animated/AnimatedPressable'
 
 export default function Step2Location() {
   const router = useRouter()
+  const { isTablet } = useResponsive()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -140,11 +141,12 @@ export default function Step2Location() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
         className="flex-1"
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={{ padding: 24, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+        <FadeInView className={isTablet ? 'self-center w-full max-w-2xl' : 'w-full'}>
           <View className="mb-8">
             <Text className="text-3xl font-black text-slate-900 tracking-tight">Location Details</Text>
             <Text className="text-slate-500 text-lg mt-1">Help players find your turf with precision.</Text>
@@ -252,19 +254,19 @@ export default function Step2Location() {
               <Text className="ml-2 text-red-700 font-medium">{error}</Text>
             </View>
           ) : null}
+        </FadeInView>
         </ScrollView>
       </KeyboardAvoidingView>
 
       {/* FOOTER */}
-      <View className="p-6 bg-white border-t border-slate-50">
-        <TouchableOpacity
+      <View className="p-6 bg-white border-t border-slate-50 items-center">
+        <AnimatedPressable
           onPress={handleNext}
-          activeOpacity={0.8}
-          className="bg-slate-900 w-full py-4 rounded-2xl items-center flex-row justify-center shadow-lg"
+          className={`bg-slate-900 py-4 rounded-2xl items-center flex-row justify-center shadow-lg ${isTablet ? 'w-96' : 'w-full'}`}
         >
           <Text className="text-white font-bold text-lg mr-2">Next Step</Text>
           <MaterialIcons name="arrow-forward" size={20} color="white" />
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
     </SafeAreaView>
   )

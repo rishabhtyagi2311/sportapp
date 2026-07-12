@@ -1,15 +1,26 @@
-import React from 'react'
-import { View, Text, FlatList, TouchableOpacity, Image } from 'react-native'
+import React, { useCallback } from 'react'
+import { View, Text, FlatList, TouchableOpacity, Image, Alert, RefreshControl } from 'react-native'
 import { MaterialIcons, Ionicons } from '@expo/vector-icons'
-import { useRouter } from 'expo-router'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { useVenueStore } from '@/store/venueStore' // Adjust path to your store
 import { Venue } from '@/types/venue'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useResponsive } from '@/hooks/useResponsive'
+import FadeInView from '@/components/animated/FadeInView'
+import AnimatedPressable from '@/components/animated/AnimatedPressable'
 
 export default function ManageVenuesScreen() {
   const router = useRouter()
+  const { isTablet } = useResponsive()
   // Fetch venues from the store
-  const { venues, deleteVenue } = useVenueStore()
+  const { venues, isLoading, fetchMyVenues, deleteVenue } = useVenueStore()
+
+  // Refetch every time the dashboard comes into focus (e.g. after creating/editing a venue)
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyVenues()
+    }, [fetchMyVenues])
+  )
 
   const EmptyState = () => (
     <View className="flex-1 items-center justify-center mt-20 px-8">
@@ -33,13 +44,15 @@ export default function ManageVenuesScreen() {
     </View>
   )
 
-  const VenueCard = ({ venue }: { venue: Venue }) => (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      onPress={() => {
-        // Future: router.push(`/venue-details/${venue.id}`)
-        console.log('Open Venue Details', venue.id)
-      }}
+  const VenueCard = ({ venue, delay = 0 }: { venue: Venue; delay?: number }) => (
+    <FadeInView delay={delay} className={isTablet ? 'w-[48%]' : 'w-full'}>
+    <AnimatedPressable
+      onPress={() =>
+        router.push({
+          pathname: '/(venueManagement)/venueHandling/editVenue' as any,
+          params: { venueId: venue.id },
+        })
+      }
       className="bg-white rounded-2xl mb-5 shadow-sm border border-slate-200 overflow-hidden"
     >
       {/* Image Section */}
@@ -88,12 +101,22 @@ export default function ManageVenuesScreen() {
 
         <View className="flex-row justify-between items-center mt-1">
           <Text className="text-slate-400 text-xs font-medium">
-            {venue.sports.length} Sports • {venue.timeSlots.length} Slots
+            {venue.sports.length} Sports • {venue.timeSlotCount ?? venue.timeSlots.length} Slots
           </Text>
           <TouchableOpacity
             onPress={() => {
-              // Simple delete confirmation could go here
-              deleteVenue(venue.id)
+              Alert.alert('Delete Venue', `Remove "${venue.name}"? This cannot be undone.`, [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  style: 'destructive',
+                  onPress: () => {
+                    deleteVenue(venue.id).catch((err: any) =>
+                      Alert.alert('Error', err.message || 'Could not delete venue')
+                    )
+                  },
+                },
+              ])
             }}
             className="p-2 -mr-2"
           >
@@ -101,7 +124,8 @@ export default function ManageVenuesScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </TouchableOpacity>
+    </AnimatedPressable>
+    </FadeInView>
   )
 
 
@@ -122,12 +146,18 @@ export default function ManageVenuesScreen() {
 
         {/* List Area */}
         <FlatList
+          key={isTablet ? 'grid' : 'list'}
           data={venues}
+          numColumns={isTablet ? 2 : 1}
+          columnWrapperStyle={isTablet ? { justifyContent: 'space-between' } : undefined}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <VenueCard venue={item} />}
+          renderItem={({ item, index }) => <VenueCard venue={item} delay={Math.min(index, 6) * 60} />}
           contentContainerStyle={{ padding: 20, paddingBottom: 100, flexGrow: 1 }}
           ListEmptyComponent={EmptyState}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={isLoading} onRefresh={fetchMyVenues} />
+          }
         />
 
 
@@ -136,20 +166,18 @@ export default function ManageVenuesScreen() {
 
 
     {venues.length > 0 && (
-        <View 
-          className="absolute bottom-10 right-6" 
+        <View
+          className="absolute bottom-10 right-6"
           style={{ zIndex: 100, elevation: 5 }}
         >
-          <TouchableOpacity
+          <AnimatedPressable
             onPress={() => {
-              console.log("FAB Pressed");
               router.push('/(venueManagement)/venueHandling/createVenue/step-1');
             }}
-            activeOpacity={0.9}
             className="bg-slate-900 w-14 h-14 rounded-full items-center justify-center shadow-xl shadow-slate-400"
           >
             <MaterialIcons name="add" size={32} color="white" />
-          </TouchableOpacity>
+          </AnimatedPressable>
         </View>
       )}
     </>

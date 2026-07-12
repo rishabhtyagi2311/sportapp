@@ -4,7 +4,7 @@ import "react-native-gesture-handler";
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
 import { View } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuthStore } from "@/store/authStore";
 import SplashScreen from "./splashScreen";
 
 export default function Index() {
@@ -17,20 +17,16 @@ export default function Index() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        console.log(
-          '[Index] checkAuth: starting AsyncStorage.getItem("user_id")'
-        );
-        const userId = await AsyncStorage.getItem("user_id");
-        console.log("[Index] checkAuth: userId =", userId);
+        console.log("[Index] checkAuth: validating stored session with the server");
+        const isLoggedIn = await useAuthStore.getState().hydrate();
+        console.log("[Index] checkAuth: isLoggedIn =", isLoggedIn);
 
-        if (userId) {
-          setInitialRoute("./(homeScreenTabs)");
-        } else {
-          setInitialRoute("./(onboardingStack)/welcome");
-        }
+        setInitialRoute(isLoggedIn ? "./(homeScreenTabs)" : "./(onboardingStack)/welcome");
       } catch (error) {
         console.log("[Index] checkAuth error:", error);
-        setInitialRoute("./(homeScreenTabs)");
+        // Fail closed — if we can't confirm the session is valid, send the
+        // user to login rather than assuming they're authenticated.
+        setInitialRoute("./(onboardingStack)/welcome");
       } finally {
         setReady(true);
       }

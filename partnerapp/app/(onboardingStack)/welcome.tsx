@@ -3,9 +3,7 @@ import {
   ScrollView,
   View,
   Text,
-  Pressable,
   SafeAreaView,
-  Dimensions,
   Image,
   Platform,
 } from 'react-native';
@@ -18,11 +16,9 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-
-const { width, height } = Dimensions.get('window');
-const isTablet = width >= 500;
-
-const responsiveFontSize = (f: number) => (isTablet ? f * 1.3 : f);
+import { useResponsive } from '@/hooks/useResponsive';
+import FadeInView from '@/components/animated/FadeInView';
+import AnimatedPressable from '@/components/animated/AnimatedPressable';
 
 const COLORS = {
   navy900: '#0F172A',
@@ -30,7 +26,7 @@ const COLORS = {
   sky400: '#38BDF8',
 };
 
-const HeroSection: FC = () => {
+const HeroSection: FC<{ isTablet: boolean; responsiveFontSize: (f: number) => number }> = ({ isTablet, responsiveFontSize }) => {
   const fadeAnim = useSharedValue(0);
   const slideAnim = useSharedValue(30);
 
@@ -52,16 +48,16 @@ const HeroSection: FC = () => {
           style={{ width: isTablet ? 280 : 180, height: isTablet ? 80 : 50, resizeMode: 'contain' }}
         />
       </View>
-      
+
       <View className="px-4">
-        <Text 
-          style={{ fontSize: responsiveFontSize(40) }} 
+        <Text
+          style={{ fontSize: responsiveFontSize(40) }}
           className="font-black text-slate-900 leading-none text-center tracking-tight"
         >
           Scale Your{"\n"}
           <Text className="text-emerald-600">Sports Business.</Text>
         </Text>
-        <Text 
+        <Text
           style={{ fontSize: responsiveFontSize(16) }}
           className="text-slate-500 text-center mt-4 font-medium px-6"
         >
@@ -72,24 +68,27 @@ const HeroSection: FC = () => {
   );
 };
 
-const FeatureCard: FC<{ icon: string, title: string, desc: string, color: string }> = ({ icon, title, desc, color }) => (
-  <View 
-    style={{ width: isTablet ? '48%' : '100%' }} 
-    className="bg-white p-6 rounded-3xl mb-4 border border-slate-100 shadow-sm"
-  >
-    <View style={{ backgroundColor: color + '15' }} className="w-12 h-12 rounded-2xl items-center justify-center mb-4">
-      <MaterialCommunityIcons name={icon as any} size={24} color={color} />
+const FeatureCard: FC<{ icon: string, title: string, desc: string, color: string, isTablet: boolean, delay: number }> = ({ icon, title, desc, color, isTablet, delay }) => (
+  <FadeInView delay={delay} style={{ width: isTablet ? '48%' : '100%' }}>
+    <View
+      className="bg-white p-6 rounded-3xl mb-4 border border-slate-100 shadow-sm"
+    >
+      <View style={{ backgroundColor: color + '15' }} className="w-12 h-12 rounded-2xl items-center justify-center mb-4">
+        <MaterialCommunityIcons name={icon as any} size={24} color={color} />
+      </View>
+      <Text className="text-slate-900 font-bold text-lg mb-1">{title}</Text>
+      <Text className="text-slate-500 text-sm leading-5 font-medium">{desc}</Text>
     </View>
-    <Text className="text-slate-900 font-bold text-lg mb-1">{title}</Text>
-    <Text className="text-slate-500 text-sm leading-5 font-medium">{desc}</Text>
-  </View>
+  </FadeInView>
 );
 
 const WelcomeScreen: FC = () => {
   const router = useRouter();
+  const { isTablet } = useResponsive();
+  const responsiveFontSize = (f: number) => (isTablet ? f * 1.3 : f);
 
-  const handleSignUp = () => router.push('/(homeScreenTabs)');
-  const handleSignIn = () => router.push('/(homeScreenTabs)');
+  const handleSignUp = () => router.push('/(onboardingStack)/basicInfoRegisterOne' as any);
+  const handleSignIn = () => router.push('/(onboardingStack)/login' as any);
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -100,10 +99,10 @@ const WelcomeScreen: FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: isTablet ? 40 : 20, paddingBottom: 220 }}
       >
-        <HeroSection />
+        <HeroSection isTablet={isTablet} responsiveFontSize={responsiveFontSize} />
 
         {/* Partner Stats Bar - Demonstrating Value */}
-        <View className="flex-row justify-between bg-emerald-900 rounded-3xl p-6 mb-8 shadow-xl">
+        <FadeInView delay={100} className="flex-row justify-between bg-emerald-900 rounded-3xl p-6 mb-8 shadow-xl">
           {[
             { label: 'Market Growth', val: '15%↑' },
             { label: 'Active Partners', val: '200+' },
@@ -114,57 +113,65 @@ const WelcomeScreen: FC = () => {
               <Text className="text-emerald-100/60 text-[9px] uppercase font-bold tracking-widest">{s.label}</Text>
             </View>
           ))}
-        </View>
+        </FadeInView>
 
         {/* Create Account Section */}
-        <View className="mt-4 bg-emerald-600 rounded-[40px] p-8 items-center shadow-2xl">
+        <FadeInView delay={160} className="mt-4 bg-emerald-600 rounded-[40px] p-8 items-center shadow-2xl">
           <Text className="text-white text-2xl font-black text-center mb-2 italic uppercase">Join the Network</Text>
           <Text className="text-emerald-100 text-center mb-6 font-medium">Digitalize your operations and maximize your facility revenue.</Text>
-          <Pressable 
+          <AnimatedPressable
             onPress={handleSignUp}
-            className="bg-white w-full py-5 rounded-2xl items-center flex-row justify-center shadow-md active:opacity-90"
+            className="bg-white w-full py-5 rounded-2xl items-center flex-row justify-center shadow-md"
           >
             <Text className="text-emerald-600 font-black text-lg mr-2">CREATE PARTNER ACCOUNT</Text>
             <MaterialCommunityIcons name="arrow-right" size={20} color="#059669" />
-          </Pressable>
-        </View>
+          </AnimatedPressable>
+        </FadeInView>
 
         {/* Partner Core Modules */}
         <Text className="text-slate-900 font-black text-xl mt-12 mb-6 px-2 italic uppercase">Operational Suite</Text>
         <View className="flex-row flex-wrap justify-between">
-          <FeatureCard 
-            icon="office-building-marker" 
-            title="Venue Manager" 
+          <FeatureCard
+            icon="office-building-marker"
+            title="Venue Manager"
             desc="Automated slot scheduling and real-time availability sync."
             color="#059669"
+            isTablet={isTablet}
+            delay={0}
           />
-          <FeatureCard 
-            icon="account-tie" 
-            title="Academy ERP" 
+          <FeatureCard
+            icon="account-tie"
+            title="Academy ERP"
             desc="Centralized student database, fees, and attendance."
             color="#0891B2"
+            isTablet={isTablet}
+            delay={60}
           />
-          <FeatureCard 
-            icon="finance" 
-            title="Revenue Analytics" 
+          <FeatureCard
+            icon="finance"
+            title="Revenue Analytics"
             desc="Daily earnings reports and automated UPI settlement."
             color="#0F172A"
+            isTablet={isTablet}
+            delay={120}
           />
-          <FeatureCard 
-            icon="bullhorn-outline" 
-            title="Promotions" 
+          <FeatureCard
+            icon="bullhorn-outline"
+            title="Promotions"
             desc="Target active local athletes with custom membership plans."
             color="#7C3AED"
+            isTablet={isTablet}
+            delay={180}
           />
         </View>
       </ScrollView>
 
       {/* Bottom Navigation */}
-      <View 
+      <View
         style={{ paddingBottom: Platform.OS === 'ios' ? 40 : 40 }}
         className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-8 pt-4 shadow-2xl"
       >
-        <Pressable
+        <AnimatedPressable
           onPress={handleSignIn}
           className="flex-row items-center justify-center py-5 bg-slate-900 rounded-2xl shadow-lg"
         >
@@ -172,7 +179,7 @@ const WelcomeScreen: FC = () => {
           <View className="ml-4">
             <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Partner Login</Text>
           </View>
-        </Pressable>
+        </AnimatedPressable>
       </View>
     </SafeAreaView>
   );

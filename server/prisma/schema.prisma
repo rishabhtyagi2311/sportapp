@@ -8,59 +8,59 @@ datasource db {
 }
 
 model userInfo {
-  id          Int             @id @default(autoincrement())
-  firstname   String
-  lastname    String
-  email       String          @unique
-  dob         String
-  city        String
-  contact     String          @unique
+  id            Int             @id @default(autoincrement())
+  firstname     String
+  lastname      String
+  email         String          @unique
+  dob           String
+  city          String
+  contact       String          @unique
 
   footballProfile footballProfile?
 
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 }
 
 model footballProfile {
-  id         Int         @id @default(autoincrement())
-  userId     Int         @unique
-  nickname   String
-  role       String
-  experience String
+  id           Int         @id @default(autoincrement())
+  userId       Int         @unique
+  nickname     String
+  role         String
+  experience   String
 
-  user       userInfo    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         userInfo    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdTeams footballTeam[] @relation("CreatedTeams")
   memberTeams  footballTeamMember[]
 
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 }
 
 model footballTeam {
-  id          Int                   @id @default(autoincrement())
-  name        String
-  location    String
-  maxPlayers  Int
-  createdById Int
+  id            Int                   @id @default(autoincrement())
+  name          String
+  location      String
+  maxPlayers    Int
+  createdById   Int
 
-  createdBy   footballProfile       @relation("CreatedTeams", fields: [createdById], references: [id])
-  members     footballTeamMember[]
+  createdBy     footballProfile       @relation("CreatedTeams", fields: [createdById], references: [id])
+  members       footballTeamMember[]
 
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 }
 
 model footballTeamMember {
-  id               Int               @id @default(autoincrement())
-  footballProfileId Int
-  footballTeamId   Int
+  id                   Int               @id @default(autoincrement())
+  footballProfileId    Int
+  footballTeamId       Int
 
-  footballProfile  footballProfile   @relation(fields: [footballProfileId], references: [id])
-  footballTeam     footballTeam      @relation(fields: [footballTeamId], references: [id])
+  footballProfile      footballProfile   @relation(fields: [footballProfileId], references: [id])
+  footballTeam         footballTeam      @relation(fields: [footballTeamId], references: [id])
 
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   @@unique([footballProfileId, footballTeamId])
 }
@@ -70,55 +70,199 @@ model PartnerIdentity {
   firstName     String
   lastName      String
   contactNumber String   @unique
-  password      String   
-  venues        Venue[]  
+  password      String
+  email         String?
+  city          String?
+  dob           String?
+  venues        Venue[]
+  academies     Academy[]
   createdAt     DateTime @default(now())
 }
 
+model Academy {
+  id            String   @id @default(uuid())
+  partnerId     String
+  academyName   String
+  sportType     String
+  address       String
+  city          String
+  coachName     String
+  contactNumber String
+  facilities    String   @db.Text
+  fee           Float
+  feeStructure  String   @default("Monthly")
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
+  partner       PartnerIdentity @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  coaches       Coach[]
+  students      Student[]
+  photos        AcademyPhoto[]
+}
+
+model Student {
+  id             String   @id @default(uuid())
+  academyId      String
+  name           String
+  age            Int
+  fatherName     String
+  fatherContact  String
+  enrollmentDate DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  academy        Academy            @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  attendance     AttendanceRecord[]
+  certificates   Certificate[]
+}
+
+model AttendanceRecord {
+  id        String   @id @default(uuid())
+  studentId String
+  date      DateTime
+  present   Boolean
+  createdAt DateTime @default(now())
+
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, date])
+}
+
+model AcademyPhoto {
+  id        String   @id @default(uuid())
+  academyId String
+  url       String
+  createdAt DateTime @default(now())
+
+  academy   Academy  @relation(fields: [academyId], references: [id], onDelete: Cascade)
+}
+
+model Certificate {
+  id                String   @id @default(uuid())
+  studentId         String
+  template          String
+  studentName       String
+  academyName       String
+  achievement       String
+  date              DateTime @default(now())
+  certificateNumber String   @unique
+
+  student           Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model Coach {
+  id             String  @id @default(uuid())
+  academyId      String
+  name           String
+  specialization String
+  experience     String?
+  contact        String?
+
+  academy        Academy @relation(fields: [academyId], references: [id], onDelete: Cascade)
+}
 
 model Venue {
-  id              String   @id @default(uuid())
-  name            String
-  description     String   @db.Text
-  isActive        Boolean  @default(true)
-  
-  city            String   
-  state           String
-  pincode         String
-  
-  images          Image[]
-  address         Address? 
-  timeSlots       TimeSlot[]
-  
-  sports          Json     
-  amenities       Json     
-  
-  contactInfo     Json     
-  operatingHours  Json    
-  partnerId       String
-  partner         PartnerIdentity @relation(fields: [partnerId], references: [id]) 
-  
-  rating          Float    @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String          @id @default(uuid())
+  name           String
+  description    String          @db.Text
+  isActive       Boolean         @default(true)
+
+  city           String
+  state          String
+  pincode        String
+
+  images         Image[]
+  address        Address?
+  timeSlots      TimeSlot[]
+  bookings       Booking[]
+  slotBlocks     SlotBlock[]
+  matchSessions  MatchSession[]
+
+  sports         Json
+  amenities      Json
+
+  contactInfo    Json
+  operatingHours Json
+  peakPricing    Json?
+  partnerId      String
+  partner        PartnerIdentity @relation(fields: [partnerId], references: [id])
+
+  rating         Float           @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 }
 
 model TimeSlot {
   id          String   @id @default(uuid())
   venueId     String
-  
-  varietyId   String   
-  varietyName String   
-  
+
+  varietyId   String
+  varietyName String
+
   date        DateTime
-  startTime   String   
-  endTime     String   
+  startTime   String
+  endTime     String
   price       Float
   status      String   @default("available")
-  venue       Venue    @relation(fields: [venueId], references:[id], onDelete:Cascade)
-  
-  @@index([venueId, date, varietyId]) 
+  venue       Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([venueId, date, varietyId])
+  @@index([status])
+}
+
+model Booking {
+  id            String   @id @default(uuid())
+  venueId       String
+  userId        String?
+  slotId        String?
+  date          DateTime
+  startTime     String
+  endTime       String
+  totalAmount   Float
+  status        String   @default("pending")
+  paymentStatus String   @default("pending")
+  bookingType   String   @default("venue")
+  participants   Int?     @default(1)
+  guestName     String?
+  guestPhone    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  venue         Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+}
+
+model SlotBlock {
+  id          String   @id @default(uuid())
+  venueId     String
+  slotId      String
+  reason      String
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  venue       Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+}
+
+model MatchSession {
+  id                String   @id @default(uuid())
+  venueId           String
+  slotId            String
+  partnerId         String
+  date              DateTime
+  startTime         String
+  endTime           String
+  sport             String
+  totalPlayers      Int
+  minPlayersForLive Int
+  pricePerPerson    Float
+  skillLevel        String?
+  description       String?
+  status            String   @default("pending")
+  playersJoined     Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  venue             Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
 }
 
 model Image {

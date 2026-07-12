@@ -1,27 +1,32 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import { Booking as BaseBooking } from '@/types/booking' 
+import { venueApiService } from '@/services/venueManagement/venue'
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
 
-// 1. Extended Booking Type (Includes Guest Info)
-export interface PartnerBooking extends BaseBooking {
+export interface PartnerBooking {
+  id: string
+  venueId: string
+  userId: string | null
+  slotId: string | null
+  date: string // YYYY-MM-DD
+  startTime: string
+  endTime: string
+  totalAmount: number
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed'
+  paymentStatus: 'pending' | 'paid' | 'refunded'
+  bookingType: string
+  participants: number
+  guestName?: string
+  guestPhone?: string
   guestDetails: {
     name: string
     phone: string
   }
-}
-
-// 2. Manual Block Type (For Owner Overrides)
-export interface ManualBlock {
-  id: string
-  venueId: string
-  date: string // YYYY-MM-DD
-  slotId: string
-  reason: string
   createdAt: string
+  updatedAt: string
 }
 
 /* -------------------------------------------------------------------------- */
@@ -29,21 +34,21 @@ export interface ManualBlock {
 /* -------------------------------------------------------------------------- */
 
 interface PartnerBookingState {
-  // DATA
   bookings: PartnerBooking[]
-  manualBlocks: ManualBlock[]
-  
-  // ACTIONS: SLOT MANAGEMENT (Restored!)
-  addManualBlock: (block: Omit<ManualBlock, 'id' | 'createdAt'>) => void
-  removeManualBlock: (blockId: string) => void
-  
-  // ACTIONS: BOOKING MANAGEMENT
-  cancelBooking: (bookingId: string) => void
-  
+  isLoading: boolean
+  error: string | null
+
+  // ACTIONS: BOOKINGS (backend-owned state)
+  fetchBookings: (venueId: string, date?: string) => Promise<void>
+  cancelBooking: (venueId: string, bookingId: string) => Promise<void>
+
+  // ACTIONS: SLOT BLOCKS (backend-owned state)
+  addManualBlock: (payload: { venueId: string; slotId: string; reason: string; date?: string }) => Promise<void>
+  removeManualBlock: (blockId: string) => Promise<void>
+
   // GETTERS
   getBookingById: (id: string) => PartnerBooking | undefined
   getBookingsForDate: (venueId: string, date: string) => PartnerBooking[]
-  getBlocksForDate: (venueId: string, date: string) => ManualBlock[]
 }
 
 /* -------------------------------------------------------------------------- */
@@ -52,85 +57,47 @@ interface PartnerBookingState {
 
 export const usePartnerBookingStore = create<PartnerBookingState>()(
   immer((set, get) => ({
-    
-    // --- MOCK DATA ---
-    bookings: [
-      {
-        id: 'b_123',
-        venueId: 'v1',
-        userId: 'u_99',
-        date: new Date().toISOString().split('T')[0], // Today
-        timeSlots: [{ 
-          id: 'ts1', startTime: '10:00', endTime: '11:00', price: 500, isAvailable: false, priceType: 'per_slot' 
-        }],
-        sportId: 's1',
-        totalAmount: 500,
-        status: 'confirmed',
-        paymentStatus: 'paid',
-        bookingType: 'venue',
-        participants: 12,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        guestDetails: { name: 'Rahul Sharma', phone: '+91 98765 43210' }
-      },
-      {
-        id: 'b_124',
-        venueId: 'v1',
-        userId: 'u_100',
-        date: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
-        timeSlots: [{ 
-          id: 'ts2', startTime: '18:00', endTime: '19:00', price: 800, isAvailable: false, priceType: 'per_slot' 
-        }],
-        sportId: 's2',
-        totalAmount: 800,
-        status: 'pending',
-        paymentStatus: 'pending',
-        bookingType: 'venue',
-        participants: 14,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        guestDetails: { name: 'Amit Verma', phone: '+91 99887 76655' }
+    bookings: [],
+    isLoading: false,
+    error: null,
+
+    fetchBookings: async (venueId, date) => {
+      set({ isLoading: true, error: null })
+      try {
+        const response = await venueApiService.getBookings(venueId, date ? { date } : undefined)
+        if (response.success) {
+          set((state) => {
+            state.bookings = response.data
+            state.isLoading = false
+          })
+        }
+      } catch (err: any) {
+        set({ error: err.response?.data?.message || 'Failed to load bookings', isLoading: false })
       }
-    ] as PartnerBooking[],
-
-    manualBlocks: [], // Starts empty
-
-    // --- SLOT ACTIONS ---
-
-    addManualBlock: (block) => set((state) => {
-      state.manualBlocks.push({
-        ...block,
-        id: Math.random().toString(36).substr(2, 9),
-        createdAt: new Date().toISOString()
-      })
-    }),
-
-    removeManualBlock: (blockId) => set((state) => {
-      state.manualBlocks = state.manualBlocks.filter(b => b.id !== blockId)
-    }),
-
-    // --- BOOKING ACTIONS ---
-
-    cancelBooking: (id) => set((state) => {
-      const booking = state.bookings.find(b => b.id === id)
-      if (booking) booking.status = 'cancelled'
-    }),
-
-    // --- GETTERS ---
-
-    getBookingById: (id) => get().bookings.find(b => b.id === id),
-
-    getBookingsForDate: (venueId, date) => {
-      return get().bookings.filter(b => 
-        b.venueId === venueId && 
-        b.date === date && 
-        b.status !== 'cancelled'
-      )
     },
 
-    getBlocksForDate: (venueId, date) => {
-      return get().manualBlocks.filter(b => b.venueId === venueId && b.date === date)
-    }
+    cancelBooking: async (venueId, bookingId) => {
+      const response = await venueApiService.cancelBooking(venueId, bookingId)
+      if (response.success) {
+        set((state) => {
+          const booking = state.bookings.find((b) => b.id === bookingId)
+          if (booking) booking.status = 'cancelled'
+        })
+      }
+    },
 
+    addManualBlock: async (payload) => {
+      await venueApiService.createBlock(payload)
+    },
+
+    removeManualBlock: async (blockId) => {
+      await venueApiService.removeBlock(blockId)
+    },
+
+    getBookingById: (id) => get().bookings.find((b) => b.id === id),
+
+    getBookingsForDate: (venueId, date) => {
+      return get().bookings.filter((b) => b.venueId === venueId && b.date === date && b.status !== 'cancelled')
+    },
   }))
 )

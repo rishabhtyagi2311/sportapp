@@ -1,11 +1,10 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   Alert,
-  useWindowDimensions,
   Image,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -13,24 +12,21 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import signUpStore from '@/store/signUpStore'
+import { useAuthStore } from '@/store/authStore'
+import { useResponsive } from '@/hooks/useResponsive'
+import FadeInView from '@/components/animated/FadeInView'
+import AnimatedPressable from '@/components/animated/AnimatedPressable'
 
 export default function ProfileScreen() {
   const router = useRouter()
-  const { width } = useWindowDimensions()
+  const { isSmallScreen, isTablet } = useResponsive()
 
-  const {
-    firstName,
-    lastName,
-    email,
-    contact,
-    city,
-    profileImage,
-    setProfileImage,
-  } = signUpStore()
+  const partner = useAuthStore((state) => state.partner)
+  // Local-only preview — there's no backend storage/upload for this yet.
+  const [profileImage, setProfileImage] = useState('')
 
-  const isSmallScreen = width < 380
-  const profilePicSize = isSmallScreen ? 110 : 140
-  const profileIconSize = isSmallScreen ? 50 : 70
+  const profilePicSize = isTablet ? 160 : isSmallScreen ? 110 : 140
+  const profileIconSize = isTablet ? 80 : isSmallScreen ? 50 : 70
 
   /* ---------------- Image Picker ---------------- */
   const handlePickImage = async () => {
@@ -52,13 +48,16 @@ export default function ProfileScreen() {
     }
   }
 
+  const logout = useAuthStore((state) => state.logout)
+
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Logout',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
+          await logout()
           signUpStore.setState({
             firstName: '',
             lastName: '',
@@ -67,7 +66,8 @@ export default function ProfileScreen() {
             city: '',
             profileImage: '',
           })
-          router.replace('/(onboardingStack)/basicInfoRegisterOne')
+          setProfileImage('')
+          router.replace('/(onboardingStack)/welcome')
         },
       },
     ])
@@ -104,9 +104,8 @@ export default function ProfileScreen() {
     onPress: () => void
     isDestructive?: boolean
   }) => (
-    <TouchableOpacity
+    <AnimatedPressable
       onPress={onPress}
-      activeOpacity={0.75}
       className="flex-row items-center justify-between px-4 py-4 border-b border-slate-700 last:border-b-0"
     >
       <View className="flex-row items-center flex-1">
@@ -139,22 +138,23 @@ export default function ProfileScreen() {
         size={24}
         color={isDestructive ? '#ef4444' : '#94a3b8'}
       />
-    </TouchableOpacity>
+    </AnimatedPressable>
   )
 
-  const fullName = `${firstName} ${lastName}`.trim() || 'User Profile'
-  const displayCity = city || 'City not set'
-  const displayEmail = email || 'email@example.com'
-  const displayContact = contact || 'Not provided'
+  const fullName = partner ? `${partner.firstName} ${partner.lastName}`.trim() : 'User Profile'
+  const displayCity = partner?.city || 'City not set'
+  const displayEmail = partner?.email || 'email@example.com'
+  const displayContact = partner?.contactNumber || 'Not provided'
 
   return (
     <SafeAreaView className="flex-1 bg-slate-900">
       <ScrollView showsVerticalScrollIndicator={false}>
+       <View className={isTablet ? 'self-center w-full max-w-2xl' : 'w-full'}>
         {/* ---------------- Decorative Header ---------------- */}
-        <View className="pt-10 pb-8 px-5 bg-slate-900">
+        <FadeInView direction="none" className="pt-10 pb-8 px-5 bg-slate-900">
           <View className="items-center">
             {/* Profile Image */}
-            <TouchableOpacity onPress={handlePickImage} activeOpacity={0.85}>
+            <AnimatedPressable onPress={handlePickImage} pressScale={0.94} className="items-center">
               <View
                 style={{ width: profilePicSize, height: profilePicSize }}
                 className="rounded-full bg-slate-800 border-2 border-slate-700 overflow-hidden items-center justify-center"
@@ -176,7 +176,7 @@ export default function ProfileScreen() {
               <View className="absolute bottom-1 right-1 bg-green-600 p-2 rounded-full">
                 <MaterialIcons name="edit" size={16} color="#fff" />
               </View>
-            </TouchableOpacity>
+            </AnimatedPressable>
 
             <Text className="text-white text-3xl font-bold mt-4">
               {fullName}
@@ -185,7 +185,7 @@ export default function ProfileScreen() {
               {displayCity}
             </Text>
           </View>
-        </View>
+        </FadeInView>
 
         {/* ---------------- Quick Access ---------------- */}
         {/* <View className="px-5 mt-4 mb-6 flex-row gap-3">
@@ -209,66 +209,77 @@ export default function ProfileScreen() {
         </View> */}
 
         {/* ---------------- Contact ---------------- */}
-        <ProfileSection title="Contact Information">
-          <View className="p-4 space-y-4">
-            <View className="flex-row items-center gap-3 mb-2">
-              <MaterialIcons name="email" size={20} color="#9ca3af" />
-              <Text className="text-white">{displayEmail}</Text>
+        <FadeInView delay={60}>
+          <ProfileSection title="Contact Information">
+            <View className="p-4 space-y-4">
+              <View className="flex-row items-center gap-3 mb-2">
+                <MaterialIcons name="email" size={20} color="#9ca3af" />
+                <Text className="text-white">{displayEmail}</Text>
+              </View>
+              <View className="h-px bg-slate-700" />
+              <View className="flex-row items-center gap-3 mt-2">
+                <MaterialIcons name="phone" size={20} color="#9ca3af" />
+                <Text className="text-white">{displayContact}</Text>
+              </View>
             </View>
-            <View className="h-px bg-slate-700" />
-            <View className="flex-row items-center gap-3 mt-2">
-              <MaterialIcons name="phone" size={20} color="#9ca3af" />
-              <Text className="text-white">{displayContact}</Text>
-            </View>
-          </View>
-        </ProfileSection>
+          </ProfileSection>
+        </FadeInView>
 
         {/* ---------------- Profile ---------------- */}
-        <ProfileSection title="Profile">
-          <ActionItem
-            icon={<MaterialIcons name="edit" size={24} color="#22c55e" />}
-            label="Edit Personal Details"
-            value="Name, email, phone, city"
-            onPress={() =>
-              router.push('./')
-            }
-          />
-        </ProfileSection>
+        <FadeInView delay={110}>
+          <ProfileSection title="Profile">
+            <ActionItem
+              icon={<MaterialIcons name="edit" size={24} color="#22c55e" />}
+              label="Edit Personal Details"
+              value="Name, email, phone, city"
+              onPress={() =>
+                router.push('./')
+              }
+            />
+          </ProfileSection>
+        </FadeInView>
 
         {/* ---------------- Account ---------------- */}
-        <ProfileSection title="Account">
-          <ActionItem
-            icon={<MaterialIcons name="vpn-key" size={24} color="#e5e7eb" />}
-            label="Change Password"
-            onPress={() =>
-              router.push('./')
-            }
-          />
-        </ProfileSection>
+        <FadeInView delay={160}>
+          <ProfileSection title="Account">
+            <ActionItem
+              icon={<MaterialIcons name="vpn-key" size={24} color="#e5e7eb" />}
+              label="Change Password"
+              onPress={() =>
+                router.push('./')
+              }
+            />
+          </ProfileSection>
+        </FadeInView>
 
         {/* ---------------- Support ---------------- */}
-        <ProfileSection title="Support">
-          <ActionItem
-            icon={<MaterialIcons name="help" size={24} color="#e5e7eb" />}
-            label="Help & Support"
-            onPress={() => Alert.alert('Support', 'Support page')}
-          />
-          <ActionItem
-            icon={<MaterialIcons name="info" size={24} color="#e5e7eb" />}
-            label="About"
-            onPress={() => Alert.alert('About', 'App version 1.0.0')}
-          />
-        </ProfileSection>
+        <FadeInView delay={210}>
+          <ProfileSection title="Support">
+            <ActionItem
+              icon={<MaterialIcons name="help" size={24} color="#e5e7eb" />}
+              label="Help & Support"
+              onPress={() => Alert.alert('Support', 'Support page')}
+            />
+            <ActionItem
+              icon={<MaterialIcons name="info" size={24} color="#e5e7eb" />}
+              label="About"
+              onPress={() => Alert.alert('About', 'App version 1.0.0')}
+            />
+          </ProfileSection>
+        </FadeInView>
 
         {/* ---------------- Danger Zone ---------------- */}
-        <ProfileSection title="Danger Zone">
-          <ActionItem
-            icon={<MaterialIcons name="logout" size={24} color="#ef4444" />}
-            label="Logout"
-            onPress={handleLogout}
-            isDestructive
-          />
-        </ProfileSection>
+        <FadeInView delay={260}>
+          <ProfileSection title="Danger Zone">
+            <ActionItem
+              icon={<MaterialIcons name="logout" size={24} color="#ef4444" />}
+              label="Logout"
+              onPress={handleLogout}
+              isDestructive
+            />
+          </ProfileSection>
+        </FadeInView>
+       </View>
       </ScrollView>
     </SafeAreaView>
   )

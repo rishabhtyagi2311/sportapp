@@ -5,6 +5,7 @@ export default function AcademyLayout() {
     <Stack
       screenOptions={{
         headerShown: false, // hides headers globally
+        animation: 'slide_from_right',
       }}
     >
       <Stack.Screen name="index" options={{ title: "My Academies" }} />

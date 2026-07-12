@@ -1,13 +1,16 @@
-import React from 'react';
-import { 
-  View, Text, ScrollView, TouchableOpacity, TextInput, 
-  KeyboardAvoidingView, Platform, Alert 
+import React, { useState } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, TextInput,
+  KeyboardAvoidingView, Platform, Alert, ActivityIndicator
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useForm, Controller } from 'react-hook-form';
 import { useMatchSessionStore } from '@/store/matchSessionStore';
+import { useResponsive } from '@/hooks/useResponsive';
+import FadeInView from '@/components/animated/FadeInView';
+import AnimatedPressable from '@/components/animated/AnimatedPressable';
 
 interface MatchForm {
   sport: string;
@@ -20,8 +23,10 @@ interface MatchForm {
 
 export default function CreateMatchSession() {
   const router = useRouter();
+  const { isTablet } = useResponsive();
   const params = useLocalSearchParams();
   const createSession = useMatchSessionStore((state) => state.createSession);
+  const [submitting, setSubmitting] = useState(false);
 
   const { control, handleSubmit, setValue, watch, formState: { errors } } = useForm<MatchForm>({
     defaultValues: {
@@ -36,33 +41,34 @@ export default function CreateMatchSession() {
 
   const currentSkill = watch('skillLevel');
 
-  const onSubmit = (data: MatchForm) => {
+  const onSubmit = async (data: MatchForm) => {
     if (parseInt(data.minPlayers) > parseInt(data.totalPlayers)) {
       Alert.alert("Logic Error", "Min players cannot be higher than total players.");
       return;
     }
 
-    const newSession = {
-      id: Math.random().toString(36).substring(7),
-      venueId: params.venueId as string,
-      venueName: params.venueName as string,
-      slotId: params.slotId as string,
-      date: params.date as string,
-      startTime: params.startTime as string,
-      endTime: params.endTime as string,
-      sport: data.sport,
-      totalPlayers: parseInt(data.totalPlayers),
-      minPlayersForLive: parseInt(data.minPlayers),
-      pricePerPerson: parseFloat(data.price),
-      skillLevel: data.skillLevel as any,
-      description: data.description,
-      status: 'pending' as const,
-      playersJoined: 0,
-    };
-
-    createSession(newSession);
-    Alert.alert("Success", "Match published successfully!");
-    router.back();
+    setSubmitting(true);
+    try {
+      await createSession({
+        venueId: params.venueId as string,
+        slotId: params.slotId as string,
+        date: params.date as string,
+        startTime: params.startTime as string,
+        endTime: params.endTime as string,
+        sport: data.sport,
+        totalPlayers: parseInt(data.totalPlayers),
+        minPlayersForLive: parseInt(data.minPlayers),
+        pricePerPerson: parseFloat(data.price),
+        skillLevel: data.skillLevel as any,
+        description: data.description,
+      });
+      Alert.alert("Success", "Match published successfully!");
+      router.back();
+    } catch (err: any) {
+      Alert.alert("Failed to Publish", err.message || "Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -84,7 +90,8 @@ export default function CreateMatchSession() {
         </View>
 
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 24 }}>
-          
+        <FadeInView className={isTablet ? 'self-center w-full max-w-xl' : 'w-full'}>
+
           {/* INFO CARD */}
           <View className="bg-slate-900 p-6 rounded-[32px] mb-8 shadow-xl shadow-slate-900">
             <View className="flex-row items-center space-x-3 mb-4">
@@ -180,17 +187,22 @@ export default function CreateMatchSession() {
             </View>
           </View>
           <View className="h-10" />
+        </FadeInView>
         </ScrollView>
 
         {/* FLOATING FOOTER */}
-        <View className="px-6 py-6 bg-white border-t border-slate-100 shadow-2xl">
-          <TouchableOpacity 
+        <View className="px-6 py-6 bg-white border-t border-slate-100 shadow-2xl items-center">
+          <AnimatedPressable
             onPress={handleSubmit(onSubmit)}
-            activeOpacity={0.8}
-            className="bg-slate-900 py-5 rounded-2xl items-center shadow-lg shadow-slate-900"
+            disabled={submitting}
+            className={`bg-slate-900 py-5 rounded-2xl items-center shadow-lg shadow-slate-900 ${isTablet ? 'w-96' : 'w-full'}`}
           >
-            <Text className="text-white font-bold text-lg">Publish Match</Text>
-          </TouchableOpacity>
+            {submitting ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text className="text-white font-bold text-lg">Publish Match</Text>
+            )}
+          </AnimatedPressable>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

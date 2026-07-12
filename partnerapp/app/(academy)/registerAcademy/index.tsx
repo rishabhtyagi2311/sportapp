@@ -8,28 +8,33 @@ import {
   TouchableOpacity,
   Alert,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAcademyStore } from "@/store/academyStore";
+import { useResponsive } from "@/hooks/useResponsive";
+import FadeInView from "@/components/animated/FadeInView";
+import AnimatedPressable from "@/components/animated/AnimatedPressable";
 
 export default function SportsAcademyRegistration() {
-  const addAcademy = useAcademyStore((state) => state.addAcademy);
+  const createAcademy = useAcademyStore((state) => state.createAcademy);
   const router = useRouter();
+  const { isTablet } = useResponsive();
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     academyName: "",
     sportType: "",
     address: "",
-    city: "", 
+    city: "",
     coachName: "",
     contactNumber: "",
     facilities: "",
-    
+
   });
 
   const [Fee, setFee] = useState("");
- const id = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 
 
 
@@ -67,7 +72,7 @@ export default function SportsAcademyRegistration() {
     setFormData((prev) => ({ ...prev, sportType: sportName }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (
       !formData.academyName ||
       !formData.sportType ||
@@ -92,24 +97,30 @@ export default function SportsAcademyRegistration() {
       return;
     }
 
-    const academyData = { ...formData,Fee,id};
-    addAcademy(academyData);
+    setSubmitting(true);
+    try {
+      await createAcademy({ ...formData, fee: Number(Fee) });
 
-    Alert.alert("Success", "Sports academy registered successfully!");
+      Alert.alert("Success", "Sports academy registered successfully!");
 
-    // reset form
-    setFormData({
-      academyName: "",
-      sportType: "",
-      address: "",
-      city: "",
-      coachName: "",
-      contactNumber: "",
-      facilities: "",
-     
-    });
-    setFee("");
-    router.navigate("./manageAcademy");
+      // reset form
+      setFormData({
+        academyName: "",
+        sportType: "",
+        address: "",
+        city: "",
+        coachName: "",
+        contactNumber: "",
+        facilities: "",
+
+      });
+      setFee("");
+      router.navigate("./manageAcademy");
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Could not register academy");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -137,6 +148,7 @@ export default function SportsAcademyRegistration() {
           enableOnAndroid={true}
           extraScrollHeight={Platform.OS === "ios" ? 20 : 50}
         >
+        <FadeInView className={isTablet ? 'self-center w-full max-w-xl' : 'w-full'}>
           {/* Academy Name */}
           <View className="mb-6">
             <Text className="text-white font-semibold mb-2">
@@ -343,22 +355,26 @@ export default function SportsAcademyRegistration() {
           </View>
 
           {/* Submit Button */}
-          <TouchableOpacity
+          <AnimatedPressable
             onPress={handleSubmit}
+            disabled={submitting}
             className="bg-white rounded-xl py-4 mb-6 shadow-lg"
-            activeOpacity={0.8}
           >
-            <View className="flex-row items-center justify-center">
-              <Text className="text-black font-bold text-lg mr-2">
-                Register Your Academy
-              </Text>
-              <Ionicons
-                name="checkmark-circle-outline"
-                size={24}
-                color="black"
-              />
-            </View>
-          </TouchableOpacity>
+            {submitting ? (
+              <ActivityIndicator color="black" />
+            ) : (
+              <View className="flex-row items-center justify-center">
+                <Text className="text-black font-bold text-lg mr-2">
+                  Register Your Academy
+                </Text>
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={24}
+                  color="black"
+                />
+              </View>
+            )}
+          </AnimatedPressable>
 
           {/* Footer Note */}
           <View className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 flex flex-row justify-center align-middle mb-10">
@@ -373,6 +389,7 @@ export default function SportsAcademyRegistration() {
               Management Dashboard
             </Text>
           </View>
+        </FadeInView>
         </KeyboardAwareScrollView>
       </View>
     </SafeAreaView>

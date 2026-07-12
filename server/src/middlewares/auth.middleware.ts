@@ -15,7 +15,7 @@ export const authenticatePartner = (req: AuthRequest, res: Response, next: NextF
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: string };
-    req.partner = decoded; // Attach partner ID to the request object
+    req.partner = decoded; 
     next();
   } catch (error) {
     res.status(403).json({ success: false, message: "Invalid or Expired Token" });

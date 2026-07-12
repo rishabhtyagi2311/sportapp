@@ -25,6 +25,8 @@ import Animated, {
 
 import { useRouter } from "expo-router";
 import signUpStore from "@/store/signUpStore";
+import { useResponsive } from "@/hooks/useResponsive";
+import AnimatedPressable from "@/components/animated/AnimatedPressable";
 
 
 type FormData = {
@@ -37,7 +39,8 @@ type FormData = {
 
 
 export default function InfoRegisterScreen() {
-  
+  const { isTablet } = useResponsive();
+
   const { setfirstName, setlastName, setEmail} = signUpStore();
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.5);
@@ -166,8 +169,8 @@ export default function InfoRegisterScreen() {
                     Get Started.
                   </Animated.Text>
 
-                  <View className="px-2 flex ">
-                    
+                  <View className={isTablet ? 'px-2 flex self-center w-full max-w-md' : 'px-2 flex'}>
+
                     {renderInput("firstName", "First Name", <User size={20} color="#64748B" />, {
                       required: "First name is required",
                     })}
@@ -190,12 +193,12 @@ export default function InfoRegisterScreen() {
                   </View>
 
                   <View className="w-full flex items-center mt-6">
-                    <TouchableOpacity
+                    <AnimatedPressable
                       className="bg-black h-14 rounded-3xl flex items-center justify-center w-10/12"
                       onPress={handleSubmit(onSubmit)}
                     >
                       <Text className="text-white text-2xl font-bold ">Proceed</Text>
-                    </TouchableOpacity>
+                    </AnimatedPressable>
                   </View>
                 </ScrollView>
               </View>

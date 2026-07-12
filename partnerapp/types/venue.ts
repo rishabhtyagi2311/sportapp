@@ -38,10 +38,37 @@ export interface TimeSlot {
   priceType: 'per_hour' | 'per_slot' | 'per_person';
 }
 
+/* -------------------------------------------------------------------------- */
+/* PERSISTED SLOT (as returned by GET /venues/:venueId/slots)                 */
+/* -------------------------------------------------------------------------- */
+
+export type SlotStatus = 'available' | 'booked' | 'blocked' | 'match_session';
+
+export interface VenueSlot {
+  id: string;
+  venueId: string;
+  varietyId: string;
+  varietyName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  price: number;
+  status: SlotStatus;
+  blockId?: string;
+  blockReason?: string;
+}
+
 export interface OperatingHours {
   open: string;
   close: string;
   isOpen: boolean;
+}
+
+export interface PeakPricingRule {
+  enabled: boolean;
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  price: number;
 }
 
 export type WeeklyOperatingHours = {
@@ -84,6 +111,7 @@ export interface Venue {
   
   // Logic
   operatingHours: WeeklyOperatingHours;
+  peakPricing?: PeakPricingRule;
   timeSlots: TimeSlot[];
   policies: {
     cancellationPolicy: string;
@@ -95,6 +123,7 @@ export interface Venue {
   createdAt: string;
   updatedAt: string;
   description : string;
+  timeSlotCount?: number;
 }
 
 /* -------------------------------------------------------------------------- */

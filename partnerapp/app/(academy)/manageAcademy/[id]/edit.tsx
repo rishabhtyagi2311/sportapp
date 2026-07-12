@@ -7,17 +7,23 @@ import {
   TouchableOpacity,
   Alert,
   SafeAreaView,
+  ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAcademyStore } from "@/store/academyStore";
+import { useResponsive } from "@/hooks/useResponsive";
+import FadeInView from "@/components/animated/FadeInView";
+import AnimatedPressable from "@/components/animated/AnimatedPressable";
 
 export default function EditAcademyScreen() {
   /* ---------------- Route Params ---------------- */
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { isTablet } = useResponsive();
 
   /* ---------------- Store ---------------- */
   const { academies, updateAcademy } = useAcademyStore();
+  const [saving, setSaving] = useState(false);
 
   if (!id) {
     return (
@@ -31,7 +37,7 @@ export default function EditAcademyScreen() {
 
   /* ---------------- Local Edit State ---------------- */
   const [editData, setEditData] = useState(
-    academy ? JSON.parse(JSON.stringify(academy)) : null
+    academy ? { ...academy, feeInput: String(academy.fee) } : null
   );
 
   if (!academy || !editData) {
@@ -43,7 +49,7 @@ export default function EditAcademyScreen() {
   }
 
   /* ---------------- Handlers ---------------- */
-  const saveChanges = () => {
+  const saveChanges = async () => {
     if (!editData.academyName?.trim()) {
       Alert.alert("Validation Error", "Academy name is required");
       return;
@@ -54,12 +60,31 @@ export default function EditAcademyScreen() {
       return;
     }
 
-    updateAcademy(editData);
-    Alert.alert("Success", "Academy details updated successfully!");
-    router.back();
+    if (isNaN(Number(editData.feeInput))) {
+      Alert.alert("Validation Error", "Fee must be a valid number");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updateAcademy(academy.id, {
+        academyName: editData.academyName,
+        address: editData.address,
+        contactNumber: editData.contactNumber,
+        fee: Number(editData.feeInput),
+        feeStructure: editData.feeStructure,
+        facilities: editData.facilities,
+      });
+      Alert.alert("Success", "Academy details updated successfully!");
+      router.back();
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Could not update academy");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const feeOptions = ["Monthly", "Quarterly", "Yearly"];
+  const feeOptions = ["Monthly", "Quarterly", "Yearly"] as const;
 
   /* ---------------- UI ---------------- */
   return (
@@ -76,6 +101,7 @@ export default function EditAcademyScreen() {
 
       {/* Content */}
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+        <FadeInView className={isTablet ? 'self-center w-full max-w-xl' : 'w-full'}>
         {/* Academy Name */}
         <Text className="text-sm font-semibold text-slate-700 mb-1">
           Academy Name
@@ -121,9 +147,9 @@ export default function EditAcademyScreen() {
         </Text>
         <TextInput
           className="border border-gray-300 rounded-lg p-3 bg-white mb-4"
-          value={editData.Fee}
+          value={editData.feeInput}
           onChangeText={(text) =>
-            setEditData({ ...editData, Fee: text })
+            setEditData({ ...editData, feeInput: text })
           }
           keyboardType="numeric"
         />
@@ -173,19 +199,24 @@ export default function EditAcademyScreen() {
           multiline
           textAlignVertical="top"
         />
+        </FadeInView>
       </ScrollView>
 
       {/* Bottom Save Button */}
-      <View className="px-4 py-4 bg-white border-t border-gray-200">
-        <TouchableOpacity
+      <View className="px-4 py-4 bg-white border-t border-gray-200 items-center">
+        <AnimatedPressable
           onPress={saveChanges}
-          className="bg-blue-600 py-4 rounded-lg"
-          activeOpacity={0.85}
+          disabled={saving}
+          className={`bg-blue-600 py-4 rounded-lg items-center justify-center ${isTablet ? 'w-96' : 'w-full'}`}
         >
-          <Text className="text-white text-center font-semibold text-base">
-            Save Changes
-          </Text>
-        </TouchableOpacity>
+          {saving ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text className="text-white text-center font-semibold text-base">
+              Save Changes
+            </Text>
+          )}
+        </AnimatedPressable>
       </View>
     </SafeAreaView>
   );

@@ -11,10 +11,14 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialIcons, Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useVenueStore } from '@/store/venueStore'
+import { useResponsive } from '@/hooks/useResponsive'
+import FadeInView from '@/components/animated/FadeInView'
+import AnimatedPressable from '@/components/animated/AnimatedPressable'
 
 export default function SlotManagementSelector() {
   const router = useRouter()
-  
+  const { isTablet } = useResponsive()
+
   // Destructure state and actions from the venue store
   const { venues, fetchMyVenues, isLoading, error } = useVenueStore()
 
@@ -32,12 +36,12 @@ export default function SlotManagementSelector() {
       <Text className="text-slate-500 text-center px-10 mt-2">
         You haven't added any venues to your partner account yet.
       </Text>
-      <TouchableOpacity 
+      <AnimatedPressable
         onPress={() => router.push('/(venueManagement)/venueHandling/createVenue/step-1')}
         className="mt-6 bg-blue-600 px-6 py-3 rounded-2xl"
       >
         <Text className="text-white font-bold">Add Your First Venue</Text>
-      </TouchableOpacity>
+      </AnimatedPressable>
     </View>
   )
 
@@ -67,7 +71,7 @@ export default function SlotManagementSelector() {
       <FlatList
         data={venues}
         keyExtractor={item => item.id}
-        contentContainerStyle={{ padding: 20, flexGrow: 1 }}
+        contentContainerStyle={{ padding: 20, flexGrow: 1, maxWidth: isTablet ? 768 : undefined, width: '100%', alignSelf: 'center' }}
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={fetchMyVenues} />
         }
@@ -79,35 +83,36 @@ export default function SlotManagementSelector() {
           ) : null
         }
         ListEmptyComponent={!isLoading ? renderEmptyState : null}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => router.push({ 
-              pathname: "/(venueManagement)/slotHandling/viewSlots", 
-              params: { venueId: item.id, venueName: item.name } 
-            })}
-            activeOpacity={0.7}
-            className="bg-white p-5 rounded-[30px] mb-4 flex-row items-center shadow-sm border border-slate-100"
-          >
-            <View className="w-14 h-14 bg-blue-50 rounded-[20px] items-center justify-center mr-4">
-              <MaterialIcons name="stadium" size={28} color="#2563eb" />
-            </View>
-            
-            <View className="flex-1">
-              <Text className="font-black text-slate-900 text-lg" numberOfLines={1}>
-                {item.name}
-              </Text>
-              <View className="flex-row items-center mt-1">
-                <Ionicons name="location-sharp" size={12} color="#94a3b8" />
-                <Text className="text-slate-400 text-xs font-bold ml-1">
-                  {item.address.city}, {item.address.state}
-                </Text>
+        renderItem={({ item, index }) => (
+          <FadeInView delay={Math.min(index, 6) * 60}>
+            <AnimatedPressable
+              onPress={() => router.push({
+                pathname: "/(venueManagement)/slotHandling/viewSlots",
+                params: { venueId: item.id, venueName: item.name }
+              })}
+              className="bg-white p-5 rounded-[30px] mb-4 flex-row items-center shadow-sm border border-slate-100"
+            >
+              <View className="w-14 h-14 bg-blue-50 rounded-[20px] items-center justify-center mr-4">
+                <MaterialIcons name="stadium" size={28} color="#2563eb" />
               </View>
-            </View>
-            
-            <View className="bg-slate-50 p-2 rounded-full">
-              <MaterialIcons name="chevron-right" size={24} color="#cbd5e1" />
-            </View>
-          </TouchableOpacity>
+
+              <View className="flex-1">
+                <Text className="font-black text-slate-900 text-lg" numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <View className="flex-row items-center mt-1">
+                  <Ionicons name="location-sharp" size={12} color="#94a3b8" />
+                  <Text className="text-slate-400 text-xs font-bold ml-1">
+                    {item.address.city}, {item.address.state}
+                  </Text>
+                </View>
+              </View>
+
+              <View className="bg-slate-50 p-2 rounded-full">
+                <MaterialIcons name="chevron-right" size={24} color="#cbd5e1" />
+              </View>
+            </AnimatedPressable>
+          </FadeInView>
         )}
       />
     </SafeAreaView>

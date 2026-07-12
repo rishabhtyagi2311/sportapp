@@ -60,7 +60,9 @@ interface VenueState {
   /* ---------- ACTIONS: API CRUD ---------- */
   fetchMyVenues: () => Promise<void>
   submitDraftVenue: () => Promise<void>
-  
+  updateVenue: (id: string, updates: Partial<CreateVenueInput>) => Promise<void>
+  deleteVenue: (id: string) => Promise<void>
+
   /* ---------- GETTERS ---------- */
   getVenueById: (id: string) => Venue | undefined
 }
@@ -129,6 +131,39 @@ export const useVenueStore = create<VenueState>()(
           const errorMsg = err.response?.data?.message || "Error creating venue";
           set({ error: errorMsg, isLoading: false });
           throw new Error(errorMsg); 
+        }
+      },
+
+      updateVenue: async (id, updates) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await venueApiService.updateVenue(id, updates);
+          if (response.success) {
+            set((state) => {
+              const index = state.venues.findIndex(v => v.id === id);
+              if (index !== -1) state.venues[index] = response.data;
+              state.isLoading = false;
+            });
+          }
+        } catch (err: any) {
+          const errorMsg = err.response?.data?.message || "Error updating venue";
+          set({ error: errorMsg, isLoading: false });
+          throw new Error(errorMsg);
+        }
+      },
+
+      deleteVenue: async (id) => {
+        set({ isLoading: true, error: null });
+        try {
+          await venueApiService.deleteVenue(id);
+          set((state) => {
+            state.venues = state.venues.filter(v => v.id !== id);
+            state.isLoading = false;
+          });
+        } catch (err: any) {
+          const errorMsg = err.response?.data?.message || "Error deleting venue";
+          set({ error: errorMsg, isLoading: false });
+          throw new Error(errorMsg);
         }
       },
 

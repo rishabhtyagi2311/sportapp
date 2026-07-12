@@ -1,14 +1,13 @@
 import React, { useState } from 'react'
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
   TextInput,
   Platform,
   StatusBar,
   Alert,
-  Dimensions,
   KeyboardAvoidingView
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -16,9 +15,9 @@ import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useVenueStore } from '@/store/venueStore'
 import { Amenity, Sport, SportVariety } from '@/types/venue'
-
-const { width } = Dimensions.get('window');
-const isTablet = width > 768;
+import { useResponsive } from '@/hooks/useResponsive'
+import FadeInView from '@/components/animated/FadeInView'
+import AnimatedPressable from '@/components/animated/AnimatedPressable'
 
 const PREDEFINED_AMENITIES: Partial<Amenity>[] = [
   { id: '1', name: 'Parking', icon: 'local-parking' },
@@ -52,7 +51,8 @@ const INITIAL_MASTER_SPORTS: Sport[] = [
 
 export default function Step3Sports() {
   const router = useRouter()
-  
+  const { isTablet } = useResponsive()
+
   // Zustand State
   const selectedAmenities = useVenueStore((state) => state.draftVenue.amenities)
   const selectedSports = useVenueStore((state) => state.draftVenue.sports)
@@ -183,7 +183,8 @@ export default function Step3Sports() {
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
         <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-          
+        <FadeInView className={isTablet ? 'self-center w-full max-w-2xl' : 'w-full'}>
+
           <Text className="text-3xl font-black text-slate-900 mb-8 tracking-tight">Facilities</Text>
 
           {/* 1. AMENITIES SECTION */}
@@ -286,16 +287,17 @@ export default function Step3Sports() {
               })}
             </View>
           </View>
+        </FadeInView>
         </ScrollView>
       </KeyboardAvoidingView>
 
       {/* FOOTER */}
       <View className="p-6 bg-white border-t border-slate-50 items-center" style={{ paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}>
-        <TouchableOpacity onPress={() => router.push('/(venueManagement)/venueHandling/createVenue/step-4')} 
+        <AnimatedPressable onPress={() => router.push('/(venueManagement)/venueHandling/createVenue/step-4')}
           className={`bg-slate-900 h-16 rounded-3xl items-center justify-center flex-row shadow-xl shadow-slate-200 ${isTablet ? 'w-96' : 'w-full'}`}>
           <Text className="text-white font-black text-lg mr-2">Continue</Text>
           <MaterialIcons name="arrow-forward" size={22} color="white" />
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
     </SafeAreaView>
   )
