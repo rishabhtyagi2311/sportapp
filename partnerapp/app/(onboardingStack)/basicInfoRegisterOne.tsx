@@ -122,6 +122,7 @@ export default function InfoRegisterScreen() {
           render={({ field: { onChange, value } }) => (
             <TextInput
               className="flex-1 text-base text-black"
+              style={{ textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0 }}
               placeholder={`Enter ${label}`}
               placeholderTextColor="#94A3B8"
               onChangeText={onChange}

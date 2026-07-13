@@ -1,10 +1,16 @@
 // app/_layout.tsx
 import "./../global.css"
-import { Slot } from "expo-router";
+import { Stack } from "expo-router";
 
 export default function RootLayout() {
-  console.log("🚀 RootLayout is rendering with RecoilRoot");
-
-  // No SplashScreen here, just the app tree
-  return <Slot />;
+  // A real Stack (not a bare Slot) so every top-level section — home tabs,
+  // venue management, academy, profile editing, onboarding — participates
+  // in native stack navigation. A Slot has no navigation container at all,
+  // which is why swipe-back only ever worked *inside* a section that
+  // already had its own nested Stack, never *between* sections.
+  return (
+    <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <Stack.Screen name="index" options={{ animation: 'none' }} />
+    </Stack>
+  );
 }

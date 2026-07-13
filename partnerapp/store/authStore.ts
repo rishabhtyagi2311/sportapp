@@ -8,6 +8,9 @@ interface AuthState {
   partner: PartnerProfile | null
   isLoading: boolean
   error: string | null
+  /** Flips true once `hydrate()` has resolved (either way) — lets screens
+   *  distinguish "haven't checked session yet" from "checked, logged out". */
+  isHydrated: boolean
 
   register: (payload: {
     firstName: string
@@ -25,6 +28,7 @@ interface AuthState {
     email?: string
     city?: string
     dob?: string
+    profileImage?: string
   }) => Promise<void>
   logout: () => Promise<void>
   /** Validates the stored token against the backend and rehydrates `partner`.
@@ -36,6 +40,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   partner: null,
   isLoading: false,
   error: null,
+  isHydrated: false,
 
   register: async (payload) => {
     console.log('[authStore] register() called with', { ...payload, password: '***' })
@@ -86,19 +91,19 @@ export const useAuthStore = create<AuthState>((set) => ({
   hydrate: async () => {
     const token = await SecureStore.getItemAsync(TOKEN_KEY)
     if (!token) {
-      set({ partner: null })
+      set({ partner: null, isHydrated: true })
       return false
     }
 
     try {
       const response = await authApiService.getMe()
-      set({ partner: response.data })
+      set({ partner: response.data, isHydrated: true })
       return true
     } catch (err) {
       // Token is missing/expired/invalid — clear it so the app doesn't
       // keep treating this device as logged in.
       await SecureStore.deleteItemAsync(TOKEN_KEY)
-      set({ partner: null })
+      set({ partner: null, isHydrated: true })
       return false
     }
   },

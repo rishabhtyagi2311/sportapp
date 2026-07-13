@@ -1,6 +1,8 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { AuthRequest } from '../../middlewares/auth.middleware';
+import { prisma } from '../../index';
 
 let s3Client: S3Client | null = null;
 
@@ -26,13 +28,25 @@ function slugify(value: string, fallback: string): string {
 }
 
 export class StorageController {
-  static async getPresignedUrl(req: Request, res: Response) {
+  static async getPresignedUrl(req: AuthRequest, res: Response) {
     try {
+      const partnerId = req.partner?.id;
+      if (!partnerId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
       const { fileName, fileType, venueName, academyName } = req.body;
 
+      const partner = await prisma.partnerIdentity.findUnique({ where: { id: partnerId } });
+      const partnerSlug = partner
+        ? `${slugify(`${partner.firstName} ${partner.lastName}`, 'partner')}-${partnerId.slice(0, 6)}`
+        : partnerId.slice(0, 8);
+
       const fileKey = academyName
-        ? `partner/Academies/${slugify(academyName, 'untitled-academy')}/photos/${Date.now()}-${fileName}`
-        : `partner/Venues/${slugify(venueName, 'untitled-venue')}/images/${Date.now()}-${fileName}`;
+        ? `partner/${partnerSlug}/Academies/${slugify(academyName, 'untitled-academy')}/photos/${Date.now()}-${fileName}`
+        : venueName
+        ? `partner/${partnerSlug}/Venues/${slugify(venueName, 'untitled-venue')}/images/${Date.now()}-${fileName}`
+        : `partner/${partnerSlug}/profile/${Date.now()}-${fileName}`;
 
       const command = new PutObjectCommand({
         Bucket: process.env.AWS_BUCKET_NAME,

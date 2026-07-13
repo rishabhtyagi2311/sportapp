@@ -156,6 +156,11 @@ export class VenueService {
               },
             }
           : {}),
+        // Full-array replace, matching how `sports`/`amenities` already work —
+        // the client always sends the complete desired image list.
+        ...(data.images
+          ? { images: { deleteMany: {}, create: data.images.map((url: string) => ({ url })) } }
+          : {}),
       },
       include: { address: true, images: true },
     });

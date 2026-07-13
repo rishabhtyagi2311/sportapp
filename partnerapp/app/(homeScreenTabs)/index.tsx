@@ -134,8 +134,8 @@ export default function VenueOwnerDashboard() {
     totalVenues: venues.length,
     totalSlots,
     // TODO: wire to real data once the booking backend exists
-    activeBookings: 12,
-    monthlyRevenue: "$4,250",
+    activeBookings: 0,
+    monthlyRevenue: "0",
   };
 
   return (
@@ -312,7 +312,7 @@ export default function VenueOwnerDashboard() {
               }
               gradientColors="bg-amber-50"
               borderColor="border-amber-100"
-              badgeCount={3}
+              badgeCount={0}
               onPress={() =>
                 router.push("/(venueManagement)/bookingHandling/venuePicker")
               }

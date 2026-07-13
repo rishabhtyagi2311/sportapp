@@ -21,4 +21,5 @@ export const updatePartnerProfileSchema = z.object({
   email: z.string().email().optional(),
   city: z.string().optional(),
   dob: z.string().optional(),
+  profileImage: z.string().optional(),
 });

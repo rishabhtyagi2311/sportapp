@@ -10,8 +10,9 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import * as Location from "expo-location";
 import { useAcademyStore } from "@/store/academyStore";
 import { useResponsive } from "@/hooks/useResponsive";
 import FadeInView from "@/components/animated/FadeInView";
@@ -35,6 +36,37 @@ export default function SportsAcademyRegistration() {
   });
 
   const [Fee, setFee] = useState("");
+  const [locating, setLocating] = useState(false);
+
+  const handleDetectLocation = async () => {
+    setLocating(true);
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Needed", "Location permission was denied.");
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const { latitude, longitude } = location.coords;
+
+      let response = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (response && response.length > 0) {
+        const geoCode = response[0];
+        const street = geoCode.name || geoCode.street || "";
+        const district = geoCode.district ? `, ${geoCode.district}` : "";
+        setFormData((prev) => ({
+          ...prev,
+          address: `${street}${district}`.trim(),
+          city: geoCode.city || geoCode.district || prev.city,
+        }));
+      }
+    } catch (err) {
+      Alert.alert("Error", "Could not fetch location. Ensure GPS is enabled.");
+    } finally {
+      setLocating(false);
+    }
+  };
 
 
 
@@ -221,6 +253,23 @@ export default function SportsAcademyRegistration() {
           {/* Address */}
           <View className="mb-6">
             <Text className="text-white font-semibold mb-2">Address *</Text>
+
+            <TouchableOpacity
+              onPress={handleDetectLocation}
+              disabled={locating}
+              activeOpacity={0.7}
+              className="flex-row items-center justify-center bg-blue-600 rounded-xl py-3 mb-3"
+            >
+              {locating ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <>
+                  <FontAwesome5 name="location-arrow" size={13} color="white" />
+                  <Text className="text-white font-bold ml-2">Use Current Location</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
             <View className="bg-slate-800 rounded-xl border border-slate-700">
               <View className="flex-row items-start px-4 pt-4">
                 <Ionicons

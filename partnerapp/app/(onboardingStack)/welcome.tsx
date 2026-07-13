@@ -1,11 +1,13 @@
-import React, { FC } from 'react';
+import React, { FC, useEffect } from 'react';
 import { ScrollView, View, Text, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useAuthStore } from '@/store/authStore';
 import { useResponsive } from '@/hooks/useResponsive';
 import FadeInView from '@/components/animated/FadeInView';
 import AnimatedPressable from '@/components/animated/AnimatedPressable';
+import SportLoader from '@/components/animated/SportLoader';
 
 const FEATURE_CHIPS = ['Venues', 'Slots', 'Academies', 'Bookings', 'Match Sessions'];
 
@@ -56,8 +58,39 @@ const WelcomeScreen: FC = () => {
   const router = useRouter();
   const { isTablet } = useResponsive();
 
+  const isHydrated = useAuthStore((state) => state.isHydrated);
+  const partner = useAuthStore((state) => state.partner);
+
   const handleSignUp = () => router.push('/(onboardingStack)/basicInfoRegisterOne' as any);
   const handleSignIn = () => router.push('/(onboardingStack)/login' as any);
+
+  // The session check (kicked off back in app/index.tsx, in parallel with
+  // the splash animation) may still be in flight when we land here — e.g. a
+  // cold-started backend. Show a loader instead of the sign-up pitch until
+  // we actually know whether this device has a valid session.
+  useEffect(() => {
+    if (isHydrated && partner) {
+      router.replace('/(homeScreenTabs)');
+    }
+  }, [isHydrated, partner]);
+
+  if (!isHydrated) {
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+        <SportLoader label="Checking your session" />
+      </SafeAreaView>
+    );
+  }
+
+  if (partner) {
+    // Already redirecting via the effect above — avoid a flash of the
+    // sign-up pitch while that navigation is in flight.
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+        <SportLoader />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50">

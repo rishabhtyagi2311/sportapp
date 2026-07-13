@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useForm, Controller } from "react-hook-form";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import signUpStore from "@/store/signUpStore";
 import { useAuthStore } from "@/store/authStore";
 import { useResponsive } from "@/hooks/useResponsive";
@@ -35,6 +36,8 @@ export default function InfoRegisterScreen() {
   const {firstName, lastName, contact, email, setDob, setCity} = signUpStore()
   const register = useAuthStore((state) => state.register)
   const [submitting, setSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const {
     control,
@@ -198,14 +201,20 @@ export default function InfoRegisterScreen() {
                         minLength: { value: 6, message: "Password must be at least 6 characters" },
                       }}
                       render={({ field: { onChange, value } }) => (
-                        <TextInput
-                          className="border-2 border-black rounded-2xl bg-white px-4 py-3 text-base font-medium text-gray-800 mx-4"
-                          placeholder="Password"
-                          placeholderTextColor="#9ca3af"
-                          secureTextEntry
-                          value={value}
-                          onChangeText={onChange}
-                        />
+                        <View className="flex-row items-center border-2 border-black rounded-2xl bg-white mx-4">
+                          <TextInput
+                            className="flex-1 px-4 py-3 text-base font-medium text-gray-800"
+                            style={{ textAlignVertical: 'center', includeFontPadding: false }}
+                            placeholder="Password"
+                            placeholderTextColor="#9ca3af"
+                            secureTextEntry={!showPassword}
+                            value={value}
+                            onChangeText={onChange}
+                          />
+                          <TouchableOpacity onPress={() => setShowPassword((v) => !v)} className="px-4">
+                            <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#6b7280" />
+                          </TouchableOpacity>
+                        </View>
                       )}
                     />
                     {errors.password && (
@@ -225,14 +234,20 @@ export default function InfoRegisterScreen() {
                       name="confirmPassword"
                       rules={{ required: "Please confirm your password" }}
                       render={({ field: { onChange, value } }) => (
-                        <TextInput
-                          className="border-2 border-black rounded-2xl bg-white px-4 py-3 text-base font-medium text-gray-800 mx-4"
-                          placeholder="Confirm Password"
-                          placeholderTextColor="#9ca3af"
-                          secureTextEntry
-                          value={value}
-                          onChangeText={onChange}
-                        />
+                        <View className="flex-row items-center border-2 border-black rounded-2xl bg-white mx-4">
+                          <TextInput
+                            className="flex-1 px-4 py-3 text-base font-medium text-gray-800"
+                            style={{ textAlignVertical: 'center', includeFontPadding: false }}
+                            placeholder="Confirm Password"
+                            placeholderTextColor="#9ca3af"
+                            secureTextEntry={!showConfirmPassword}
+                            value={value}
+                            onChangeText={onChange}
+                          />
+                          <TouchableOpacity onPress={() => setShowConfirmPassword((v) => !v)} className="px-4">
+                            <Ionicons name={showConfirmPassword ? 'eye-off' : 'eye'} size={20} color="#6b7280" />
+                          </TouchableOpacity>
+                        </View>
                       )}
                     />
                     {errors.confirmPassword && (

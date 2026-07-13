@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialIcons, Ionicons } from '@expo/vector-icons'
@@ -13,6 +14,7 @@ import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import signUpStore from '@/store/signUpStore'
 import { useAuthStore } from '@/store/authStore'
+import { authApiService } from '@/services/auth/auth'
 import { useResponsive } from '@/hooks/useResponsive'
 import FadeInView from '@/components/animated/FadeInView'
 import AnimatedPressable from '@/components/animated/AnimatedPressable'
@@ -22,8 +24,13 @@ export default function ProfileScreen() {
   const { isSmallScreen, isTablet } = useResponsive()
 
   const partner = useAuthStore((state) => state.partner)
-  // Local-only preview — there's no backend storage/upload for this yet.
-  const [profileImage, setProfileImage] = useState('')
+  const updateProfile = useAuthStore((state) => state.updateProfile)
+  // Instant local preview while the S3 upload is in flight — once it
+  // resolves, `partner.profileImage` (persisted) takes over as the source
+  // of truth on the next render.
+  const [localPreview, setLocalPreview] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const displayImage = localPreview || partner?.profileImage || ''
 
   const profilePicSize = isTablet ? 160 : isSmallScreen ? 110 : 140
   const profileIconSize = isTablet ? 80 : isSmallScreen ? 50 : 70
@@ -43,8 +50,23 @@ export default function ProfileScreen() {
       quality: 0.85,
     })
 
-    if (!result.canceled) {
-      setProfileImage(result.assets[0].uri)
+    if (result.canceled) return
+
+    const asset = result.assets[0]
+    setLocalPreview(asset.uri)
+    setUploading(true)
+    try {
+      const { uploadUrl, publicUrl } = await authApiService.getPresignedUrl(
+        asset.fileName || `profile_${Date.now()}.jpg`,
+        'image/jpeg'
+      )
+      await authApiService.uploadToS3(uploadUrl, asset.uri, 'image/jpeg')
+      await updateProfile({ profileImage: publicUrl })
+    } catch (err) {
+      Alert.alert('Upload Failed', 'Could not upload profile photo.')
+      setLocalPreview('')
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -66,7 +88,7 @@ export default function ProfileScreen() {
             city: '',
             profileImage: '',
           })
-          setProfileImage('')
+          setLocalPreview('')
           router.replace('/(onboardingStack)/welcome')
         },
       },
@@ -148,20 +170,20 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-900">
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
        <View className={isTablet ? 'self-center w-full max-w-2xl' : 'w-full'}>
         {/* ---------------- Decorative Header ---------------- */}
         <FadeInView direction="none" className="pt-10 pb-8 px-5 bg-slate-900">
           <View className="items-center">
             {/* Profile Image */}
-            <AnimatedPressable onPress={handlePickImage} pressScale={0.94} className="items-center">
+            <AnimatedPressable onPress={handlePickImage} pressScale={0.94} disabled={uploading} className="items-center">
               <View
                 style={{ width: profilePicSize, height: profilePicSize }}
                 className="rounded-full bg-slate-800 border-2 border-slate-700 overflow-hidden items-center justify-center"
               >
-                {profileImage ? (
+                {displayImage ? (
                   <Image
-                    source={{ uri: profileImage }}
+                    source={{ uri: displayImage }}
                     style={{ width: '100%', height: '100%' }}
                   />
                 ) : (
@@ -170,6 +192,11 @@ export default function ProfileScreen() {
                     size={profileIconSize}
                     color="#e5e7eb"
                   />
+                )}
+                {uploading && (
+                  <View className="absolute inset-0 bg-black/50 items-center justify-center">
+                    <ActivityIndicator color="white" />
+                  </View>
                 )}
               </View>
 

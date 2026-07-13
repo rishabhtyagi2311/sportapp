@@ -137,6 +137,7 @@ export default function InfoRegisterScreen() {
                           render={({ field: { onChange, value } }) => (
                             <TextInput
                               className="text-base text-gray-800 font-medium"
+                              style={{ textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0 }}
                               placeholder="Phone number"
                               placeholderTextColor="#9ca3af"
                               keyboardType="phone-pad"

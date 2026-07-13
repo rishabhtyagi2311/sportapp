@@ -10,6 +10,7 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
+  ImageBackground,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -91,7 +92,7 @@ export default function AcademyAnnouncementsScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50" edges={["top"]}>
+    <SafeAreaView className="flex-1 bg-slate-50" edges={["top", "bottom"]}>
       <StatusBar barStyle="dark-content" />
 
       {/* HEADER */}
@@ -107,38 +108,46 @@ export default function AcademyAnnouncementsScreen() {
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
-        <FlatList
-          data={posts}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            padding: 16,
-            paddingBottom: 20,
-            flexGrow: 1,
-            maxWidth: isTablet ? 768 : undefined,
-            width: "100%",
-            alignSelf: "center",
-          }}
-          ListHeaderComponent={
-            <Text className="text-slate-400 text-xs font-bold mb-4 uppercase tracking-widest pl-1">
-              Broadcast updates to parents & students
-            </Text>
-          }
-          ListEmptyComponent={
-            !isLoading ? (
-              <View className="items-center justify-center py-16">
-                <Ionicons name="megaphone-outline" size={48} color="#cbd5e1" />
-                <Text className="text-slate-400 mt-4 text-center">
-                  No announcements yet.{"\n"}Post your first update below.
+        <ImageBackground
+          source={require("@/assets/images/bgEnhancedCoverImage.png")}
+          className="flex-1"
+          resizeMode="cover"
+        >
+          <View className="flex-1 bg-slate-950/70">
+            <FlatList
+              data={posts}
+              keyExtractor={(item) => item.id}
+              renderItem={renderItem}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{
+                padding: 16,
+                paddingBottom: 20,
+                flexGrow: 1,
+                maxWidth: isTablet ? 768 : undefined,
+                width: "100%",
+                alignSelf: "center",
+              }}
+              ListHeaderComponent={
+                <Text className="text-slate-300 text-xs font-bold mb-4 uppercase tracking-widest pl-1">
+                  Broadcast updates to parents & students
                 </Text>
-              </View>
-            ) : null
-          }
-        />
+              }
+              ListEmptyComponent={
+                !isLoading ? (
+                  <View className="items-center justify-center py-16">
+                    <Ionicons name="megaphone-outline" size={48} color="#94a3b8" />
+                    <Text className="text-slate-300 mt-4 text-center">
+                      No announcements yet.{"\n"}Post your first update below.
+                    </Text>
+                  </View>
+                ) : null
+              }
+            />
+          </View>
+        </ImageBackground>
 
         {/* COMPOSER */}
-        <View className="bg-white border-t border-slate-100 px-4 py-3 flex-row items-end">
+        <View className="bg-white border-t border-slate-100 px-4 py-3 flex-row items-center">
           <View className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2 mr-2">
             <TextInput
               placeholder="Type an update for this academy..."

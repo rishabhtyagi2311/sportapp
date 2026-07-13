@@ -1,80 +1,126 @@
 import React, { useEffect, useState } from "react";
-import { Image, View } from "react-native";
-import Animated, { FadeIn, FadeOut, Easing } from "react-native-reanimated";
+import { Image, View, Dimensions } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  Keyframe,
+  RotateOutDownLeft,
+  RotateOutUpRight,
+  Easing,
+} from "react-native-reanimated";
+
+const { height } = Dimensions.get("window");
+
+/** Chevron entrance: slides in from off-screen and settles into place. */
+const topTranslateKeyframe = new Keyframe({
+  0: { transform: [{ translateY: -height * 0.4 }] },
+  100: { transform: [{ translateY: 0 }] },
+});
+
+const bottomTranslateKeyframe = new Keyframe({
+  0: { transform: [{ translateY: height * 0.4 }] },
+  100: { transform: [{ translateY: 0 }] },
+});
+
+/** One full spin while sliding in — the flourish this screen is built around. */
+const rotateKeyframe = new Keyframe({
+  0: { transform: [{ rotate: "0deg" }] },
+  100: { transform: [{ rotate: "360deg" }] },
+});
 
 interface SplashScreenProps {
-  ready: boolean;
-  initialRoute: string | null;
+  /** Always fires after a fixed duration — never gated on anything async
+   * (auth checks, network calls, etc). Those happen on the screen we
+   * navigate to next, with their own loading state. A splash screen that
+   * waits on the network can freeze indefinitely if that call is slow. */
   onFinish: () => void;
 }
 
-// Total on-screen time is deliberately short (~2.2s) — the brand mark should
-// be the thing people see, not an animation warm-up before it appears.
-const ACCENT_ENTER_MS = 400;
-const LOGO_ENTER_DELAY_MS = 120;
-const LOGO_ENTER_MS = 450;
-const HOLD_MS = 1300;
-const EXIT_MS = 350;
-const SHOW_DURATION_MS = LOGO_ENTER_DELAY_MS + LOGO_ENTER_MS + HOLD_MS;
+const DELAY = 150;
+const SLIDE_ROTATE_DURATION = 900;
+const LOGO_DELAY = 150;
+const LOGO_DURATION = 500;
+const HOLD_MS = 700;
+const EXIT_DURATION = 400;
+const SHOW_DURATION_MS = Math.max(DELAY + SLIDE_ROTATE_DURATION, LOGO_DELAY + LOGO_DURATION) + HOLD_MS;
 
-export default function SplashScreen({ ready, initialRoute, onFinish }: SplashScreenProps) {
+export default function SplashScreen({ onFinish }: SplashScreenProps): React.ReactNode {
   const [showContent, setShowContent] = useState(true);
 
   useEffect(() => {
-    if (!ready || !initialRoute) return;
-
     const exitTimer = setTimeout(() => setShowContent(false), SHOW_DURATION_MS);
-    const navTimer = setTimeout(() => onFinish(), SHOW_DURATION_MS + EXIT_MS);
+    const navTimer = setTimeout(() => onFinish(), SHOW_DURATION_MS + EXIT_DURATION);
 
     return () => {
       clearTimeout(exitTimer);
       clearTimeout(navTimer);
     };
-  }, [ready, initialRoute, onFinish]);
+  }, [onFinish]);
 
   return (
-    <View className="flex-1 bg-white items-center justify-center">
+    <View className="flex-1">
+      <LinearGradient
+        colors={['#F8FAFC', '#EFF6FF', '#F8FAFC']}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+      />
+
       {showContent && (
-        <>
+        <View className="flex-1 items-center justify-center">
+          {/* Soft glow behind the mark */}
+          <View
+            className="absolute bg-blue-100 rounded-full"
+            style={{ width: 260, height: 260, opacity: 0.5 }}
+          />
+
+          {/* Top chevron */}
           <Animated.View
-            entering={FadeIn.duration(ACCENT_ENTER_MS).easing(Easing.out(Easing.cubic))}
-            exiting={FadeOut.duration(EXIT_MS)}
+            entering={topTranslateKeyframe.duration(SLIDE_ROTATE_DURATION).delay(DELAY)}
             className="absolute"
-            style={{ top: "30%" }}
+            style={{ top: '50%', marginTop: -170 }}
           >
-            <Image
-              style={{ width: 48, height: 34 }}
-              resizeMode="contain"
-              source={require("@/assets/images/logo3.png")}
-            />
+            <Animated.View
+              entering={rotateKeyframe.duration(SLIDE_ROTATE_DURATION).delay(DELAY)}
+              exiting={RotateOutDownLeft.duration(EXIT_DURATION)}
+            >
+              <Image
+                style={{ width: 56, height: 40 }}
+                resizeMode="contain"
+                source={require("@/assets/images/logo3.png")}
+              />
+            </Animated.View>
           </Animated.View>
 
+          {/* Brand mark */}
           <Animated.View
-            entering={FadeIn.duration(LOGO_ENTER_MS)
-              .delay(LOGO_ENTER_DELAY_MS)
-              .easing(Easing.out(Easing.cubic))}
-            exiting={FadeOut.duration(EXIT_MS)}
+            entering={FadeIn.duration(LOGO_DURATION).delay(LOGO_DELAY).easing(Easing.out(Easing.cubic))}
+            exiting={FadeOut.duration(EXIT_DURATION)}
           >
             <Image
-              style={{ width: 180, height: 180 }}
+              style={{ width: 190, height: 190 }}
               resizeMode="contain"
               source={require("@/assets/images/logo2.png")}
             />
           </Animated.View>
 
+          {/* Bottom chevron */}
           <Animated.View
-            entering={FadeIn.duration(ACCENT_ENTER_MS).easing(Easing.out(Easing.cubic))}
-            exiting={FadeOut.duration(EXIT_MS)}
+            entering={bottomTranslateKeyframe.duration(SLIDE_ROTATE_DURATION).delay(DELAY)}
             className="absolute"
-            style={{ bottom: "30%" }}
+            style={{ bottom: '50%', marginBottom: -170 }}
           >
-            <Image
-              style={{ width: 48, height: 34 }}
-              resizeMode="contain"
-              source={require("@/assets/images/logo1.png")}
-            />
+            <Animated.View
+              entering={rotateKeyframe.duration(SLIDE_ROTATE_DURATION).delay(DELAY)}
+              exiting={RotateOutUpRight.duration(EXIT_DURATION)}
+            >
+              <Image
+                style={{ width: 56, height: 40 }}
+                resizeMode="contain"
+                source={require("@/assets/images/logo1.png")}
+              />
+            </Animated.View>
           </Animated.View>
-        </>
+        </View>
       )}
     </View>
   );

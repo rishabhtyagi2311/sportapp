@@ -66,4 +66,5 @@ export const updateVenueSchema = z.object({
   peakPricing: peakPricingSchema.optional(),
   sports: z.array(z.any()).optional(),
   amenities: z.array(z.any()).optional(),
+  images: z.array(z.string()).optional(),
 });

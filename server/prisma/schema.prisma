@@ -74,6 +74,7 @@ model PartnerIdentity {
   email         String?
   city          String?
   dob           String?
+  profileImage  String?
   venues        Venue[]
   academies     Academy[]
   createdAt     DateTime @default(now())

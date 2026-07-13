@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useForm, Controller } from "react-hook-form";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "@/store/authStore";
 import { useResponsive } from "@/hooks/useResponsive";
 import FadeInView from "@/components/animated/FadeInView";
@@ -30,6 +31,7 @@ export default function PartnerLoginScreen() {
   const { isTablet } = useResponsive();
   const login = useAuthStore((state) => state.login);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     control,
@@ -112,14 +114,20 @@ export default function PartnerLoginScreen() {
                       name="password"
                       rules={{ required: "Password is required" }}
                       render={({ field: { onChange, value } }) => (
-                        <TextInput
-                          className="border-2 border-black rounded-2xl bg-white px-4 py-3 text-base font-medium text-gray-800 mx-4"
-                          placeholder="Password"
-                          placeholderTextColor="#9ca3af"
-                          secureTextEntry
-                          value={value}
-                          onChangeText={onChange}
-                        />
+                        <View className="flex-row items-center border-2 border-black rounded-2xl bg-white mx-4">
+                          <TextInput
+                            className="flex-1 px-4 py-3 text-base font-medium text-gray-800"
+                            style={{ textAlignVertical: 'center', includeFontPadding: false }}
+                            placeholder="Password"
+                            placeholderTextColor="#9ca3af"
+                            secureTextEntry={!showPassword}
+                            value={value}
+                            onChangeText={onChange}
+                          />
+                          <TouchableOpacity onPress={() => setShowPassword((v) => !v)} className="px-4">
+                            <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#6b7280" />
+                          </TouchableOpacity>
+                        </View>
                       )}
                     />
                     {errors.password && (

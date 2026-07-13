@@ -17,6 +17,7 @@ export class AuthService {
     email?: string | null;
     city?: string | null;
     dob?: string | null;
+    profileImage?: string | null;
   }) {
     return {
       id: partner.id,
@@ -26,6 +27,7 @@ export class AuthService {
       email: partner.email || undefined,
       city: partner.city || undefined,
       dob: partner.dob || undefined,
+      profileImage: partner.profileImage || undefined,
     };
   }
 
@@ -97,7 +99,7 @@ export class AuthService {
 
   static async updateProfile(
     partnerId: string,
-    data: { firstName?: string; lastName?: string; email?: string; city?: string; dob?: string }
+    data: { firstName?: string; lastName?: string; email?: string; city?: string; dob?: string; profileImage?: string }
   ) {
     const existing = await globalClient.partnerIdentity.findUnique({ where: { id: partnerId } });
 
@@ -113,6 +115,7 @@ export class AuthService {
         email: data.email,
         city: data.city,
         dob: data.dob,
+        profileImage: data.profileImage,
       },
     });
 

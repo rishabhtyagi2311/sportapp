@@ -75,14 +75,18 @@ export default function Step3Sports() {
 
   const addCustomAmenity = () => {
     if (!customAmenityText.trim()) return
-    const newAmenity: Amenity = { 
-      id: `ca_${Date.now()}`, 
-      name: customAmenityText.trim(), 
-      category: 'facilities', 
-      icon: 'star' 
+    const newAmenity: Amenity = {
+      id: `ca_${Date.now()}`,
+      name: customAmenityText.trim(),
+      category: 'facilities',
+      icon: 'star'
     }
     updateDraftVenue({ amenities: [...selectedAmenities, newAmenity] })
     setCustomAmenityText('')
+  }
+
+  const removeCustomAmenity = (amenityId: string) => {
+    updateDraftVenue({ amenities: selectedAmenities.filter(a => a.id !== amenityId) })
   }
 
   /* --- SPORT & VARIETY HANDLERS --- */
@@ -201,9 +205,25 @@ export default function Step3Sports() {
                 )
               })}
             </View>
+            {selectedAmenities.filter(a => !PREDEFINED_AMENITIES.some(p => p.id === a.id)).length > 0 && (
+              <View className="flex-row flex-wrap gap-2 mb-4">
+                {selectedAmenities
+                  .filter(a => !PREDEFINED_AMENITIES.some(p => p.id === a.id))
+                  .map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      onPress={() => removeCustomAmenity(item.id)}
+                      className="px-4 py-3 rounded-2xl border bg-blue-600 border-blue-600 flex-row items-center"
+                    >
+                      <Text className="font-bold text-white mr-2">{item.name}</Text>
+                      <Ionicons name="close-circle" size={16} color="white" />
+                    </TouchableOpacity>
+                  ))}
+              </View>
+            )}
             <View className="flex-row gap-2">
-              <TextInput 
-                value={customAmenityText} 
+              <TextInput
+                value={customAmenityText}
                 onChangeText={setCustomAmenityText} 
                 placeholder="Add other (e.g. Cafe, Shower)" 
                 placeholderTextColor="#94a3b8"

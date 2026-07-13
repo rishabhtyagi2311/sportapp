@@ -18,6 +18,7 @@ function fakePartner(overrides: Partial<any> = {}) {
     email: null,
     city: null,
     dob: null,
+    profileImage: null,
     createdAt: new Date(),
     ...overrides,
   };
