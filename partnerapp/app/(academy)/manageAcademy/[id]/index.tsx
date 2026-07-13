@@ -169,6 +169,11 @@ export default function AcademyDetailScreen() {
               title="Certificates"
               onPress={() => router.push(`/manageAcademy/${id}/certificates`)}
             />
+            <NavigationCard
+              icon="megaphone"
+              title="Info Channel"
+              onPress={() => router.push(`/manageAcademy/${id}/announcements`)}
+            />
           </FadeInView>
 
           {/* ✅ 2. Basic Info */}

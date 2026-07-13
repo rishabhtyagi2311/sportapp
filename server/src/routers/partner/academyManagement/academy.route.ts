@@ -29,4 +29,8 @@ router.delete('/academies/:academyId/photos/:photoId', authenticatePartner, Acad
 router.post('/students/:studentId/certificates', authenticatePartner, AcademyController.createCertificate);
 router.get('/academies/:academyId/certificates', authenticatePartner, AcademyController.getAcademyCertificates);
 
+router.post('/academies/:academyId/announcements', authenticatePartner, AcademyController.createAnnouncement);
+router.get('/academies/:academyId/announcements', authenticatePartner, AcademyController.getAnnouncements);
+router.delete('/academies/:academyId/announcements/:announcementId', authenticatePartner, AcademyController.removeAnnouncement);
+
 export default router;

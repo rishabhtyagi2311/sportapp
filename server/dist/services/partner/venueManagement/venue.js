@@ -82,7 +82,7 @@ class VenueService {
                 sports: data.sports,
                 operatingHours: data.operatingHours,
                 basePrice,
-                daysCount: 30,
+                daysCount: slotGenerator_1.ROLLING_WINDOW_DAYS,
                 peakPricing: data.peakPricing || null,
             });
             return created;

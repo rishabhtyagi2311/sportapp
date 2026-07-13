@@ -1,5 +1,5 @@
 import { prisma as globalClient } from "../../../index";
-import { generateSlotsForRange } from "./slotGenerator";
+import { generateSlotsForRange, ROLLING_WINDOW_DAYS } from "./slotGenerator";
 
 /**
  * Professional Venue Service
@@ -84,7 +84,7 @@ export class VenueService {
         sports: data.sports,
         operatingHours: data.operatingHours,
         basePrice,
-        daysCount: 30,
+        daysCount: ROLLING_WINDOW_DAYS,
         peakPricing: data.peakPricing || null,
       });
 

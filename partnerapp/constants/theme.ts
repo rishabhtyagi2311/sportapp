@@ -42,7 +42,6 @@ export const motion = {
   fast: 150,
   base: 250,
   slow: 400,
-  spring: { damping: 16, stiffness: 160, mass: 0.9 },
 } as const;
 
 export const breakpoints = {

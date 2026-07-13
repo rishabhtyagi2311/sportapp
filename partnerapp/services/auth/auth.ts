@@ -49,4 +49,15 @@ export const authApiService = {
     const response = await apiClient.get('/partner/auth/me');
     return response.data;
   },
+
+  updateProfile: async (payload: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    city?: string;
+    dob?: string;
+  }): Promise<MeResponse> => {
+    const response = await apiClient.put('/partner/auth/me', payload);
+    return response.data;
+  },
 };

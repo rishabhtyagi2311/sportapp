@@ -71,14 +71,10 @@ export default function Step5Review() {
       // 1. Get pre-signed URL from our backend service
       const { uploadUrl, publicUrl } = await venueApiService.getPresignedUrl(fileName, 'image/jpeg', draftVenue.name);
 
-      // 2. Convert URI to Blob (Crucial for direct S3 binary upload)
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      // 2. Upload the local file directly to S3 using the presigned URL
+      await venueApiService.uploadToS3(uploadUrl, uri, 'image/jpeg');
 
-      // 3. Upload directly to S3 using the Put URL
-      await venueApiService.uploadToS3(uploadUrl, blob, 'image/jpeg');
-
-      // 4. Save the permanent public URL in Zustand
+      // 3. Save the permanent public URL in Zustand
       updateDraftVenue({
         images: [...draftVenue.images, publicUrl]
       });

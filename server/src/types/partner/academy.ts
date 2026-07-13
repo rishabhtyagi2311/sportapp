@@ -67,3 +67,7 @@ export const createCertificateSchema = z.object({
   template: z.string().min(1),
   achievement: z.string().min(1),
 });
+
+export const createAnnouncementSchema = z.object({
+  content: z.string().min(1).max(1000),
+});

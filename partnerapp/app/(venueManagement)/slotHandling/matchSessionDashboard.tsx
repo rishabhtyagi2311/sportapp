@@ -42,12 +42,18 @@ export default function VenueMatchSessionsView() {
   const { isTablet } = useResponsive();
   const { venueId } = useLocalSearchParams() as { venueId: string };
   
-  const sessions = useMatchSessionStore((state) =>
-    state.sessions.filter(s => s.venueId === venueId)
-  );
+  // Select the raw array (stable reference) and filter in a memo, not in the
+  // selector — a selector that returns a fresh array on every call defeats
+  // Zustand's reference-equality bailout and causes an infinite render loop.
+  const allSessions = useMatchSessionStore((state) => state.sessions);
   const { isLoading, fetchSessions, cancelSession, setSessionStatus } = useMatchSessionStore();
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+
+  const sessions = useMemo(
+    () => allSessions.filter((s) => s.venueId === venueId),
+    [allSessions, venueId]
+  );
 
   useFocusEffect(
     useCallback(() => {

@@ -15,9 +15,11 @@ const auth_route_1 = __importDefault(require("./routers/partner/auth/auth.route"
 const storage_route_1 = __importDefault(require("./routers/partner/storage/storage.route"));
 const academy_route_1 = __importDefault(require("./routers/partner/academyManagement/academy.route"));
 const slotCleanup_1 = require("./jobs/slotCleanup");
+const slotGeneration_1 = require("./jobs/slotGeneration");
 const app = (0, express_1.default)();
 exports.prisma = new client_1.PrismaClient();
 (0, slotCleanup_1.scheduleSlotCleanup)(exports.prisma);
+(0, slotGeneration_1.scheduleSlotGeneration)(exports.prisma);
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 app.use((req, _res, next) => {

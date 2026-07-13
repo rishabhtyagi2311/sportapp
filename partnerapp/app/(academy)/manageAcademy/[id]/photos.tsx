@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -29,7 +29,12 @@ export default function AcademyPhotosScreen() {
   const academy = useAcademyStore((state) =>
     state.academies.find((a) => a.id === id)
   );
-  const photos = useAcademyStore((state) => state.getPhotosByAcademy(id));
+  // Select the raw array and derive the per-academy list with useMemo —
+  // selecting `state.getPhotosByAcademy(id)` directly returns a fresh array
+  // every call, which defeats Zustand's reference-equality bailout and
+  // causes an infinite render loop ("Maximum update depth exceeded").
+  const allPhotos = useAcademyStore((state) => state.photos);
+  const photos = useMemo(() => allPhotos.filter((p) => p.academyId === id), [allPhotos, id]);
   const fetchPhotos = useAcademyStore((state) => state.fetchPhotos);
   const addPhoto = useAcademyStore((state) => state.addPhoto);
   const removePhoto = useAcademyStore((state) => state.removePhoto);
@@ -81,9 +86,7 @@ export default function AcademyPhotosScreen() {
         academy.academyName
       );
 
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      await academyApiService.uploadToS3(uploadUrl, blob, 'image/jpeg');
+      await academyApiService.uploadToS3(uploadUrl, uri, 'image/jpeg');
 
       await addPhoto(academy.id, publicUrl);
     } catch (err) {

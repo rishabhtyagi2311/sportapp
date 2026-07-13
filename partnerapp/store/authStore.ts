@@ -19,6 +19,13 @@ interface AuthState {
     dob?: string
   }) => Promise<void>
   login: (payload: { contactNumber: string; password: string }) => Promise<void>
+  updateProfile: (payload: {
+    firstName?: string
+    lastName?: string
+    email?: string
+    city?: string
+    dob?: string
+  }) => Promise<void>
   logout: () => Promise<void>
   /** Validates the stored token against the backend and rehydrates `partner`.
    *  Clears the token and returns false if there is none, or it's no longer valid. */
@@ -54,6 +61,18 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ partner: response.data.partner, isLoading: false })
     } catch (err: any) {
       const message = err.response?.data?.message || 'Invalid contact number or password'
+      set({ error: message, isLoading: false })
+      throw new Error(message)
+    }
+  },
+
+  updateProfile: async (payload) => {
+    set({ isLoading: true, error: null })
+    try {
+      const response = await authApiService.updateProfile(payload)
+      set({ partner: response.data, isLoading: false })
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not update profile'
       set({ error: message, isLoading: false })
       throw new Error(message)
     }

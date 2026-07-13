@@ -94,4 +94,28 @@ export class AuthService {
 
     return { token, partner: this.toPublicPartner(partner) };
   }
+
+  static async updateProfile(
+    partnerId: string,
+    data: { firstName?: string; lastName?: string; email?: string; city?: string; dob?: string }
+  ) {
+    const existing = await globalClient.partnerIdentity.findUnique({ where: { id: partnerId } });
+
+    if (!existing) {
+      throw new Error("Partner not found");
+    }
+
+    const partner = await globalClient.partnerIdentity.update({
+      where: { id: partnerId },
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        city: data.city,
+        dob: data.dob,
+      },
+    });
+
+    return this.toPublicPartner(partner);
+  }
 }

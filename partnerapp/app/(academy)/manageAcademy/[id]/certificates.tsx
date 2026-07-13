@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -28,11 +28,26 @@ export default function CertificatesScreen() {
   const { isTablet } = useResponsive();
 
   const isLoading = useAcademyStore((state) => state.isLoading);
-  const students = useAcademyStore((state) => state.getStudentsByAcademy(id));
-  const certificates = useAcademyStore((state) => state.getCertificatesByAcademy(id));
+  // Select the raw arrays (stable references) and derive per-academy lists
+  // with useMemo — selecting `state.getXByAcademy(id)` directly returns a
+  // fresh array every call, which defeats Zustand's reference-equality
+  // bailout and causes an infinite render loop ("Maximum update depth
+  // exceeded").
+  const allStudents = useAcademyStore((state) => state.students);
+  const allCertificates = useAcademyStore((state) => state.certificates);
   const fetchStudents = useAcademyStore((state) => state.fetchStudents);
   const fetchCertificates = useAcademyStore((state) => state.fetchCertificates);
   const createCertificate = useAcademyStore((state) => state.createCertificate);
+
+  const students = useMemo(
+    () => allStudents.filter((s) => s.academyId === id),
+    [allStudents, id]
+  );
+  const studentIds = useMemo(() => new Set(students.map((s) => s.id)), [students]);
+  const certificates = useMemo(
+    () => allCertificates.filter((c) => studentIds.has(c.studentId)),
+    [allCertificates, studentIds]
+  );
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);

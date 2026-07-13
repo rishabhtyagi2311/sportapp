@@ -61,7 +61,7 @@ export default function BookingListScreen() {
       <FadeInView delay={30}>
         <AnimatedPressable
           onPress={() => router.push({ pathname: './bookingDetail', params: { bookingId: item.id } })}
-          className={`bg-white p-4 rounded-xl mb-3 border ${isCancelled ? 'border-red-100 bg-red-50/30' : 'border-slate-200'} shadow-sm`}
+          className={`bg-white p-4 rounded-xl mb-3 border ${isCancelled ? 'border-red-100 bg-red-50' : 'border-slate-200'} shadow-sm`}
         >
           <View className="flex-row justify-between items-start mb-2">
             <View className="bg-slate-100 px-2 py-1 rounded-md">

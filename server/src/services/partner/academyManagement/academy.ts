@@ -424,4 +424,60 @@ export class AcademyService {
 
     return certificates.map((cert) => this.mapCertificateForClient(cert));
   }
+
+  /* ------------------------------------------------------------------ */
+  /* ANNOUNCEMENTS                                                       */
+  /* ------------------------------------------------------------------ */
+
+  static mapAnnouncementForClient(announcement: any) {
+    return {
+      id: announcement.id,
+      academyId: announcement.academyId,
+      content: announcement.content,
+      createdAt: announcement.createdAt.toISOString(),
+    };
+  }
+
+  static async createAnnouncement(academyId: string, partnerId: string, content: string) {
+    const academy = await globalClient.academy.findFirst({ where: { id: academyId, partnerId } });
+
+    if (!academy) {
+      throw new Error('Academy not found or not owned by partner');
+    }
+
+    const announcement = await globalClient.announcement.create({ data: { academyId, content } });
+
+    return this.mapAnnouncementForClient(announcement);
+  }
+
+  static async getAnnouncementsByAcademy(academyId: string, partnerId: string) {
+    const academy = await globalClient.academy.findFirst({ where: { id: academyId, partnerId } });
+
+    if (!academy) {
+      throw new Error('Academy not found or not owned by partner');
+    }
+
+    const announcements = await globalClient.announcement.findMany({
+      where: { academyId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return announcements.map((a) => this.mapAnnouncementForClient(a));
+  }
+
+  static async removeAnnouncement(academyId: string, partnerId: string, announcementId: string) {
+    const academy = await globalClient.academy.findFirst({ where: { id: academyId, partnerId } });
+
+    if (!academy) {
+      throw new Error('Academy not found or not owned by partner');
+    }
+
+    const announcement = await globalClient.announcement.findFirst({ where: { id: announcementId, academyId } });
+
+    if (!announcement) {
+      throw new Error('Announcement not found');
+    }
+
+    await globalClient.announcement.delete({ where: { id: announcementId } });
+  }
 }

@@ -9,6 +9,9 @@ export function minsToTime(m: number): string {
 
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
+/** Days of slots that should always exist ahead of today, topped up by the daily rolling job. */
+export const ROLLING_WINDOW_DAYS = 3;
+
 export interface PeakPricingRule {
   enabled: boolean;
   startTime: string; // HH:mm
@@ -29,9 +32,13 @@ function priceForSlot(startMins: number, basePrice: number, peakPricing?: PeakPr
  * Builds the list of candidate slots for a venue over a date range based on
  * its sports/varieties and weekly operating hours. Does not touch the DB.
  *
- * Day-of-week is derived from the server's local calendar day (`getDay()`),
- * not from locale-formatted strings, so this has no dependency on Node's
- * ICU/locale data. This still assumes the server and the venues it serves
+ * Dates are anchored as UTC midnight for the server's local calendar day
+ * (via `Date.UTC`), matching how date-only strings like "2026-07-13" from
+ * the client are parsed (`new Date("2026-07-13")` is UTC midnight per the
+ * ES spec). Using local-midnight `Date` objects here instead would silently
+ * desync from every exact-date lookup whenever the server's UTC offset is
+ * non-zero (e.g. IST) — the slot would exist but no query for "today" would
+ * ever find it. This still assumes the server and the venues it serves
  * share a timezone (true for this single-region deployment) — full
  * correctness for multi-timezone venues would require storing a per-venue
  * IANA timezone, which the schema does not have.
@@ -51,11 +58,9 @@ export function buildCandidateSlots(params: {
   for (const sport of sports || []) {
     for (const variety of sport.varieties || []) {
       for (let i = 0; i < daysCount; i++) {
-        const targetDate = new Date(startDate);
-        targetDate.setDate(startDate.getDate() + i);
-        targetDate.setHours(0, 0, 0, 0);
+        const targetDate = new Date(Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i));
 
-        const dayName = WEEKDAYS[targetDate.getDay()];
+        const dayName = WEEKDAYS[targetDate.getUTCDay()];
         const dayConfig = operatingHours?.[dayName];
 
         if (dayConfig && dayConfig.isOpen) {
@@ -101,7 +106,7 @@ export async function generateSlotsForRange(
     peakPricing?: PeakPricingRule | null;
   }
 ): Promise<number> {
-  const daysCount = params.daysCount ?? 30;
+  const daysCount = params.daysCount ?? ROLLING_WINDOW_DAYS;
   const startDate = params.startDate ?? new Date();
 
   const slots = buildCandidateSlots({
@@ -118,7 +123,7 @@ export async function generateSlotsForRange(
     return 0;
   }
 
-  const rangeEnd = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + daysCount);
+  const rangeEnd = new Date(Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + daysCount));
 
   const existingSlots = await client.timeSlot.findMany({
     where: {

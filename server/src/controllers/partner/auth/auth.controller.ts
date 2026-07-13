@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { AuthRequest } from "../../../middlewares/auth.middleware";
 import { AuthService } from "../../../services/partner/auth/auth.service";
-import { partnerLoginSchema, partnerRegisterSchema } from "../../../types/partner/auth";
+import { partnerLoginSchema, partnerRegisterSchema, updatePartnerProfileSchema } from "../../../types/partner/auth";
 
 export class AuthController {
   static async register(req: Request, res: Response) {
@@ -61,6 +61,27 @@ export class AuthController {
       return res.status(200).json({ success: true, data: partner });
     } catch (error: any) {
       return res.status(404).json({ success: false, message: error.message || "Partner not found" });
+    }
+  }
+
+  static async updateProfile(req: AuthRequest, res: Response) {
+    try {
+      const partnerId = req.partner?.id;
+
+      if (!partnerId) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const parsed = updatePartnerProfileSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ success: false, message: "Invalid profile data", error: parsed.error.issues });
+      }
+
+      const partner = await AuthService.updateProfile(partnerId, parsed.data);
+
+      return res.status(200).json({ success: true, message: "Profile updated successfully", data: partner });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message || "Error updating profile" });
     }
   }
 }

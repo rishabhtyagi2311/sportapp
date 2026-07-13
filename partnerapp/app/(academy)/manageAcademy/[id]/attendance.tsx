@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -24,11 +24,11 @@ export default function AttendanceScreen() {
   const {
     markAttendance,
     getAttendanceStatus,
-    getStudentsByAcademy,
     fetchStudents,
     fetchAcademyAttendance,
     isLoading,
   } = useAcademyStore();
+  const allStudents = useAcademyStore((state) => state.students);
 
   const [selectedTab, setSelectedTab] =
     useState<"mark" | "history">("mark");
@@ -46,9 +46,12 @@ export default function AttendanceScreen() {
     }, [id, fetchStudents, fetchAcademyAttendance, selectedDate])
   );
 
-  if (!id) return null;
+  const students = useMemo(
+    () => allStudents.filter((s) => s.academyId === id),
+    [allStudents, id]
+  );
 
-  const students = getStudentsByAcademy(id);
+  if (!id) return null;
 
   const handleMarkAttendance = (studentId: string, present: boolean) => {
     markAttendance(studentId, selectedDate, present).catch(() => {});

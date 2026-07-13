@@ -127,9 +127,13 @@ export default function SlotManagerView() {
     })
   }, [slots, selectedVariety, bookings, sessions, selectedDate])
 
-  // 6. DATE TABS (Today + 7 Days for Partner)
+  // 6. DATE TABS — matches the server's rolling generation window
+  // (server/src/services/partner/venueManagement/slotGenerator.ts:
+  // ROLLING_WINDOW_DAYS). Showing more tabs than the window covers would let
+  // partners tap into days that are never actually generated.
+  const ROLLING_WINDOW_DAYS = 3
   const dateTabs = useMemo(() => {
-    return Array.from({ length: 8 }).map((_, i) => addDays(new Date(), i))
+    return Array.from({ length: ROLLING_WINDOW_DAYS }).map((_, i) => addDays(new Date(), i))
   }, [])
 
   const handleSlotPress = (slotState: SlotState) => {
@@ -148,7 +152,13 @@ export default function SlotManagerView() {
     if (!venueId) return
     setActionLoading(true)
     try {
-      await generateSlots(venueId, format(selectedDate, 'yyyy-MM-dd'))
+      const created = await generateSlots(venueId, format(selectedDate, 'yyyy-MM-dd'))
+      Alert.alert(
+        created > 0 ? 'Slots Generated' : 'Already Up To Date',
+        created > 0
+          ? `${created} new slot(s) were added to the upcoming schedule.`
+          : 'No new slots were needed — the upcoming schedule is already fully generated.'
+      )
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.message || 'Could not generate slots')
     } finally {
@@ -242,14 +252,16 @@ export default function SlotManagerView() {
           </View>
         </View>
 
-        {/* SPORT/VARIETY FILTER TRIGGER */}
-        <TouchableOpacity
-          onPress={() => setFilterModalVisible(true)}
-          className="bg-blue-50 px-3 py-2 rounded-xl flex-row items-center"
-        >
-          <MaterialIcons name="tune" size={18} color="#2563eb" />
-          <Text className="text-blue-600 font-bold text-xs ml-2">Switch Court</Text>
-        </TouchableOpacity>
+        <View className="flex-row items-center">
+          {/* SPORT/VARIETY FILTER TRIGGER */}
+          <TouchableOpacity
+            onPress={() => setFilterModalVisible(true)}
+            className="bg-blue-50 px-3 py-2 rounded-xl flex-row items-center"
+          >
+            <MaterialIcons name="tune" size={18} color="#2563eb" />
+            <Text className="text-blue-600 font-bold text-xs ml-2">Switch Court</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* DATE TABS */}

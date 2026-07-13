@@ -1,6 +1,6 @@
 import React from 'react';
 import { ViewStyle } from 'react-native';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn, Easing } from 'react-native-reanimated';
 import { motion } from '@/constants/theme';
 
 interface FadeInViewProps {
@@ -19,7 +19,7 @@ interface FadeInViewProps {
  */
 export default function FadeInView({ children, delay = 0, direction = 'up', className, style }: FadeInViewProps) {
   const entering = direction === 'up'
-    ? FadeInDown.duration(motion.base).delay(delay).springify().damping(18)
+    ? FadeInDown.duration(motion.base).delay(delay).easing(Easing.out(Easing.cubic))
     : FadeIn.duration(motion.base).delay(delay);
 
   return (

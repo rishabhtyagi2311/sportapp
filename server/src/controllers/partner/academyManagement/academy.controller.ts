@@ -11,6 +11,7 @@ import {
   markAttendanceSchema,
   addPhotoSchema,
   createCertificateSchema,
+  createAnnouncementSchema,
 } from '../../../types/partner/academy';
 
 export class AcademyController {
@@ -415,6 +416,66 @@ export class AcademyController {
       return res.status(200).json({ success: true, data: certificates });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message || 'Error fetching certificates' });
+    }
+  }
+
+  /* -------------------------------------------------------------- */
+  /* ANNOUNCEMENTS                                                   */
+  /* -------------------------------------------------------------- */
+
+  static async createAnnouncement(req: AuthRequest, res: Response) {
+    try {
+      const partnerId = req.partner?.id;
+      const { academyId } = req.params;
+
+      if (!partnerId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const parsed = createAnnouncementSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ success: false, message: 'Invalid announcement data', error: parsed.error.issues });
+      }
+
+      const announcement = await AcademyService.createAnnouncement(academyId, partnerId, parsed.data.content);
+
+      return res.status(201).json({ success: true, message: 'Announcement posted successfully', data: announcement });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message || 'Error posting announcement' });
+    }
+  }
+
+  static async getAnnouncements(req: AuthRequest, res: Response) {
+    try {
+      const partnerId = req.partner?.id;
+      const { academyId } = req.params;
+
+      if (!partnerId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const announcements = await AcademyService.getAnnouncementsByAcademy(academyId, partnerId);
+
+      return res.status(200).json({ success: true, data: announcements });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message || 'Error fetching announcements' });
+    }
+  }
+
+  static async removeAnnouncement(req: AuthRequest, res: Response) {
+    try {
+      const partnerId = req.partner?.id;
+      const { academyId, announcementId } = req.params;
+
+      if (!partnerId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      await AcademyService.removeAnnouncement(academyId, partnerId, announcementId);
+
+      return res.status(200).json({ success: true, message: 'Announcement removed successfully' });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message || 'Error removing announcement' });
     }
   }
 }

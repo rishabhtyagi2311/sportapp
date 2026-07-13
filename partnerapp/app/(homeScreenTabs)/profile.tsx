@@ -231,22 +231,9 @@ export default function ProfileScreen() {
             <ActionItem
               icon={<MaterialIcons name="edit" size={24} color="#22c55e" />}
               label="Edit Personal Details"
-              value="Name, email, phone, city"
+              value="Name, email, city, date of birth"
               onPress={() =>
-                router.push('./')
-              }
-            />
-          </ProfileSection>
-        </FadeInView>
-
-        {/* ---------------- Account ---------------- */}
-        <FadeInView delay={160}>
-          <ProfileSection title="Account">
-            <ActionItem
-              icon={<MaterialIcons name="vpn-key" size={24} color="#e5e7eb" />}
-              label="Change Password"
-              onPress={() =>
-                router.push('./')
+                router.push('/(profileManagement)/editProfile' as any)
               }
             />
           </ProfileSection>

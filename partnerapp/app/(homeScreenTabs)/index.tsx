@@ -5,7 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import signUpStore from "./../../store/signUpStore";
 import { useVenueStore } from "@/store/venueStore";
@@ -284,6 +284,18 @@ export default function VenueOwnerDashboard() {
               borderColor="border-cyan-100"
               onPress={() =>
                 router.push("/(venueManagement)/slotHandling/venuePicker")
+              }
+            />
+
+            <ActionCard
+              delay={315}
+              title="Match Sessions"
+              subtitle="Track pending, live & finished open matches"
+              icon={<FontAwesome5 name="users" size={24} color="#4338ca" />}
+              gradientColors="bg-indigo-50"
+              borderColor="border-indigo-100"
+              onPress={() =>
+                router.push("/(venueManagement)/slotHandling/matchSessionVenuePicker")
               }
             />
 

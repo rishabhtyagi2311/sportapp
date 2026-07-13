@@ -14,7 +14,7 @@ interface SlotState {
   // Actions
   setSelectedDate: (date: string) => void
   loadSlots: (venueId: string, date: string) => Promise<void>
-  generateSlots: (venueId: string, startDate: string) => Promise<void>
+  generateSlots: (venueId: string, date: string) => Promise<number>
   updateSlotPrice: (slotId: string, price: number) => Promise<void>
 }
 
@@ -44,16 +44,23 @@ export const useSlotStore = create<SlotState>()(
         }
       },
 
-      generateSlots: async (venueId, startDate) => {
+      // Tops up the rolling window from today (not `date`, which is only the
+      // currently-viewed tab and gets re-fetched afterwards to reflect any
+      // newly created slots). Returns the number of slots actually created,
+      // since dedup means most manual top-ups within an already-covered
+      // window legitimately generate 0 new rows.
+      generateSlots: async (venueId, date) => {
         set({ isLoading: true, error: null });
         try {
-          await venueApiService.generateSlots(venueId, { startDate });
-          const response = await venueApiService.getSlots(venueId, startDate);
+          const genResponse = await venueApiService.generateSlots(venueId, {});
+          const response = await venueApiService.getSlots(venueId, date);
           if (response.success) {
             set({ slots: response.data });
           }
+          return genResponse.data?.generatedCount ?? 0;
         } catch (err: any) {
           set({ error: err.message || "Failed to generate slots" });
+          throw err;
         } finally {
           set({ isLoading: false });
         }
