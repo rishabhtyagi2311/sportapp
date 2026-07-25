@@ -1,31 +1,53 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-   
-  KeyboardAvoidingView, 
-  Platform, 
-  ScrollView, 
-  Alert 
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useKnockoutStore } from '@/store/knockoutTournamentStore';
+import { useTournamentStore } from '@/store/tournamentStore';
+import { useEventManagerStore } from '@/store/eventManagerStore';
+import { useRegistrationRequestStore } from '@/store/eventRegistrationRequestStore';
 
 export default function KnockoutStep1() {
   const router = useRouter();
-  const { startDraft, updateDraft } = useKnockoutStore();
-   
+  const { eventId } = useLocalSearchParams<{ eventId?: string }>();
+  const { startDraft, updateDraft } = useTournamentStore();
+  const { getEventById, fetchEventById } = useEventManagerStore();
+  const { getRegistrationsByEvent, fetchRegistrationsForEvent } = useRegistrationRequestStore();
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-   
+
   // Team Count State
-  const [teamCount, setTeamCount] = useState<number>(8); 
+  const [teamCount, setTeamCount] = useState<number>(8);
   const [customTeamInput, setCustomTeamInput] = useState('');
   const [isCustomMode, setIsCustomMode] = useState(false);
+
+  const sourceEvent = eventId ? getEventById(eventId) : undefined;
+  const registrations = eventId ? getRegistrationsByEvent(eventId) : [];
+  const acceptedTeamCount = eventId
+    ? registrations.filter((r) => r.status === 'accepted' && !!r.footballTeamId).length
+    : undefined;
+
+  useEffect(() => {
+    if (!eventId) return;
+    fetchEventById(eventId);
+    fetchRegistrationsForEvent(eventId);
+  }, [eventId]);
+
+  useEffect(() => {
+    if (sourceEvent && !name) {
+      setName(sourceEvent.name);
+    }
+  }, [sourceEvent]);
 
   // Helper to check for Power of 2 (required for clean brackets)
   const isPowerOfTwo = (n: number) => n > 0 && (n & (n - 1)) === 0;
@@ -45,61 +67,52 @@ export default function KnockoutStep1() {
   };
 
   const handleNext = () => {
-    // 1. Basic Validation
     if (!name.trim()) {
       Alert.alert('Required', 'Please enter a tournament name.');
       return;
     }
 
-    // 2. Team Count Validation
     if (isNaN(teamCount) || teamCount < 2) {
       Alert.alert('Invalid Teams', 'You need at least 2 teams.');
       return;
     }
 
-    // 3. Enforce Even Number (User Requirement)
-    if (teamCount % 2 !== 0) {
-      Alert.alert('Invalid Number', 'The number of teams must be an even number.');
-      return;
-    }
-
-    // 4. Enforce Power of 2 (System Requirement for Brackets)
     if (!isPowerOfTwo(teamCount)) {
       Alert.alert(
-        'Bracket Requirement', 
+        'Bracket Requirement',
         `For a balanced knockout bracket, the team count must be a power of 2 (e.g., 4, 8, 16, 32, 64).\n\n${teamCount} is not a power of 2.`
       );
       return;
     }
-     
-    // Initialize draft
-    startDraft(name);
-     
-    // Save configurations
-    updateDraft({
-      teamCount,
-      settings: {
-        venue: '', 
-        matchDuration: 90,
-        extraTime: true,
-        // Removed penalties: true
-      }
+
+    if (acceptedTeamCount !== undefined && teamCount > acceptedTeamCount) {
+      Alert.alert(
+        'Not Enough Accepted Teams',
+        `This event only has ${acceptedTeamCount} accepted team registration${acceptedTeamCount === 1 ? '' : 's'}, but you selected a ${teamCount}-team bracket. Choose a smaller bracket size.`
+      );
+      return;
+    }
+
+    startDraft('knockout');
+    updateDraft({ name: name.trim(), description: description.trim() });
+
+    router.push({
+      pathname: '/(football)/startKnockOutTournament/step2',
+      params: { targetCount: String(teamCount), ...(eventId ? { eventId } : {}) },
     });
-     
-    router.push('./step2');
   };
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
-        
+
         {/* Header */}
         <View className="px-6 py-4 bg-white border-b border-slate-200 flex-row items-center justify-between">
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="close" size={24} color="#0f172a" />
           </TouchableOpacity>
           <Text className="text-lg font-bold text-slate-900">Create Knockout Cup</Text>
-          <View className="w-6" /> 
+          <View className="w-6" />
         </View>
 
         {/* Progress Indicator */}
@@ -129,6 +142,18 @@ export default function KnockoutStep1() {
         </View>
 
         <ScrollView className="flex-1 p-6" showsVerticalScrollIndicator={false}>
+          {sourceEvent && (
+            <View className="bg-green-50 rounded-xl p-4 mb-6 flex-row items-start">
+              <Ionicons name="link" size={20} color="#16a34a" />
+              <View className="flex-1 ml-3">
+                <Text className="text-sm font-semibold text-green-900 mb-1">Linked to Event</Text>
+                <Text className="text-sm text-green-700 leading-5">
+                  "{sourceEvent.name}" has {acceptedTeamCount} accepted team{acceptedTeamCount === 1 ? '' : 's'}. Choose a bracket size at or below that count.
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Tournament Name */}
           <View className="mb-6">
             <Text className="text-sm font-semibold text-slate-700 mb-2">Tournament Name *</Text>
@@ -161,28 +186,34 @@ export default function KnockoutStep1() {
           <View className="mb-6">
             <Text className="text-sm font-semibold text-slate-700 mb-2">Number of Teams *</Text>
             <Text className="text-xs text-slate-500 mb-4">Choose a standard size or enter a custom number.</Text>
-             
+
             {/* Presets */}
             <View className="flex-row flex-wrap gap-3 mb-4">
-              {[4, 8, 16, 32].map((count) => (
+              {[4, 8, 16, 32].map((count) => {
+                const disabled = acceptedTeamCount !== undefined && count > acceptedTeamCount;
+                return (
                 <TouchableOpacity
                   key={count}
                   onPress={() => selectPreset(count)}
+                  disabled={disabled}
                   className={`flex-1 min-w-[20%] py-3 rounded-xl border items-center ${
-                    !isCustomMode && teamCount === count 
-                      ? 'border-orange-600 bg-orange-50' 
+                    disabled
+                      ? 'border-slate-100 bg-slate-50 opacity-50'
+                      : !isCustomMode && teamCount === count
+                      ? 'border-orange-600 bg-orange-50'
                       : 'border-slate-200 bg-white'
                   }`}
                 >
-                  <Text className={`font-bold ${!isCustomMode && teamCount === count ? 'text-orange-700' : 'text-slate-700'}`}>
+                  <Text className={`font-bold ${!isCustomMode && teamCount === count && !disabled ? 'text-orange-700' : 'text-slate-700'}`}>
                     {count}
                   </Text>
                 </TouchableOpacity>
-              ))}
+                );
+              })}
             </View>
 
             {/* Custom Input Option */}
-            <TouchableOpacity 
+            <TouchableOpacity
               activeOpacity={1}
               onPress={() => setIsCustomMode(true)}
               className={`flex-row items-center border rounded-xl px-4 py-3 ${isCustomMode ? 'border-orange-600 bg-orange-50' : 'border-slate-200 bg-white'}`}
@@ -204,7 +235,7 @@ export default function KnockoutStep1() {
                 />
               )}
             </TouchableOpacity>
-             
+
             {isCustomMode && (
               <Text className="text-xs text-orange-600 mt-2 ml-2">
                 * Must be a power of 2 (e.g. 64, 128)

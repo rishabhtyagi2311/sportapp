@@ -158,14 +158,43 @@ class AcademyController {
         try {
             const partnerId = req.partner?.id;
             const { academyId } = req.params;
+            const { status } = req.query;
             if (!partnerId) {
                 return res.status(401).json({ success: false, message: 'Unauthorized' });
             }
-            const students = await academy_1.AcademyService.getStudentsByAcademy(academyId, partnerId);
+            const students = await academy_1.AcademyService.getStudentsByAcademy(academyId, partnerId, status);
             return res.status(200).json({ success: true, data: students });
         }
         catch (error) {
             return res.status(500).json({ success: false, message: error.message || 'Error fetching students' });
+        }
+    }
+    static async approveEnrollment(req, res) {
+        try {
+            const partnerId = req.partner?.id;
+            const { academyId, studentId } = req.params;
+            if (!partnerId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+            const student = await academy_1.AcademyService.approveEnrollment(academyId, partnerId, studentId);
+            return res.status(200).json({ success: true, message: 'Enrollment approved', data: student });
+        }
+        catch (error) {
+            return res.status(400).json({ success: false, message: error.message || 'Error approving enrollment' });
+        }
+    }
+    static async rejectEnrollment(req, res) {
+        try {
+            const partnerId = req.partner?.id;
+            const { academyId, studentId } = req.params;
+            if (!partnerId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+            const student = await academy_1.AcademyService.rejectEnrollment(academyId, partnerId, studentId);
+            return res.status(200).json({ success: true, message: 'Enrollment rejected', data: student });
+        }
+        catch (error) {
+            return res.status(400).json({ success: false, message: error.message || 'Error rejecting enrollment' });
         }
     }
     static async updateStudent(req, res) {
@@ -332,6 +361,112 @@ class AcademyController {
         }
         catch (error) {
             return res.status(500).json({ success: false, message: error.message || 'Error fetching certificates' });
+        }
+    }
+    /* -------------------------------------------------------------- */
+    /* ANNOUNCEMENTS                                                   */
+    /* -------------------------------------------------------------- */
+    static async createAnnouncement(req, res) {
+        try {
+            const partnerId = req.partner?.id;
+            const { academyId } = req.params;
+            if (!partnerId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+            const parsed = academy_2.createAnnouncementSchema.safeParse(req.body);
+            if (!parsed.success) {
+                return res.status(400).json({ success: false, message: 'Invalid announcement data', error: parsed.error.issues });
+            }
+            const announcement = await academy_1.AcademyService.createAnnouncement(academyId, partnerId, parsed.data.content);
+            return res.status(201).json({ success: true, message: 'Announcement posted successfully', data: announcement });
+        }
+        catch (error) {
+            return res.status(500).json({ success: false, message: error.message || 'Error posting announcement' });
+        }
+    }
+    static async getAnnouncements(req, res) {
+        try {
+            const partnerId = req.partner?.id;
+            const { academyId } = req.params;
+            if (!partnerId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+            const announcements = await academy_1.AcademyService.getAnnouncementsByAcademy(academyId, partnerId);
+            return res.status(200).json({ success: true, data: announcements });
+        }
+        catch (error) {
+            return res.status(500).json({ success: false, message: error.message || 'Error fetching announcements' });
+        }
+    }
+    static async removeAnnouncement(req, res) {
+        try {
+            const partnerId = req.partner?.id;
+            const { academyId, announcementId } = req.params;
+            if (!partnerId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+            await academy_1.AcademyService.removeAnnouncement(academyId, partnerId, announcementId);
+            return res.status(200).json({ success: true, message: 'Announcement removed successfully' });
+        }
+        catch (error) {
+            return res.status(500).json({ success: false, message: error.message || 'Error removing announcement' });
+        }
+    }
+    static async getDemoBookings(req, res) {
+        try {
+            const partnerId = req.partner?.id;
+            const { academyId } = req.params;
+            const { status } = req.query;
+            if (!partnerId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+            const bookings = await academy_1.AcademyService.getDemoBookingsForAcademy(academyId, partnerId, status);
+            return res.status(200).json({ success: true, data: bookings });
+        }
+        catch (error) {
+            return res.status(500).json({ success: false, message: error.message || 'Error fetching demo bookings' });
+        }
+    }
+    static async confirmDemoBooking(req, res) {
+        try {
+            const partnerId = req.partner?.id;
+            const { bookingId } = req.params;
+            if (!partnerId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+            const booking = await academy_1.AcademyService.confirmDemoBooking(bookingId, partnerId);
+            return res.status(200).json({ success: true, message: 'Demo booking confirmed', data: booking });
+        }
+        catch (error) {
+            return res.status(400).json({ success: false, message: error.message || 'Error confirming demo booking' });
+        }
+    }
+    static async completeDemoBooking(req, res) {
+        try {
+            const partnerId = req.partner?.id;
+            const { bookingId } = req.params;
+            if (!partnerId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+            const booking = await academy_1.AcademyService.completeDemoBooking(bookingId, partnerId);
+            return res.status(200).json({ success: true, message: 'Demo booking marked completed', data: booking });
+        }
+        catch (error) {
+            return res.status(400).json({ success: false, message: error.message || 'Error completing demo booking' });
+        }
+    }
+    static async cancelDemoBooking(req, res) {
+        try {
+            const partnerId = req.partner?.id;
+            const { bookingId } = req.params;
+            if (!partnerId) {
+                return res.status(401).json({ success: false, message: 'Unauthorized' });
+            }
+            const booking = await academy_1.AcademyService.cancelDemoBooking(bookingId, partnerId);
+            return res.status(200).json({ success: true, message: 'Demo booking cancelled', data: booking });
+        }
+        catch (error) {
+            return res.status(400).json({ success: false, message: error.message || 'Error cancelling demo booking' });
         }
     }
 }

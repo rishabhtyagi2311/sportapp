@@ -1,5 +1,5 @@
 // app/(academy)/academyMainScreen.tsx
-import React, { useRef, useMemo } from "react";
+import React, { useRef, useMemo, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   View,
@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { usechildStore } from "@/store/academyChildProfile";
 
 const { width } = Dimensions.get("window");
 
@@ -26,6 +27,11 @@ const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as any;
 export default function AcademyMainScreen() {
   const scrollX = useRef(new Animated.Value(0)).current;
   const mainBanner = require("@/assets/images/heroBannerAcademy.png");
+  const { hasProfiles, fetchMyChildProfiles } = usechildStore();
+
+  useEffect(() => {
+    fetchMyChildProfiles();
+  }, []);
 
 
   const carouselData = [
@@ -200,7 +206,7 @@ export default function AcademyMainScreen() {
     if (action === "Explore") {
       router.push("/(academy)/browseAcademy");
     } else if (action === "Manage") {
-      router.push("/manageProfile");
+      router.push(hasProfiles() ? "/(academy)/manageProfile/profile" : "/(academy)/registerChildProfile");
     }
   };
 
@@ -271,7 +277,7 @@ export default function AcademyMainScreen() {
     <SafeAreaView className="flex-1 bg-slate-900">
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: 110 }}
       >
         {/* CAROUSEL SECTION */}
         <View className="mt-4 mb-2">

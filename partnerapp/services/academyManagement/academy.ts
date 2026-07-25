@@ -73,8 +73,10 @@ export const academyApiService = {
     return response.data;
   },
 
-  getStudents: async (academyId: string) => {
-    const response = await apiClient.get(`/partner/academies/${academyId}/students`);
+  getStudents: async (academyId: string, status?: string) => {
+    const response = await apiClient.get(`/partner/academies/${academyId}/students`, {
+      params: status ? { status } : undefined,
+    });
     return response.data;
   },
 
@@ -85,6 +87,16 @@ export const academyApiService = {
 
   removeStudent: async (academyId: string, studentId: string) => {
     const response = await apiClient.delete(`/partner/academies/${academyId}/students/${studentId}`);
+    return response.data;
+  },
+
+  approveEnrollment: async (academyId: string, studentId: string) => {
+    const response = await apiClient.patch(`/partner/academies/${academyId}/students/${studentId}/approve`);
+    return response.data;
+  },
+
+  rejectEnrollment: async (academyId: string, studentId: string) => {
+    const response = await apiClient.patch(`/partner/academies/${academyId}/students/${studentId}/reject`);
     return response.data;
   },
 
@@ -144,6 +156,29 @@ export const academyApiService = {
 
   removeAnnouncement: async (academyId: string, announcementId: string) => {
     const response = await apiClient.delete(`/partner/academies/${academyId}/announcements/${announcementId}`);
+    return response.data;
+  },
+
+  // --- Demo bookings ---
+  getDemoBookings: async (academyId: string, status?: string) => {
+    const response = await apiClient.get(`/partner/academies/${academyId}/demo-bookings`, {
+      params: status ? { status } : undefined,
+    });
+    return response.data;
+  },
+
+  confirmDemoBooking: async (bookingId: string) => {
+    const response = await apiClient.patch(`/partner/demo-bookings/${bookingId}/confirm`);
+    return response.data;
+  },
+
+  completeDemoBooking: async (bookingId: string) => {
+    const response = await apiClient.patch(`/partner/demo-bookings/${bookingId}/complete`);
+    return response.data;
+  },
+
+  cancelDemoBooking: async (bookingId: string) => {
+    const response = await apiClient.patch(`/partner/demo-bookings/${bookingId}/cancel`);
     return response.data;
   },
 };

@@ -1,18 +1,50 @@
-import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-} from "react-native";
+import React, { useState } from "react";
+import { View, Text, TouchableOpacity, ScrollView, StatusBar, Alert, ActivityIndicator } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { useEnrollmentStore } from "@/store/academyEnrollmentStore";
 
 export default function AcademyDashboard() {
   const router = useRouter();
-  const { childId, academyId, academyName } = useLocalSearchParams();
+  const { childId, studentId, academyId, academyName, status } = useLocalSearchParams<{
+    childId: string;
+    studentId: string;
+    academyId: string;
+    academyName: string;
+    status: string;
+  }>();
+  const isPending = status === "pending";
+  const withdrawEnrollment = useEnrollmentStore((state) => state.withdrawEnrollment);
+  const [withdrawing, setWithdrawing] = useState(false);
+
+  const handleCancelAdmission = () => {
+    Alert.alert(
+      "Cancel Admission",
+      `Withdraw this child's enrollment from ${academyName}? This cannot be undone.`,
+      [
+        { text: "Back", style: "cancel" },
+        {
+          text: "Withdraw",
+          style: "destructive",
+          onPress: async () => {
+            setWithdrawing(true);
+            try {
+              await withdrawEnrollment(studentId);
+              router.replace({
+                pathname: "/(academy)/manageProfile/academies",
+                params: { childId },
+              });
+            } catch (err: any) {
+              Alert.alert("Error", err.message || "Could not withdraw enrollment");
+            } finally {
+              setWithdrawing(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const menuItems = [
     {
@@ -81,7 +113,9 @@ export default function AcademyDashboard() {
         <View className="flex-row px-6 mb-8 justify-between">
           <View className="bg-slate-50 rounded-2xl p-4 flex-1 mr-2 border border-slate-100">
              <Text className="text-slate-400 text-[10px] font-bold uppercase">Status</Text>
-             <Text className="text-emerald-600 font-bold text-base">Active</Text>
+             <Text className={`font-bold text-base ${isPending ? 'text-amber-600' : 'text-emerald-600'}`}>
+               {isPending ? 'Awaiting Approval' : 'Active'}
+             </Text>
           </View>
           <View className="bg-slate-50 rounded-2xl p-4 flex-1 ml-2 border border-slate-100">
              <Text className="text-slate-400 text-[10px] font-bold uppercase">Enrollment ID</Text>
@@ -89,6 +123,34 @@ export default function AcademyDashboard() {
           </View>
         </View>
 
+        {isPending ? (
+          <View className="px-6">
+            <View className="bg-amber-50 border border-amber-100 rounded-3xl p-6 items-center mb-4">
+              <View className="bg-amber-500 h-14 w-14 rounded-2xl items-center justify-center mb-4">
+                <Ionicons name="time-outline" size={28} color="white" />
+              </View>
+              <Text className="text-slate-900 font-bold text-lg text-center mb-2">
+                Enrollment Pending Approval
+              </Text>
+              <Text className="text-slate-500 text-center text-sm leading-6">
+                The academy hasn't confirmed this enrollment yet. Attendance, certificates, and announcements
+                will be available here once they approve it.
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleCancelAdmission}
+              disabled={withdrawing}
+              className="flex-row items-center justify-center bg-red-50 p-4 rounded-2xl border border-red-100"
+            >
+              {withdrawing ? (
+                <ActivityIndicator size="small" color="#ef4444" />
+              ) : (
+                <Text className="text-red-600 font-bold text-base">Cancel Request</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+        <>
         {/* Dashboard Grid */}
         <View className="px-6 flex-row flex-wrap justify-between">
           {menuItems.map((item, index) => (
@@ -96,7 +158,7 @@ export default function AcademyDashboard() {
               key={index}
               onPress={() => router.push({
                 pathname: item.path,
-                params: { childId, academyId, academyName }
+                params: { childId, studentId, academyId, academyName }
               })}
               activeOpacity={0.8}
               className={`w-[48%] mb-4 p-5 rounded-[24px] bg-white border border-slate-100 shadow-xl ${item.shadow}`}
@@ -118,7 +180,8 @@ export default function AcademyDashboard() {
         <View className="px-6 mt-8 mb-10">
           <Text className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-4 ml-1">Danger Zone</Text>
           <TouchableOpacity
-            onPress={() => {/* Add Cancel Admission Logic */}}
+            onPress={handleCancelAdmission}
+            disabled={withdrawing}
             className="flex-row items-center justify-between bg-red-50 p-5 rounded-3xl border border-red-100"
           >
             <View className="flex-row items-center">
@@ -130,9 +193,15 @@ export default function AcademyDashboard() {
                 <Text className="text-red-400 text-xs">This action is permanent</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#ef4444" />
+            {withdrawing ? (
+              <ActivityIndicator size="small" color="#ef4444" />
+            ) : (
+              <Ionicons name="chevron-forward" size={20} color="#ef4444" />
+            )}
           </TouchableOpacity>
         </View>
+        </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

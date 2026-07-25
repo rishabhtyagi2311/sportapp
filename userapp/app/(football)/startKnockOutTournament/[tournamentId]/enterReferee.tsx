@@ -1,131 +1,227 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, SafeAreaView, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useKnockoutStore } from '@/store/knockoutTournamentStore';
-import { useFootballStore } from '@/store/footballTeamStore';
+import { useTournamentStore } from '@/store/tournamentStore';
+import { useMatchCreationStore } from '@/store/footballMatchCreationStore';
+import { useMatchExecutionStore } from '@/store/footballMatchEventStore';
 
-export default function KnockoutSelectOfficialsScreen() {
+export default function KnockoutEnterRefereesScreen() {
   const router = useRouter();
   const { tournamentId, fixtureId } = useLocalSearchParams<{ tournamentId: string; fixtureId: string }>();
-  
-  const { activeMatch, startMatch, updateDraft } = useKnockoutStore(); // updateDraft is not needed here, we need updateMatch details
-  // Note: We need actions to set captains/referees in store. 
-  // Assuming these exist or we just pass them when starting.
-  // Ideally, useKnockoutStore should have `setMatchCaptains` and `setMatchReferees`.
-  // I will simulate saving them via local state passed to a final commit if store doesn't persist them yet.
-  
-  const { players: allPlayers } = useFootballStore();
 
-  const [homeCaptainId, setHomeCaptainId] = useState<string>('');
-  const [awayCaptainId, setAwayCaptainId] = useState<string>('');
-  const [refereeName, setRefereeName] = useState('');
+  const { getTournament, startFixtureMatch } = useTournamentStore();
+  const { matchData } = useMatchCreationStore();
+  const { loadActiveMatch } = useMatchExecutionStore();
 
-  if (!activeMatch) return null;
+  const tournament = getTournament(tournamentId);
+  const fixture = tournament?.fixtures.find((f) => f.id === fixtureId);
 
-  // Resolve player objects for dropdown/selection
-  const homeStarters = activeMatch.homeTeamPlayers.map(id => allPlayers.find(p => p.id === id)).filter(Boolean);
-  const awayStarters = activeMatch.awayTeamPlayers.map(id => allPlayers.find(p => p.id === id)).filter(Boolean);
+  const [referees, setReferees] = useState<string[]>(['']);
+  const [duration, setDuration] = useState('90');
+  const [isStarting, setIsStarting] = useState(false);
 
-  const handleStartMatch = () => {
-    if (!homeCaptainId || !awayCaptainId) {
-      Alert.alert('Missing Captains', 'Please select a captain for both teams.');
-      return;
-    }
-    if (!refereeName.trim()) {
-      Alert.alert('Missing Referee', 'Please enter the main referee name.');
-      return;
-    }
-
-    // Start the match in the store
-    startMatch(); 
-    
-    // Redirect to Scoring Dashboard
-    // Important: The `KnockoutMatchScoring` screen we built previously uses this data.
-    router.replace({
-      pathname: `/(football)/startKnockOutTournament/${tournamentId}/scoringScreen`,
-      params: { fixtureId }
+  const updateReferee = (index: number, value: string) => {
+    setReferees((prev) => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
     });
   };
 
+  const addRefereeField = () => setReferees((prev) => [...prev, '']);
+
+  const handleStartMatch = async () => {
+    const filledReferees = referees.map((r) => r.trim()).filter(Boolean);
+
+    if (filledReferees.length === 0) {
+      Alert.alert('Incomplete', 'Please enter at least one referee name');
+      return;
+    }
+
+    if (!matchData.myTeam.captain || !matchData.opponentTeam.captain) {
+      Alert.alert('Setup Incomplete', 'Captains not selected. Please go back and complete setup.');
+      return;
+    }
+
+    if (matchData.myTeam.selectedPlayers.length === 0 || matchData.opponentTeam.selectedPlayers.length === 0) {
+      Alert.alert('Setup Incomplete', 'Players not selected. Please go back and complete setup.');
+      return;
+    }
+
+    const durationNum = parseInt(duration, 10);
+    if (isNaN(durationNum) || durationNum < 1) {
+      Alert.alert('Error', 'Please enter a valid match duration.');
+      return;
+    }
+
+    setIsStarting(true);
+    try {
+      const match = await startFixtureMatch(tournamentId, fixtureId, {
+        duration: durationNum,
+        homeRoster: {
+          startingXI: matchData.myTeam.selectedPlayers,
+          bench: matchData.myTeam.substitutes,
+          captainId: matchData.myTeam.captain,
+          subsUsed: 0,
+        },
+        awayRoster: {
+          startingXI: matchData.opponentTeam.selectedPlayers,
+          bench: matchData.opponentTeam.substitutes,
+          captainId: matchData.opponentTeam.captain,
+          subsUsed: 0,
+        },
+        referees: filledReferees,
+      });
+
+      loadActiveMatch(match, {
+        homeOnPitch: [...matchData.myTeam.selectedPlayers],
+        homeBench: [...matchData.myTeam.substitutes],
+        awayOnPitch: [...matchData.opponentTeam.selectedPlayers],
+        awayBench: [...matchData.opponentTeam.substitutes],
+        homeSubsUsed: 0,
+        awaySubsUsed: 0,
+      });
+
+      router.push({
+        pathname: '/(football)/startMatch/scoringScreen',
+        params: { tournamentId, format: 'knockout' },
+      });
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Could not start match');
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  if (!fixture) {
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+        <View className="items-center px-6">
+          <Text className="text-lg font-bold text-slate-900 mb-2">No Active Match Setup</Text>
+          <TouchableOpacity
+            onPress={() => router.push({ pathname: '/(football)/startKnockOutTournament/[tournamentId]/dashboard', params: { tournamentId } })}
+            className="bg-orange-600 px-6 py-3 rounded-xl mt-4"
+          >
+            <Text className="text-white font-semibold">Go to Tournament</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView className="flex-1 bg-slate-50">
-      <View className="bg-white px-4 py-4 border-b border-slate-200 flex-row items-center">
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#1e293b" />
-        </TouchableOpacity>
-        <Text className="text-lg font-bold text-slate-900 ml-4">Officials & Captains</Text>
-      </View>
-
-      <ScrollView className="flex-1 px-6 pt-6">
-        
-        {/* Home Captain */}
-        <Text className="text-sm font-bold text-slate-500 mb-3 uppercase">
-          Captain: {activeMatch.homeTeamName}
-        </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-8">
-          <View className="flex-row gap-3">
-            {homeStarters.map(p => (
-              <TouchableOpacity
-                key={p?.id}
-                onPress={() => setHomeCaptainId(p?.id || '')}
-                className={`p-3 rounded-xl border items-center w-28 ${
-                  homeCaptainId === p?.id ? 'bg-green-50 border-green-500' : 'bg-white border-slate-200'
-                }`}
-              >
-                <Ionicons name="shield" size={20} color={homeCaptainId === p?.id ? '#16a34a' : '#94a3b8'} />
-                <Text numberOfLines={1} className="font-bold text-slate-900 mt-2">{p?.name}</Text>
-              </TouchableOpacity>
-            ))}
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+      <SafeAreaView className="flex-1 bg-slate-50">
+        {/* Header */}
+        <View className="bg-white px-4 py-4 border-b border-slate-200">
+          <View className="flex-row items-center justify-between mb-4">
+            <TouchableOpacity onPress={() => router.back()} className="p-2">
+              <Ionicons name="arrow-back" size={24} color="#1e293b" />
+            </TouchableOpacity>
+            <Text className="text-lg font-bold text-slate-900">Enter Referees</Text>
+            <View className="w-10" />
           </View>
-        </ScrollView>
 
-        {/* Away Captain */}
-        <Text className="text-sm font-bold text-slate-500 mb-3 uppercase">
-          Captain: {activeMatch.awayTeamName}
-        </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-8">
-          <View className="flex-row gap-3">
-            {awayStarters.map(p => (
-              <TouchableOpacity
-                key={p?.id}
-                onPress={() => setAwayCaptainId(p?.id || '')}
-                className={`p-3 rounded-xl border items-center w-28 ${
-                  awayCaptainId === p?.id ? 'bg-red-50 border-red-500' : 'bg-white border-slate-200'
-                }`}
-              >
-                <Ionicons name="shield-outline" size={20} color={awayCaptainId === p?.id ? '#ef4444' : '#94a3b8'} />
-                <Text numberOfLines={1} className="font-bold text-slate-900 mt-2">{p?.name}</Text>
-              </TouchableOpacity>
-            ))}
+          {/* Match Info */}
+          <View className="bg-orange-600 rounded-xl p-4">
+            <Text className="text-white text-sm mb-2">Match Ready to Start</Text>
+            <View className="flex-row items-center justify-between">
+              <Text className="text-white text-base font-bold" numberOfLines={1}>{matchData.myTeam.teamName}</Text>
+              <Text className="text-white text-lg font-bold">VS</Text>
+              <Text className="text-white text-base font-bold" numberOfLines={1}>{matchData.opponentTeam.teamName}</Text>
+            </View>
           </View>
-        </ScrollView>
-
-        {/* Referee */}
-        <Text className="text-sm font-bold text-slate-500 mb-3 uppercase">Match Official</Text>
-        <View className="bg-white p-4 rounded-xl border border-slate-200 mb-8">
-          <Text className="text-slate-900 font-semibold mb-2">Main Referee Name</Text>
-          <TextInput
-            value={refereeName}
-            onChangeText={setRefereeName}
-            placeholder="Enter Name"
-            className="bg-slate-50 border border-slate-200 rounded-lg p-3"
-          />
         </View>
 
-      </ScrollView>
-
-      <View className="p-4 bg-white border-t border-slate-200">
-        <TouchableOpacity 
-          onPress={handleStartMatch}
-          className="bg-green-600 py-4 rounded-xl items-center shadow-lg shadow-green-200"
-        >
-          <View className="flex-row items-center">
-          
-            <Text className="text-white font-bold text-lg ml-2">Kick Off Match</Text>
+        <ScrollView className="flex-1 px-4 pt-6" showsVerticalScrollIndicator={false}>
+          <View className="mb-6">
+            {referees.map((name, index) => (
+              <View key={index} className="mb-4">
+                <Text className="text-sm font-semibold text-slate-700 mb-2">
+                  {index === 0 ? 'Main Referee' : `Assistant Referee ${index}`}
+                </Text>
+                <TextInput
+                  value={name}
+                  onChangeText={(value) => updateReferee(index, value)}
+                  placeholder="Enter referee name"
+                  className="bg-white border border-slate-200 rounded-xl px-4 py-3 text-base text-slate-900"
+                  placeholderTextColor="#94a3b8"
+                  autoCapitalize="words"
+                />
+              </View>
+            ))}
+            <TouchableOpacity onPress={addRefereeField} className="flex-row items-center">
+              <Ionicons name="add-circle-outline" size={18} color="#ea580c" />
+              <Text className="text-orange-600 font-semibold ml-2 text-sm">Add another referee</Text>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+
+          {/* Match Duration */}
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-slate-700 mb-2">Match Duration (minutes)</Text>
+            <TextInput
+              value={duration}
+              onChangeText={setDuration}
+              keyboardType="numeric"
+              className="bg-white border border-slate-200 rounded-xl px-4 py-3 text-base text-slate-900"
+              placeholderTextColor="#94a3b8"
+            />
+          </View>
+
+          {/* Setup Summary Display */}
+          <View className="bg-slate-100 rounded-xl p-4 mb-6">
+            <Text className="text-sm font-bold text-slate-700 mb-3">Match Setup Summary</Text>
+
+            <View className="flex-row items-center mb-2">
+              <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+              <Text className="text-sm text-slate-600 ml-2">
+                {matchData.myTeam.teamName}: {matchData.myTeam.selectedPlayers.length} Starters
+                {matchData.myTeam.substitutes.length > 0 ? `, ${matchData.myTeam.substitutes.length} Subs` : ''}
+              </Text>
+            </View>
+
+            <View className="flex-row items-center mb-2">
+              <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+              <Text className="text-sm text-slate-600 ml-2">
+                {matchData.opponentTeam.teamName}: {matchData.opponentTeam.selectedPlayers.length} Starters
+                {matchData.opponentTeam.substitutes.length > 0 ? `, ${matchData.opponentTeam.substitutes.length} Subs` : ''}
+              </Text>
+            </View>
+          </View>
+
+          <View className="bg-blue-50 rounded-xl p-4 mb-6 flex-row">
+            <Ionicons name="information-circle" size={20} color="#2563eb" />
+            <View className="flex-1 ml-3">
+              <Text className="text-sm font-semibold text-blue-900 mb-1">Knockout Rules</Text>
+              <Text className="text-sm text-blue-700 leading-5">
+                If the match ends in a draw, you will be asked to enter penalty shootout scores to determine the winner.
+              </Text>
+            </View>
+          </View>
+          <View className="h-24" />
+        </ScrollView>
+
+        <View className="bg-white px-4 py-4 border-t border-slate-200">
+          <TouchableOpacity
+            onPress={handleStartMatch}
+            disabled={isStarting}
+            className="rounded-xl py-4 items-center bg-green-600"
+          >
+            <View className="flex-row items-center">
+              {isStarting ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <>
+                  <Ionicons name="play-circle" size={20} color="white" />
+                  <Text className="text-white font-bold text-base ml-2">Start Match</Text>
+                </>
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }

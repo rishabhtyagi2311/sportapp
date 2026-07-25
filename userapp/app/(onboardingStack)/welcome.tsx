@@ -1,15 +1,6 @@
 import React, { FC, useEffect } from 'react';
-import {
-  ScrollView,
-  View,
-  Text,
-  Pressable,
-  SafeAreaView,
-  Dimensions,
-  Image,
-  StyleSheet,
-  Platform,
-} from 'react-native';
+import { ScrollView, View, Text, Pressable, Dimensions, Image, StyleSheet } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -90,6 +81,7 @@ const FeatureCard: FC<{ icon: string, title: string, desc: string, color: string
 
 const WelcomeScreen: FC = () => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -106,8 +98,8 @@ const WelcomeScreen: FC = () => {
         <View className="mt-8 bg-blue-600 rounded-[40px] p-8 items-center shadow-2xl">
           <Text className="text-white text-2xl font-bold text-center mb-2">Ready to Play?</Text>
           <Text className="text-blue-100 text-center mb-6">Join thousands of athletes and owners today.</Text>
-          <Pressable 
-            onPress={() => router.push('/(homeScreenTabs)')}
+          <Pressable
+            onPress={() => router.push('/(onboardingStack)/signUp')}
             className="bg-white w-full py-5 rounded-2xl items-center"
           >
             <Text className="text-blue-600 font-black text-lg">CREATE ACCOUNT</Text>
@@ -164,16 +156,22 @@ const WelcomeScreen: FC = () => {
       </ScrollView>
 
       {/* Responsive Bottom Navigation */}
-      <View 
-        style={{ paddingBottom: Platform.OS === 'ios' ? 40 : 60 }}
+      <View
+        style={{ paddingBottom: insets.bottom + 16 }}
         className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-8 pt-4"
       >
         <Pressable
-          onPress={() => router.push('/(onboardingStack)/basicInfoRegisterOne')}
+          onPress={() => router.push('/(onboardingStack)/login')}
           className="flex-row items-center justify-center py-4 bg-slate-900 rounded-2xl"
         >
           <MaterialCommunityIcons name="login" size={20} color="white" />
           <Text className="text-white font-bold ml-3 text-lg">Sign In to Dashboard</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.push('/(onboardingStack)/signUp')}
+          className="items-center py-4"
+        >
+          <Text className="text-slate-700 font-semibold underline">New here? Create an account</Text>
         </Pressable>
       </View>
     </SafeAreaView>

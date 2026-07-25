@@ -1,23 +1,21 @@
-import React from "react";
-import {
-  SafeAreaView,
-  View,
-  Text,
-  TouchableOpacity,
-  FlatList,
-  ImageBackground,
-  StatusBar,
-} from "react-native";
+import React, { useEffect } from "react";
+import { View, Text, TouchableOpacity, FlatList, ImageBackground, StatusBar } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import { useAnnouncementStore, Announcement } from "@/store/announcementStore";
+import { useAnnouncementStore } from "@/store/announcementStore";
+import { Announcement } from "@/types/academy";
 
 const backgroundImage = require("@/assets/images/bgEnhancedCoverImage.png");
 
 export default function UserAnnouncementsScreen() {
-  // We only need 'posts' here. No 'addPost' since users can't write.
-  const { posts } = useAnnouncementStore();
+  const { academyId } = useLocalSearchParams<{ academyId: string }>();
+  const { posts, fetchAnnouncementsForAcademy } = useAnnouncementStore();
+
+  useEffect(() => {
+    if (academyId) fetchAnnouncementsForAcademy(academyId);
+  }, [academyId]);
 
   const formatDate = (isoString: string) => {
     const date = new Date(isoString);

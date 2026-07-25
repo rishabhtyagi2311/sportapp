@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,18 @@ import {
   Dimensions,
   StatusBar,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFootballStore } from '@/store/footballTeamStore';
+import { useMatchExecutionStore } from '@/store/footballMatchEventStore';
+import { useUserBookingStore } from '@/store/bookingStore';
 
 const { width } = Dimensions.get('window');
 
-// Using 'as const' ensures TypeScript treats these as fixed tuples, 
+// Using 'as const' ensures TypeScript treats these as fixed tuples,
 // fixing the "No overload matches this call" error.
 const FEATURES = [
   {
@@ -27,12 +31,12 @@ const FEATURES = [
     route: '/(football)/landingScreen/matches',
   },
   {
-    id: 'possession',
-    title: 'Possession',
-    desc: 'Live toggle system.',
-    icon: 'analytics',
+    id: 'tournaments',
+    title: 'Tournaments',
+    desc: 'Leagues & knockouts.',
+    icon: 'trophy',
     colors: ['#3b82f6', '#2563eb'] as const,
-    route: '/(football)/scoring',
+    route: '/(football)/landingScreen/tournament',
   },
   {
     id: 'roster',
@@ -40,7 +44,7 @@ const FEATURES = [
     desc: 'Handle substitutions.',
     icon: 'people',
     colors: ['#6366f1', '#4f46e5'] as const,
-    route: '/(football)/teams',
+    route: '/(football)/landingScreen/teams',
   },
   {
     id: 'stats',
@@ -48,18 +52,36 @@ const FEATURES = [
     desc: 'Automated match summaries.',
     icon: 'flash',
     colors: ['#f59e0b', '#d97706'] as const,
-    route: '/(football)/history',
+    route: '/(football)/playerStats',
   },
 ];
 
 export default function HomeScreen() {
   const router = useRouter();
 
+  const { myTeams, fetchMyTeams } = useFootballStore();
+  const { myMatches, fetchMyMatches } = useMatchExecutionStore();
+  const { bookings, fetchMyBookings } = useUserBookingStore();
+
+  useEffect(() => {
+    fetchMyTeams().catch(() => {});
+    fetchMyMatches().catch(() => {});
+    fetchMyBookings().catch(() => {});
+  }, []);
+
+  const upcomingBookings = bookings.filter((b) => b.status !== 'cancelled' && new Date(b.date) >= new Date()).length;
+
+  const insights = [
+    { label: 'My Matches', val: String(myMatches.length), icon: 'football-outline' },
+    { label: 'My Teams', val: String(myTeams.length), icon: 'people-outline' },
+    { label: 'Upcoming Bookings', val: String(upcomingBookings), icon: 'calendar-outline' },
+  ];
+
   return (
     <View className="flex-1 bg-[#F8FAFC]">
       <StatusBar barStyle="light-content" />
       
-      <ScrollView showsVerticalScrollIndicator={false} bounces={true}>
+      <ScrollView showsVerticalScrollIndicator={false} bounces={true} contentContainerStyle={{ paddingBottom: 110 }}>
         {/* --- HERO SECTION --- */}
         <ImageBackground
           source={{ uri: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80' }}
@@ -105,13 +127,9 @@ export default function HomeScreen() {
 
         {/* --- QUICK INSIGHTS TICKER --- */}
         <View className="mt-8 px-6">
-           <Text className="text-slate-900 font-black text-lg uppercase italic mb-4 tracking-tight">Live Insights</Text>
+           <Text className="text-slate-900 font-black text-lg uppercase italic mb-4 tracking-tight">Your Activity</Text>
            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-              {[
-                { label: 'Active Matches', val: '24', icon: 'timer-outline' },
-                { label: 'Top Scorers', val: '182', icon: 'podium-outline' },
-                { label: 'Venues Busy', val: '85%', icon: 'business-outline' }
-              ].map((item, i) => (
+              {insights.map((item, i) => (
                 <View key={i} className="bg-white px-6 py-4 rounded-3xl mr-3 border border-slate-100 shadow-sm flex-row items-center">
                   <View className="mr-4 bg-slate-50 p-2 rounded-xl">
                     <Ionicons name={item.icon as any} size={20} color="#2563eb" />
@@ -139,7 +157,11 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={item.id}
                 activeOpacity={0.85}
-                onPress={() => router.push(item.route as any)}
+                onPress={() =>
+                  item.route
+                    ? router.push(item.route as any)
+                    : Alert.alert('Coming Soon', `${item.title} will be available soon.`)
+                }
                 style={{ width: width * 0.435 }}
                 className="bg-white p-6 rounded-[35px] mb-5 border border-slate-50 shadow-sm"
               >

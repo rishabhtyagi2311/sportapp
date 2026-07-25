@@ -5,6 +5,7 @@ import { academyApiService, CreateAcademyInput } from '@/services/academyManagem
 interface AcademyStore {
   academies: Academy[];
   students: Student[];
+  pendingEnrollments: Student[];
   attendance: Attendance[];
   certificates: Certificate[];
   photos: AcademyPhoto[];
@@ -30,6 +31,11 @@ interface AcademyStore {
   removeStudent: (academyId: string, studentId: string) => Promise<void>;
   getStudentsByAcademy: (academyId: string) => Student[];
 
+  // Pending enrollment approval (API-backed, kept separate from the main roster)
+  fetchPendingEnrollments: (academyId: string) => Promise<void>;
+  approveEnrollment: (academyId: string, studentId: string) => Promise<void>;
+  rejectEnrollment: (academyId: string, studentId: string) => Promise<void>;
+
   // Attendance actions (API-backed)
   fetchAcademyAttendance: (academyId: string, date?: string) => Promise<void>;
   fetchStudentAttendance: (studentId: string) => Promise<void>;
@@ -51,6 +57,7 @@ interface AcademyStore {
 export const useAcademyStore = create<AcademyStore>((set, get) => ({
   academies: [],
   students: [],
+  pendingEnrollments: [],
   attendance: [],
   certificates: [],
   photos: [],
@@ -166,6 +173,40 @@ export const useAcademyStore = create<AcademyStore>((set, get) => ({
     } catch (err: any) {
       set({ error: err.response?.data?.message || 'Failed to load students', isLoading: false });
     }
+  },
+
+  // --- Pending Enrollment Implementation ---
+  fetchPendingEnrollments: async (academyId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.getStudents(academyId, 'pending');
+      if (response.success) {
+        set({ pendingEnrollments: response.data, isLoading: false });
+      }
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || 'Failed to load enrollment requests', isLoading: false });
+    }
+  },
+
+  approveEnrollment: async (academyId, studentId) => {
+    const response = await academyApiService.approveEnrollment(academyId, studentId);
+    if (!response.success) {
+      throw new Error(response.message || 'Could not approve enrollment');
+    }
+    set((state) => ({
+      pendingEnrollments: state.pendingEnrollments.filter((s) => s.id !== studentId),
+      students: [...state.students.filter((s) => s.id !== studentId), response.data],
+    }));
+  },
+
+  rejectEnrollment: async (academyId, studentId) => {
+    const response = await academyApiService.rejectEnrollment(academyId, studentId);
+    if (!response.success) {
+      throw new Error(response.message || 'Could not reject enrollment');
+    }
+    set((state) => ({
+      pendingEnrollments: state.pendingEnrollments.filter((s) => s.id !== studentId),
+    }));
   },
 
   addStudent: async (academyId, student) => {

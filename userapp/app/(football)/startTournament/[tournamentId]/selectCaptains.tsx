@@ -1,78 +1,69 @@
 // app/(football)/tournaments/[tournamentId]/selectCaptains.tsx
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useTournamentStore } from '@/store/footballTournamentStore';
+import { useTournamentStore } from '@/store/tournamentStore';
+import { useMatchCreationStore } from '@/store/footballMatchCreationStore';
 import { useFootballStore } from '@/store/footballTeamStore';
 
 export default function TournamentSelectCaptainsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const tournamentId = params.tournamentId as string;
-  const fixtureId = params.fixtureId as string;
-  
-  const { 
-    activeTournamentMatch, 
-    setTournamentMatchCaptains,
-    initializeTournamentMatch
-  } = useTournamentStore();
-  
-  const { getPlayerById } = useFootballStore();
-  
-  const [homeCaptain, setHomeCaptain] = useState<string | null>(null);
-  const [awayCaptain, setAwayCaptain] = useState<string | null>(null);
-  
-  // Initialize match if not already initialized
-  useEffect(() => {
-    if (!activeTournamentMatch && tournamentId && fixtureId) {
-      initializeTournamentMatch(tournamentId, fixtureId);
-    }
-  }, [tournamentId, fixtureId, activeTournamentMatch, initializeTournamentMatch]);
-  
-  // Get full player objects from the selected player IDs
+  const { tournamentId, fixtureId } = useLocalSearchParams<{ tournamentId: string; fixtureId: string }>();
+
+  const { getTournament } = useTournamentStore();
+  const { matchData, updateCaptains } = useMatchCreationStore();
+  const { getTeamById } = useFootballStore();
+
+  const tournament = getTournament(tournamentId);
+  const fixture = tournament?.fixtures.find((f) => f.id === fixtureId);
+
+  const [homeCaptain, setHomeCaptain] = useState<number | null>(null);
+  const [awayCaptain, setAwayCaptain] = useState<number | null>(null);
+
   const homePlayers = useMemo(() => {
-    if (!activeTournamentMatch) return [];
-    return activeTournamentMatch.homeTeamPlayers
-      .map(id => getPlayerById(id))
-      .filter(p => p !== undefined);
-  }, [activeTournamentMatch?.homeTeamPlayers, getPlayerById]);
-  
+    if (!fixture?.homeTeamId) return [];
+    const roster = getTeamById(fixture.homeTeamId)?.members.map((m) => m.footballProfile) ?? [];
+    return roster.filter((p) => matchData.myTeam.selectedPlayers.includes(p.id));
+  }, [fixture?.homeTeamId, getTeamById, matchData.myTeam.selectedPlayers]);
+
   const awayPlayers = useMemo(() => {
-    if (!activeTournamentMatch) return [];
-    return activeTournamentMatch.awayTeamPlayers
-      .map(id => getPlayerById(id))
-      .filter(p => p !== undefined);
-  }, [activeTournamentMatch?.awayTeamPlayers, getPlayerById]);
-  
+    if (!fixture?.awayTeamId) return [];
+    const roster = getTeamById(fixture.awayTeamId)?.members.map((m) => m.footballProfile) ?? [];
+    return roster.filter((p) => matchData.opponentTeam.selectedPlayers.includes(p.id));
+  }, [fixture?.awayTeamId, getTeamById, matchData.opponentTeam.selectedPlayers]);
+
   const handleContinue = () => {
     if (!homeCaptain || !awayCaptain) {
       Alert.alert('Incomplete Selection', 'Please select captains for both teams');
       return;
     }
-    
-    // Save captains to store
-    setTournamentMatchCaptains(homeCaptain, awayCaptain);
-    
-    // Navigate to referee entry
-    router.push(`/(football)/startTournament/${tournamentId}/enterReferee?fixtureId=${fixtureId}`);
+
+    updateCaptains(homeCaptain, awayCaptain);
+
+    if (useMatchCreationStore.getState().error) {
+      Alert.alert('Error', useMatchCreationStore.getState().error!);
+      return;
+    }
+
+    router.push({
+      pathname: '/(football)/startTournament/[tournamentId]/enterReferee',
+      params: { tournamentId, fixtureId },
+    });
   };
-  
-  if (!activeTournamentMatch) {
+
+  if (!fixture) {
     return (
       <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
-        <Text className="text-slate-500">No active match found</Text>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mt-4 bg-blue-600 px-6 py-3 rounded-xl"
-        >
+        <Text className="text-slate-500">Fixture not found</Text>
+        <TouchableOpacity onPress={() => router.back()} className="mt-4 bg-blue-600 px-6 py-3 rounded-xl">
           <Text className="text-white font-semibold">Go Back</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
   }
-  
+
   if (homePlayers.length === 0 || awayPlayers.length === 0) {
     return (
       <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
@@ -94,7 +85,7 @@ export default function TournamentSelectCaptainsScreen() {
       </SafeAreaView>
     );
   }
-  
+
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
       {/* Header */}
@@ -116,7 +107,7 @@ export default function TournamentSelectCaptainsScreen() {
             <View className="flex-1">
               <Text className="text-sm text-amber-700 mb-1">Match Setup Progress</Text>
               <Text className="text-base font-bold text-amber-900">
-                {(homeCaptain && awayCaptain) ? '2/2 Captains Selected' : `${(homeCaptain ? 1 : 0) + (awayCaptain ? 1 : 0)}/2 Captains Selected`}
+                {(homeCaptain ? 1 : 0) + (awayCaptain ? 1 : 0)}/2 Captains Selected
               </Text>
             </View>
           </View>
@@ -132,7 +123,7 @@ export default function TournamentSelectCaptainsScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-lg font-bold text-slate-900">
-                {activeTournamentMatch.homeTeamName} Captain
+                {matchData.myTeam.teamName} Captain
               </Text>
               <Text className="text-xs text-slate-500 mt-1">
                 Select from {homePlayers.length} players
@@ -163,10 +154,10 @@ export default function TournamentSelectCaptainsScreen() {
                   </View>
                   <View className="flex-1">
                     <Text className="text-base font-bold text-slate-900" numberOfLines={1}>
-                      {player.name}
+                      {player.nickname}
                     </Text>
                     <Text className="text-xs text-slate-500 mt-1">
-                      {player.position}
+                      {player.role}
                     </Text>
                   </View>
                 </View>
@@ -188,7 +179,7 @@ export default function TournamentSelectCaptainsScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-lg font-bold text-slate-900">
-                {activeTournamentMatch.awayTeamName} Captain
+                {matchData.opponentTeam.teamName} Captain
               </Text>
               <Text className="text-xs text-slate-500 mt-1">
                 Select from {awayPlayers.length} players
@@ -219,10 +210,10 @@ export default function TournamentSelectCaptainsScreen() {
                   </View>
                   <View className="flex-1">
                     <Text className="text-base font-bold text-slate-900" numberOfLines={1}>
-                      {player.name}
+                      {player.nickname}
                     </Text>
                     <Text className="text-xs text-slate-500 mt-1">
-                      {player.position}
+                      {player.role}
                     </Text>
                   </View>
                 </View>

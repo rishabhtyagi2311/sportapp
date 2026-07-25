@@ -13,13 +13,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
 import { useFootballStore } from '@/store/footballTeamStore';
-import { FootballPlayerFormData, FootballPosition, FootballPlayerImage, FootballPlayer } from '@/types/addingMemberTypes';
+import { FootballPlayerFormData, FootballPosition } from '@/types/addingMemberTypes';
 
 export default function CreateFootballProfile() {
-  const { addPlayer, setCurrentPlayer } = useFootballStore();
-  
+  const { registerProfile } = useFootballStore();
+  const [submitting, setSubmitting] = useState(false);
+
   const [formData, setFormData] = useState<FootballPlayerFormData>({
     name: '',
     position: '',
@@ -43,7 +43,6 @@ export default function CreateFootballProfile() {
   ];
   
   const experienceLevels = ['Beginner', 'Intermediate', 'Advanced', 'Professional'];
-  const preferredFootOptions = ['Left', 'Right', 'Both'];
   
   // Validate form data
   const validateForm = (): boolean => {
@@ -64,33 +63,22 @@ export default function CreateFootballProfile() {
   };
   
   // Handle form submission
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
-    
-    const newPlayer: FootballPlayer = {
-      id: `player-${Date.now()}`,
-      name: formData.name.trim(),
-      position: formData.position as FootballPosition,
-      isRegistered: true,
-      preferredFoot: formData.preferredFoot || undefined,
-      experience: formData.experience || undefined,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    
-    // Add player to store
-    addPlayer(newPlayer);
-    
-    // Set as current player
-    setCurrentPlayer(newPlayer);
-    
-    // Navigate to matches screen
+
+    setSubmitting(true);
     try {
+      await registerProfile({
+        nickname: formData.name.trim(),
+        role: formData.position,
+        experience: formData.experience || 'Beginner',
+      });
+
       router.push("/(football)/landingScreen/matches");
-    } catch (error) {
-      console.error("Navigation error:", error);
-      // Alternative navigation if router fails
-      router.replace("/(football)/landingScreen/matches");
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to create football profile.');
+    } finally {
+      setSubmitting(false);
     }
   };
   
@@ -177,38 +165,6 @@ export default function CreateFootballProfile() {
             Additional Details (Optional)
           </Text>
           
-          {/* Preferred Foot */}
-          <View className="mb-4">
-            <Text className="text-white font-semibold mb-2">Preferred Foot</Text>
-            <View className="flex-row">
-              {preferredFootOptions.map((foot) => (
-                <TouchableOpacity
-                  key={foot}
-                  onPress={() => setFormData(prev => ({ 
-                    ...prev, 
-                    preferredFoot: foot as 'Left' | 'Right' | 'Both' 
-                  }))}
-                  className={`flex-1 rounded-lg py-3 px-2 mr-2 border ${
-                    formData.preferredFoot === foot
-                      ? "bg-green-600 border-green-500"
-                      : "bg-sky-100 border-gray-300"
-                  }`}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    className={`text-center text-sm ${
-                      formData.preferredFoot === foot
-                        ? "text-white font-semibold"
-                        : "text-gray-700"
-                    }`}
-                  >
-                    {foot}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-          
           {/* Experience Level */}
           <View className="mb-6">
             <Text className="text-white font-semibold mb-2">Experience Level</Text>
@@ -244,12 +200,13 @@ export default function CreateFootballProfile() {
           {/* Submit Button */}
           <TouchableOpacity
             onPress={handleSubmit}
+            disabled={submitting}
             className="bg-blue-300 rounded-xl py-4 mb-6 shadow-lg"
             activeOpacity={0.8}
           >
             <View className="flex-row items-center justify-center">
               <Text className="text-black font-bold text-lg mr-2">
-                Create Football Profile
+                {submitting ? 'Creating…' : 'Create Football Profile'}
               </Text>
               <Ionicons name="checkmark-circle-outline" size={24} color="black" />
             </View>

@@ -57,6 +57,23 @@ class AuthController {
             return res.status(404).json({ success: false, message: error.message || "Partner not found" });
         }
     }
+    static async updateProfile(req, res) {
+        try {
+            const partnerId = req.partner?.id;
+            if (!partnerId) {
+                return res.status(401).json({ success: false, message: "Unauthorized" });
+            }
+            const parsed = auth_1.updatePartnerProfileSchema.safeParse(req.body);
+            if (!parsed.success) {
+                return res.status(400).json({ success: false, message: "Invalid profile data", error: parsed.error.issues });
+            }
+            const partner = await auth_service_1.AuthService.updateProfile(partnerId, parsed.data);
+            return res.status(200).json({ success: true, message: "Profile updated successfully", data: partner });
+        }
+        catch (error) {
+            return res.status(500).json({ success: false, message: error.message || "Error updating profile" });
+        }
+    }
 }
 exports.AuthController = AuthController;
 //# sourceMappingURL=auth.controller.js.map

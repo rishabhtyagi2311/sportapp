@@ -1,11 +1,12 @@
-import React, { useState } from "react";
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  TouchableOpacity, 
-  Modal, 
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
@@ -16,20 +17,36 @@ import { useDemoBookingStore } from "@/store/demobookingstore";
 
 export default function DetailsScreen() {
   const { id } = useLocalSearchParams();
-  const { getAcademyById } = useAcademyStore();
-  const childProfiles = usechildStore((state) => state.childProfiles);
-  const { enrollChild, isChildEnrolled } = useEnrollmentStore();
-  const { addDemoBooking, isDemoBooked } = useDemoBookingStore();
-  
+  const academyId = id as string;
+  const { getAcademyById, fetchAcademyById } = useAcademyStore();
+  const { childProfiles, fetchMyChildProfiles } = usechildStore();
+  const { enrollChild, isChildEnrolled, fetchMyEnrollments } = useEnrollmentStore();
+  const { createDemoBooking, isDemoBooked, fetchMyDemoBookings } = useDemoBookingStore();
+
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [nextDemoDate, setNextDemoDate] = useState<string>("");
   const [nextDemoDay, setNextDemoDay] = useState<string>("");
-  
-  const academy = getAcademyById(id as string);
+  const [nextDemoIso, setNextDemoIso] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
 
-  if (!academy) return null;
+  const academy = getAcademyById(academyId);
+
+  useEffect(() => {
+    fetchAcademyById(academyId);
+    fetchMyChildProfiles();
+    fetchMyEnrollments();
+    fetchMyDemoBookings();
+  }, [academyId]);
+
+  if (!academy) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50">
+        <ActivityIndicator size="large" color="#0f172a" />
+      </View>
+    );
+  }
 
   // Function to calculate next working day (excluding weekends)
   const calculateNextWorkingDay = () => {
@@ -84,7 +101,8 @@ export default function DetailsScreen() {
     const { date, day, isoDate } = calculateNextWorkingDay();
     setNextDemoDate(date);
     setNextDemoDay(day);
-    
+    setNextDemoIso(isoDate);
+
     setShowDemoModal(true);
   };
 
@@ -92,13 +110,12 @@ export default function DetailsScreen() {
     setSelectedChildId(childId);
   };
 
-  const handleConfirmEnrollment = () => {
+  const handleConfirmEnrollment = async () => {
     if (!selectedChildId) {
       Alert.alert("Error", "Please select a child profile");
       return;
     }
 
-    // Check if already enrolled
     if (isChildEnrolled(selectedChildId, academy.id)) {
       Alert.alert("Already Enrolled", "This child is already enrolled in this academy.");
       return;
@@ -107,32 +124,29 @@ export default function DetailsScreen() {
     const selectedChild = childProfiles.find((c) => c.id === selectedChildId);
     if (!selectedChild) return;
 
-    // Create enrollment
-    enrollChild({
-      childId: selectedChild.id,
-      childName: selectedChild.childName,
-      academyId: academy.id,
-      academyName: academy.academyName,
-      status: 'active',
-    });
-
-    setShowEnrollModal(false);
-    setSelectedChildId(null);
-
-    Alert.alert(
-      "Success!",
-      `${selectedChild.childName} has been enrolled in ${academy.academyName}!`,
-      [{ text: "OK" }]
-    );
+    setSubmitting(true);
+    try {
+      await enrollChild(selectedChild.id, academy.id);
+      setShowEnrollModal(false);
+      setSelectedChildId(null);
+      Alert.alert(
+        "Enrollment Requested!",
+        `${selectedChild.childName}'s enrollment at ${academy.academyName} is awaiting the academy's approval.`,
+        [{ text: "OK" }]
+      );
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Could not enroll child");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleConfirmDemoBooking = () => {
+  const handleConfirmDemoBooking = async () => {
     if (!selectedChildId) {
       Alert.alert("Error", "Please select a child profile");
       return;
     }
 
-    // Check if demo already booked
     if (isDemoBooked(selectedChildId, academy.id)) {
       Alert.alert("Already Booked", "This child already has a demo class booked with this academy.");
       return;
@@ -141,29 +155,25 @@ export default function DetailsScreen() {
     const selectedChild = childProfiles.find((c) => c.id === selectedChildId);
     if (!selectedChild) return;
 
-    // Calculate the demo date (ensure fresh calculation)
-    const { isoDate } = calculateNextWorkingDay();
-
-    // Create demo booking
-    addDemoBooking({
-      childId: selectedChild.id,
-      childName: selectedChild.childName,
-      fatherName: selectedChild.fatherName,
-      contactNumber: "", // You might want to add this to the child profile or fetch from user profile
-      academyId: academy.id,
-      academyName: academy.academyName,
-      bookingDate: isoDate,
-      status: 'confirmed',
-    });
-
-    setShowDemoModal(false);
-    setSelectedChildId(null);
-
-    Alert.alert(
-      "Demo Booked!",
-      `${selectedChild.childName}'s demo class with ${academy.academyName} has been confirmed for ${nextDemoDate} (${nextDemoDay})!`,
-      [{ text: "OK" }]
-    );
+    setSubmitting(true);
+    try {
+      await createDemoBooking({
+        childProfileId: selectedChild.id,
+        academyId: academy.id,
+        bookingDate: nextDemoIso || calculateNextWorkingDay().isoDate,
+      });
+      setShowDemoModal(false);
+      setSelectedChildId(null);
+      Alert.alert(
+        "Demo Requested!",
+        `${selectedChild.childName}'s demo class with ${academy.academyName} has been requested for ${nextDemoDate} (${nextDemoDay}). The academy will confirm shortly.`,
+        [{ text: "OK" }]
+      );
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Could not book a demo");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -389,7 +399,7 @@ export default function DetailsScreen() {
                 onPress={handleConfirmEnrollment}
                 className="flex-1 bg-blue-500 rounded-xl py-4"
                 activeOpacity={0.8}
-                disabled={!selectedChildId}
+                disabled={!selectedChildId || submitting}
                 style={{
                   opacity: selectedChildId ? 1 : 0.5,
                 }}
@@ -540,7 +550,7 @@ export default function DetailsScreen() {
                 onPress={handleConfirmDemoBooking}
                 className="flex-1 bg-green-500 rounded-xl py-4"
                 activeOpacity={0.8}
-                disabled={!selectedChildId}
+                disabled={!selectedChildId || submitting}
                 style={{
                   opacity: selectedChildId ? 1 : 0.5,
                 }}

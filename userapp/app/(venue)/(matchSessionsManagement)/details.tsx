@@ -1,16 +1,79 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useMatchSessionStore } from '@/store/matchSessionStore';
 
 export default function MatchDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const session = useMatchSessionStore((state) => state.sessions.find(s => s.id === id));
+  const isJoined = useMatchSessionStore((state) => state.isSessionJoined(id));
+  const fetchSessionById = useMatchSessionStore((state) => state.fetchSessionById);
+  const fetchMySessions = useMatchSessionStore((state) => state.fetchMySessions);
+  const joinSession = useMatchSessionStore((state) => state.joinSession);
+  const leaveSession = useMatchSessionStore((state) => state.leaveSession);
+  const [joining, setJoining] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  if (!session) return null;
+  useEffect(() => {
+    fetchMySessions().catch(() => {});
+    if (!session) {
+      fetchSessionById(id).catch((err: any) => setLoadError(err.message || 'Match session not found'));
+    }
+  }, [id]);
+
+  const handleJoin = async () => {
+    setJoining(true);
+    try {
+      await joinSession(session!.id);
+      Alert.alert('You\'re in!', 'You have joined this match session.');
+    } catch (err: any) {
+      Alert.alert('Could not join', err.message || 'Please try again.');
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  const handleLeave = () => {
+    Alert.alert('Leave Match', 'Are you sure you want to leave this match session?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Leave',
+        style: 'destructive',
+        onPress: async () => {
+          setLeaving(true);
+          try {
+            await leaveSession(session!.id);
+            Alert.alert('Left match', 'You have left this match session.');
+          } catch (err: any) {
+            Alert.alert('Could not leave', err.message || 'Please try again.');
+          } finally {
+            setLeaving(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  if (!session) {
+    return (
+      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+        {loadError ? (
+          <>
+            <Text className="text-slate-500 mb-4">{loadError}</Text>
+            <TouchableOpacity onPress={() => router.back()} className="bg-blue-600 px-6 py-3 rounded-xl">
+              <Text className="text-white font-semibold">Go Back</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <ActivityIndicator size="large" color="#3b82f6" />
+        )}
+      </SafeAreaView>
+    );
+  }
 
   return (
     <View className="flex-1 bg-white">
@@ -38,10 +101,10 @@ export default function MatchDetailScreen() {
             <View className="bg-blue-100 px-3 py-1 rounded-lg">
               <Text className="text-blue-700 font-bold text-[10px] uppercase">{session.sport}</Text>
             </View>
-            <Text className="text-slate-400 text-xs font-medium">Hosted by {session.hostName}</Text>
+            <Text className="text-slate-400 text-xs font-medium">{session.skillLevel} level</Text>
           </View>
 
-          <Text className="text-3xl font-black text-slate-900 mb-6">{session.venueName}</Text>
+          <Text className="text-3xl font-black text-slate-900 mb-6">{session.venueName || 'Match Session'}</Text>
 
           {/* DATE & TIME CARDS */}
           <View className="flex-row justify-between mb-8">
@@ -67,7 +130,14 @@ export default function MatchDetailScreen() {
           {/* PLAYER SLOT INFO */}
           <View className="bg-slate-900 p-6 rounded-[32px] mb-10">
             <View className="flex-row justify-between items-center mb-4">
-                <Text className="text-white font-bold text-lg">Availability</Text>
+                <View className="flex-row items-center">
+                  <Text className="text-white font-bold text-lg">Availability</Text>
+                  {isJoined && (
+                    <View className="bg-green-500/20 px-2 py-0.5 rounded-full ml-3">
+                      <Text className="text-green-400 text-[10px] font-bold uppercase">You're In</Text>
+                    </View>
+                  )}
+                </View>
                 <Text className="text-blue-400 font-bold">{session.totalPlayers - session.playersJoined} slots left</Text>
             </View>
             <View className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
@@ -84,12 +154,25 @@ export default function MatchDetailScreen() {
           <Text className="text-slate-400 text-xs font-bold uppercase">Total Price</Text>
           <Text className="text-2xl font-black text-slate-900">₹{session.pricePerPerson}</Text>
         </View>
-        <TouchableOpacity 
-          className="bg-blue-600 px-10 py-5 rounded-[24px] shadow-lg shadow-blue-200"
-          onPress={() => alert('Proceeding to Payment...')}
-        >
-          <Text className="text-white font-black text-lg">Join Match</Text>
-        </TouchableOpacity>
+        {isJoined ? (
+          <TouchableOpacity
+            className="bg-red-600 px-10 py-5 rounded-[24px] shadow-lg shadow-red-200"
+            onPress={handleLeave}
+            disabled={leaving || session.status !== 'pending'}
+          >
+            <Text className="text-white font-black text-lg">
+              {leaving ? 'Leaving…' : session.status !== 'pending' ? 'Match Locked' : 'Leave Match'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            className="bg-blue-600 px-10 py-5 rounded-[24px] shadow-lg shadow-blue-200"
+            onPress={handleJoin}
+            disabled={joining}
+          >
+            <Text className="text-white font-black text-lg">{joining ? 'Joining…' : 'Join Match'}</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

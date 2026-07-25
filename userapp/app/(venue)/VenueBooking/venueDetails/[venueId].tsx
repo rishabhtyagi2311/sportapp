@@ -1,19 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-  SafeAreaView,
-  StatusBar,
-  Alert,
-  FlatList,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, StatusBar, Alert, FlatList } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Venue, Sport, SportVariety } from '@/types/booking';
-import { dummyVenues } from '@/constants/venueData';
+import { Sport, SportVariety } from '@/types/booking';
+import { useBookingStore } from '@/store/venueStore';
 
 const { width } = Dimensions.get('window');
 
@@ -21,24 +12,25 @@ const VenueDetailsScreen: React.FC = () => {
   const params = useLocalSearchParams();
   const router = useRouter();
   const venueId = params.venueId as string;
-  
-  const [venue, setVenue] = useState<Venue | null>(null);
+
+  const { getVenueById, fetchVenueById } = useBookingStore();
+  const venue = getVenueById(venueId);
   const [selectedVariety, setSelectedVariety] = useState<SportVariety | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<'main' | 'amenities'>('main');
+  const [loading, setLoading] = useState(!venue);
 
   useEffect(() => {
-    const foundVenue = dummyVenues.find(v => v.id === venueId);
-    if (foundVenue) {
-      setVenue(foundVenue);
-    }
+    fetchVenueById(venueId).finally(() => setLoading(false));
   }, [venueId]);
 
   if (!venue) {
     return (
       <SafeAreaView className="flex-1 bg-gray-100">
         <View className="flex-1 items-center justify-center">
-          <Text className="text-gray-500 text-lg">Venue not found</Text>
+          <Text className="text-gray-500 text-lg">
+            {loading ? 'Loading venue…' : 'Venue not found'}
+          </Text>
         </View>
       </SafeAreaView>
     );

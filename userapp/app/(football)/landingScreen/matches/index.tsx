@@ -1,6 +1,6 @@
 // app/(football)/landingScreen/matches.tsx
 import React, { useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, RefreshControl, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -14,8 +14,8 @@ type IoniconsName = 'football-outline' | 'timer-outline' | 'calendar-outline' | 
 
 export default function MatchesScreen() {
   const router = useRouter();
-  const { completed } = useFootballMatches();
-  const { currentPlayer } = useFootballStore();
+  const { completed, isLoading } = useFootballMatches();
+  const { profile } = useFootballStore();
   
   console.log('⚽ Matches screen is rendering');
   
@@ -165,7 +165,7 @@ export default function MatchesScreen() {
         {/* Footer Row */}
         <View className="flex-row items-center justify-between mt-3 pt-3 border-t border-slate-50">
           <Text className="text-slate-400 text-xs">
-            {formatDuration((match as any).actualDuration || 90)}
+            {formatDuration(match.duration)}
           </Text>
           
           <View className="flex-row items-center">
@@ -212,9 +212,9 @@ export default function MatchesScreen() {
           You don't have any completed matches yet. Create a match to get started.
         </Text>
         
-        {!currentPlayer && (
+        {!profile && (
           <TouchableOpacity
-            onPress={() => router.push('/create-football-profile')}
+            onPress={() => router.push('/(football)/createFootballProfile')}
             className="bg-blue-500 px-5 py-3 rounded-xl"
           >
             <Text className="text-white font-bold">Create Profile</Text>
@@ -229,8 +229,12 @@ export default function MatchesScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
-    
-      {!hasCompletedMatches ? (
+
+      {isLoading && !hasCompletedMatches ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#0f172a" />
+        </View>
+      ) : !hasCompletedMatches ? (
         renderEmptyState()
       ) : (
         <ScrollView 

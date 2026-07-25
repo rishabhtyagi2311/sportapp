@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useHealthStore } from '@/store/HealthLogStore'; // Adjust path
@@ -66,9 +67,10 @@ export default function HealthFormScreen() {
   );
 
   return (
-    <ScrollView className="flex-1 bg-slate-900 px-6" showsVerticalScrollIndicator={false}>
+    <SafeAreaView className="flex-1 bg-slate-900">
+    <ScrollView className="flex-1 px-6" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
       {/* Header */}
-      <View className="flex-row justify-between items-center mt-12 mb-8">
+      <View className="flex-row justify-between items-center mt-4 mb-8">
         <View>
           <Text className="text-slate-400 text-sm font-medium">Today</Text>
           <Text className="text-white text-2xl font-bold">{today}</Text>
@@ -126,12 +128,13 @@ export default function HealthFormScreen() {
         </View>
       </View>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         onPress={handleSave}
         className="bg-blue-500 w-full py-4 rounded-2xl items-center my-10 shadow-lg shadow-blue-500/30"
       >
         <Text className="text-white text-lg font-bold">Save Daily Log</Text>
       </TouchableOpacity>
     </ScrollView>
+    </SafeAreaView>
   );
 }

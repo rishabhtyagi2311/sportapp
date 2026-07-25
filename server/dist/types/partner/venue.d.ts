@@ -130,5 +130,6 @@ export declare const updateVenueSchema: z.ZodObject<{
     }, z.core.$strip>>;
     sports: z.ZodOptional<z.ZodArray<z.ZodAny>>;
     amenities: z.ZodOptional<z.ZodArray<z.ZodAny>>;
+    images: z.ZodOptional<z.ZodArray<z.ZodString>>;
 }, z.core.$strip>;
 //# sourceMappingURL=venue.d.ts.map

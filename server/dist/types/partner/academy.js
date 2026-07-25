@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createCertificateSchema = exports.addPhotoSchema = exports.markAttendanceSchema = exports.updateStudentSchema = exports.addStudentSchema = exports.updateCoachSchema = exports.addCoachSchema = exports.updateAcademySchema = exports.createAcademySchema = void 0;
+exports.createAnnouncementSchema = exports.createCertificateSchema = exports.addPhotoSchema = exports.markAttendanceSchema = exports.updateStudentSchema = exports.addStudentSchema = exports.updateCoachSchema = exports.addCoachSchema = exports.updateAcademySchema = exports.createAcademySchema = void 0;
 const zod_1 = require("zod");
 exports.createAcademySchema = zod_1.z.object({
     academyName: zod_1.z.string().min(3),
@@ -60,5 +60,8 @@ exports.addPhotoSchema = zod_1.z.object({
 exports.createCertificateSchema = zod_1.z.object({
     template: zod_1.z.string().min(1),
     achievement: zod_1.z.string().min(1),
+});
+exports.createAnnouncementSchema = zod_1.z.object({
+    content: zod_1.z.string().min(1).max(1000),
 });
 //# sourceMappingURL=academy.js.map

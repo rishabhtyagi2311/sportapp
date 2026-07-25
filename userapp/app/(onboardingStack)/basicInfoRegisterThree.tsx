@@ -14,18 +14,22 @@ import {
 import { useForm, Controller } from "react-hook-form";
 import { useRouter } from "expo-router";
 import signUpStore from "./../../store/signUpStore"
-import { onBoardingService } from "@/services/onBoarding";
+import { useAuthStore } from "@/store/authStore";
 
 
 type FormData = {
   city: string;
   dob: string;
+  email: string;
+  password: string;
 };
 
 export default function InfoRegisterScreen() {
   const router = useRouter();
-  const {name, nickName, email, contact, setDob, setCity} = signUpStore()
-  
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const {name, contact, setDob, setCity, setEmail, setPassword} = signUpStore()
+  const register = useAuthStore((state) => state.register);
+
   const {
     control,
     handleSubmit,
@@ -34,27 +38,35 @@ export default function InfoRegisterScreen() {
     defaultValues: {
       city: "",
       dob: "",
+      email: "",
+      password: "",
     },
   });
 
   const onSubmit = async (data: FormData) => {
-    
+    setSubmitError(null);
     setCity(data.city)
     setDob(data.dob)
+    setEmail(data.email)
+    setPassword(data.password)
 
-  //   const response =  await onBoardingService.basicInfoRegister(
-  //   firstName,lastName,email, contact, data.city, data.dob
-  //  )
-  //  console.log(response);
-  //   if(response!== null)
-  //   {
-  //     router.push("./../(homeScreenTabs)");
-  //   }
-  //   else{
-  //     alert("Server Issue, Try again ")
-  //   }
+    const [firstname, ...rest] = name.trim().split(/\s+/);
+    const lastname = rest.join(" ") || firstname;
 
-   router.push("./../(homeScreenTabs)");
+    try {
+      await register({
+        firstname,
+        lastname,
+        email: data.email,
+        contact,
+        city: data.city,
+        dob: data.dob,
+        password: data.password,
+      });
+      router.push("./../(homeScreenTabs)");
+    } catch (err: any) {
+      setSubmitError(err.message || "Server Issue, Try again");
+    }
   }
 
   return (
@@ -163,6 +175,74 @@ export default function InfoRegisterScreen() {
                       </Text>
                     )}
                   </View>
+
+                  {/* Email Input */}
+                  <View className="px-4 mt-6">
+                    <Text className="text-black text-xl mb-2 ml-4">Email</Text>
+                    <Controller
+                      control={control}
+                      name="email"
+                      rules={{
+                        required: "Email is required",
+                        pattern: {
+                          value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                          message: "Invalid email address",
+                        },
+                      }}
+                      render={({ field: { onChange, value } }) => (
+                        <TextInput
+                          className="border-2 border-black rounded-2xl bg-white px-4 py-3 text-base font-medium text-gray-800 mx-4"
+                          placeholder="you@example.com"
+                          placeholderTextColor="#9ca3af"
+                          autoCorrect={false}
+                          autoCapitalize="none"
+                          keyboardType="email-address"
+                          value={value}
+                          onChangeText={onChange}
+                        />
+                      )}
+                    />
+                    {errors.email && (
+                      <Text className="text-red-800 font-medium ml-2 mt-1">
+                        {errors.email.message}
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Password Input */}
+                  <View className="px-4 mt-6">
+                    <Text className="text-black text-xl mb-2 ml-4">Password</Text>
+                    <Controller
+                      control={control}
+                      name="password"
+                      rules={{
+                        required: "Password is required",
+                        minLength: { value: 6, message: "Password must be at least 6 characters" },
+                      }}
+                      render={({ field: { onChange, value } }) => (
+                        <TextInput
+                          className="border-2 border-black rounded-2xl bg-white px-4 py-3 text-base font-medium text-gray-800 mx-4"
+                          placeholder="Choose a password"
+                          placeholderTextColor="#9ca3af"
+                          secureTextEntry
+                          autoCapitalize="none"
+                          value={value}
+                          onChangeText={onChange}
+                        />
+                      )}
+                    />
+                    {errors.password && (
+                      <Text className="text-red-800 font-medium ml-2 mt-1">
+                        {errors.password.message}
+                      </Text>
+                    )}
+                  </View>
+
+                  {submitError && (
+                    <Text className="text-red-800 font-medium ml-8 mt-4">
+                      {submitError}
+                    </Text>
+                  )}
 
                   {/* Submit Button */}
                   <View className="w-full flex items-center mt-8">

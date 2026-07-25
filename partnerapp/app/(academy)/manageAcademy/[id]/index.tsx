@@ -174,6 +174,16 @@ export default function AcademyDetailScreen() {
               title="Info Channel"
               onPress={() => router.push(`/manageAcademy/${id}/announcements`)}
             />
+            <NavigationCard
+              icon="calendar-outline"
+              title="Demo Requests"
+              onPress={() => router.push(`/manageAcademy/${id}/demoRequests`)}
+            />
+            <NavigationCard
+              icon="person-add-outline"
+              title="Enrollment Requests"
+              onPress={() => router.push(`/manageAcademy/${id}/enrollmentRequests`)}
+            />
           </FadeInView>
 
           {/* ✅ 2. Basic Info */}

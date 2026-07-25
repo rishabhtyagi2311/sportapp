@@ -1,32 +1,27 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  SafeAreaView,
-  TouchableOpacity,
-  ScrollView,
-  StatusBar
-} from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, TouchableOpacity, ScrollView, StatusBar } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from "@react-native-picker/picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAcademyStore } from "@/store/academyStore";
-import { useEnrollmentStore } from "@/store/academyEnrollmentStore";
 import { usechildStore } from "@/store/academyChildProfile";
 
 export default function ChildAttendanceScreen() {
   const router = useRouter();
-  const { childId, academyId, academyName } = useLocalSearchParams<{ 
-    childId: string; 
-    academyId: string;
+  const { childId, studentId, academyName } = useLocalSearchParams<{
+    childId: string;
+    studentId: string;
     academyName: string;
   }>();
-  
-  // Get the attendance data and methods from the academy store
-  const getAttendanceStatus = useAcademyStore((state) => state.getAttendanceStatus);
-  const attendance = useAcademyStore((state) => state.attendance);
+
+  const { getAttendanceStatus, attendance, fetchChildAttendance } = useAcademyStore();
   const childProfiles = usechildStore((state) => state.childProfiles);
-  
+
+  useEffect(() => {
+    if (studentId) fetchChildAttendance(studentId);
+  }, [studentId]);
+
   // Find the child profile
   const childProfile = childProfiles.find(profile => profile.id === childId);
   const childName = childProfile?.childName || "Child";
@@ -46,9 +41,9 @@ export default function ChildAttendanceScreen() {
   const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  // Filter attendance records for this specific child
-  const childAttendance = attendance.filter((a) => a.studentId === childId);
-  
+  // Filter attendance records for this specific enrollment
+  const childAttendance = attendance.filter((a) => a.studentId === studentId);
+
   // Create a map for quick lookup
   const attendanceMap: Record<string, boolean> = {};
   childAttendance.forEach((a) => {
@@ -58,7 +53,7 @@ export default function ChildAttendanceScreen() {
   // Get status for a specific day
   const getDayStatus = (day: number) => {
     const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    return getAttendanceStatus(childId, dateStr);
+    return getAttendanceStatus(studentId, dateStr);
   };
 
   // Calculate attendance statistics for the selected month

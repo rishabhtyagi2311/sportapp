@@ -177,4 +177,27 @@ export class VenueService {
 
     await globalClient.venue.delete({ where: { id: venueId } });
   }
+
+  /** Public, unauthenticated browse — no partnerId scoping, active venues only. */
+  static async getPublicVenues(filters: { city?: string } = {}) {
+    const venues = await globalClient.venue.findMany({
+      where: {
+        isActive: true,
+        ...(filters.city ? { city: { equals: filters.city, mode: 'insensitive' } } : {}),
+      },
+      include: { address: true, images: true, _count: { select: { timeSlots: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return venues.map((venue) => this.mapVenueForClient(venue));
+  }
+
+  static async getPublicVenueById(venueId: string) {
+    const venue = await globalClient.venue.findFirst({
+      where: { id: venueId, isActive: true },
+      include: { address: true, images: true, timeSlots: true },
+    });
+
+    return venue ? this.mapVenueForClient(venue) : null;
+  }
 }

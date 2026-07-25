@@ -1,76 +1,63 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-export interface DemoBooking {
-  id: string;
-  childId: string;
-  childName: string;
-  fatherName: string;
-  contactNumber: string;
-  academyId: string;
-  academyName: string;
-  bookingDate: string; // ISO string of the scheduled demo date
-  status: 'confirmed' | 'completed' | 'cancelled';
-  createdAt: string;
-}
+import { DemoBooking } from '@/types/academy';
+import { academyApiService } from '@/services/academyManagement/academy';
 
 interface DemoBookingStore {
   demoBookings: DemoBooking[];
-  addDemoBooking: (booking: Omit<DemoBooking, 'id' | 'createdAt'>) => void;
-  updateDemoBookingStatus: (id: string, status: DemoBooking['status']) => void;
-  getBookingsByChildId: (childId: string) => DemoBooking[];
-  getBookingsByAcademyId: (academyId: string) => DemoBooking[];
-  isDemoBooked: (childId: string, academyId: string) => boolean;
+  isLoading: boolean;
+  error: string | null;
+
+  fetchMyDemoBookings: () => Promise<void>;
+  createDemoBooking: (payload: { childProfileId: string; academyId: string; bookingDate: string }) => Promise<DemoBooking>;
+  cancelDemoBooking: (id: string) => Promise<void>;
+  isDemoBooked: (childProfileId: string, academyId: string) => boolean;
 }
 
-export const useDemoBookingStore = create<DemoBookingStore>()(
-  persist(
-    (set, get) => ({
-      demoBookings: [],
-      
-      addDemoBooking: (booking) => 
-        set((state) => ({
-          demoBookings: [
-            ...state.demoBookings,
-            {
-              ...booking,
-              id: `demo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              createdAt: new Date().toISOString(),
-            }
-          ]
-        })),
-        
-      updateDemoBookingStatus: (id, status) =>
-        set((state) => ({
-          demoBookings: state.demoBookings.map((booking) => 
-            booking.id === id ? { ...booking, status } : booking
-          )
-        })),
-        
-      getBookingsByChildId: (childId) => {
-        const { demoBookings } = get();
-        return demoBookings.filter((booking) => booking.childId === childId);
-      },
-      
-      getBookingsByAcademyId: (academyId) => {
-        const { demoBookings } = get();
-        return demoBookings.filter((booking) => booking.academyId === academyId);
-      },
-      
-      isDemoBooked: (childId, academyId) => {
-        const { demoBookings } = get();
-        return demoBookings.some(
-          (booking) => 
-            booking.childId === childId && 
-            booking.academyId === academyId && 
-            booking.status !== 'cancelled'
-        );
-      },
-    }),
-    {
-      name: 'demo-bookings-storage',
-      storage: createJSONStorage(() => AsyncStorage),
+export const useDemoBookingStore = create<DemoBookingStore>((set, get) => ({
+  demoBookings: [],
+  isLoading: false,
+  error: null,
+
+  fetchMyDemoBookings: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.getMyDemoBookings();
+      set({ demoBookings: response.data, isLoading: false });
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || 'Could not load demo bookings', isLoading: false });
     }
-  )
-);
+  },
+
+  createDemoBooking: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.createDemoBooking(payload);
+      set((state) => ({ demoBookings: [response.data, ...state.demoBookings], isLoading: false }));
+      return response.data;
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not book a demo';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
+
+  cancelDemoBooking: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.cancelDemoBooking(id);
+      set((state) => ({
+        demoBookings: state.demoBookings.map((b) => (b.id === id ? response.data : b)),
+        isLoading: false,
+      }));
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not cancel demo booking';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
+
+  isDemoBooked: (childProfileId, academyId) =>
+    get().demoBookings.some(
+      (b) => b.childProfileId === childProfileId && b.academyId === academyId && b.status !== 'cancelled'
+    ),
+}));

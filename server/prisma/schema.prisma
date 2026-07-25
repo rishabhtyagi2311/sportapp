@@ -15,8 +15,17 @@ model userInfo {
   dob           String
   city          String
   contact       String          @unique
+  password      String
 
   footballProfile footballProfile?
+  bookings        Booking[]
+  matchSessionParticipations MatchSessionParticipant[]
+  childProfiles   ChildProfile[]
+  reviews         Review[]
+  createdEvents   Event[]
+  eventRegistrations EventRegistration[]
+  createdMatches  Match[]
+  createdTournaments Tournament[]
 
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
@@ -32,6 +41,7 @@ model footballProfile {
   user         userInfo    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdTeams footballTeam[] @relation("CreatedTeams")
   memberTeams  footballTeamMember[]
+  matchStats   MatchPlayerStat[]
 
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
@@ -43,9 +53,19 @@ model footballTeam {
   location      String
   maxPlayers    Int
   createdById   Int
+  matchesPlayed Int                   @default(0)
+  matchesWon    Int                   @default(0)
+  matchesLost   Int                   @default(0)
+  matchesDrawn  Int                   @default(0)
 
   createdBy     footballProfile       @relation("CreatedTeams", fields: [createdById], references: [id])
   members       footballTeamMember[]
+  eventRegistrations EventRegistration[]
+  homeMatches   Match[]               @relation("HomeMatches")
+  awayMatches   Match[]               @relation("AwayMatches")
+  tournamentEntries TournamentEntry[]
+  homeFixtures  TournamentFixture[]   @relation("FixtureHome")
+  awayFixtures  TournamentFixture[]   @relation("FixtureAway")
 
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
@@ -93,6 +113,8 @@ model Academy {
   fee           Float
   feeStructure  String   @default("Monthly")
   isActive      Boolean  @default(true)
+  averageRating Float    @default(0)
+  reviewCount   Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -101,6 +123,8 @@ model Academy {
   students      Student[]
   photos        AcademyPhoto[]
   announcements Announcement[]
+  demoBookings  DemoBooking[]
+  reviews       Review[]
 }
 
 model Student {
@@ -113,9 +137,60 @@ model Student {
   enrollmentDate DateTime @default(now())
   createdAt      DateTime @default(now())
 
+  // Nullable — a partner can add a walk-in student with no linked parent
+  // account, same nullable-FK pattern as Booking.userId for guest bookings.
+  childProfileId String?
+  status         String   @default("active") // active | pending | inactive
+
   academy        Academy            @relation(fields: [academyId], references: [id], onDelete: Cascade)
+  childProfile   ChildProfile?      @relation(fields: [childProfileId], references: [id])
   attendance     AttendanceRecord[]
   certificates   Certificate[]
+}
+
+model ChildProfile {
+  id            String   @id @default(uuid())
+  parentId      Int
+  childName     String
+  childAge      Int
+  motherName    String?
+  fatherName    String
+  fatherContact String?
+  address       String?
+  city          String?
+  createdAt     DateTime @default(now())
+
+  parent        userInfo      @relation(fields: [parentId], references: [id])
+  enrollments   Student[]
+  demoBookings  DemoBooking[]
+  reviews       Review[]
+}
+
+model Review {
+  id             String   @id @default(uuid())
+  academyId      String
+  childProfileId String
+  parentId       Int
+  rating         Int
+  title          String?
+  comment        String   @db.Text
+  createdAt      DateTime @default(now())
+
+  academy        Academy      @relation(fields: [academyId], references: [id])
+  childProfile   ChildProfile @relation(fields: [childProfileId], references: [id])
+  parent         userInfo     @relation(fields: [parentId], references: [id])
+}
+
+model DemoBooking {
+  id             String   @id @default(uuid())
+  childProfileId String
+  academyId      String
+  bookingDate    DateTime
+  status         String   @default("pending") // pending | confirmed | completed | cancelled
+  createdAt      DateTime @default(now())
+
+  childProfile   ChildProfile @relation(fields: [childProfileId], references: [id])
+  academy        Academy      @relation(fields: [academyId], references: [id])
 }
 
 model AttendanceRecord {
@@ -190,6 +265,7 @@ model Venue {
   bookings       Booking[]
   slotBlocks     SlotBlock[]
   matchSessions  MatchSession[]
+  events         Event[]
 
   sports         Json
   amenities      Json
@@ -226,7 +302,7 @@ model TimeSlot {
 model Booking {
   id            String   @id @default(uuid())
   venueId       String
-  userId        String?
+  userId        Int?
   slotId        String?
   date          DateTime
   startTime     String
@@ -242,6 +318,9 @@ model Booking {
   updatedAt     DateTime @updatedAt
 
   venue         Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  user          userInfo? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model SlotBlock {
@@ -275,7 +354,23 @@ model MatchSession {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  venue             Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  venue             Venue                     @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  participants      MatchSessionParticipant[]
+}
+
+model MatchSessionParticipant {
+  id             String   @id @default(uuid())
+  matchSessionId String
+  userId         Int
+  status         String   @default("joined") // joined | left
+  joinedAt       DateTime @default(now())
+
+  matchSession   MatchSession @relation(fields: [matchSessionId], references: [id], onDelete: Cascade)
+  user           userInfo     @relation(fields: [userId], references: [id])
+
+  @@unique([matchSessionId, userId])
+  @@index([matchSessionId])
+  @@index([userId])
 }
 
 model Image {
@@ -292,4 +387,207 @@ model Address {
   lng      Float?
   venueId  String @unique
   venue    Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id                   String   @id @default(uuid())
+  creatorId            Int
+  venueId              String?
+  locationName         String?  // freeform address, used when venueId is null
+  name                 String
+  description          String?  @db.Text
+  eventType            String   // 'regular' | 'footballtournament'
+  tournamentFormat     String?  // 'league' | 'knockout'
+  sportName            String
+  participationType    String   // 'individual' | 'team'
+  teamSize             Int?
+  maxParticipants      Int
+  currentParticipants  Int      @default(0)
+  dateTime             DateTime
+  duration             Int      // minutes
+  feeAmount            Float
+  feeCurrency          String   @default("INR")
+  feeType              String   // 'per_person' | 'per_team' | 'total'
+  organizerName        String
+  organizerContact     String
+  status               String   @default("upcoming") // upcoming | ongoing | completed | cancelled
+  isPublic             Boolean  @default(true)
+  registrationDeadline DateTime
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  creator       userInfo @relation(fields: [creatorId], references: [id])
+  venue         Venue?   @relation(fields: [venueId], references: [id])
+  registrations EventRegistration[]
+
+  @@index([status])
+  @@index([creatorId])
+}
+
+model EventRegistration {
+  id             String    @id @default(uuid())
+  eventId        String
+  userId         Int?      // set for participationType: 'individual'
+  footballTeamId Int?      // set for participationType: 'team'
+  status         String    @default("pending") // pending | accepted | rejected
+  notes          String?   @db.Text
+  processedAt    DateTime?
+  processedBy    Int?      // userInfo.id of the organizer who processed it
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  event        Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user         userInfo?     @relation(fields: [userId], references: [id])
+  footballTeam footballTeam? @relation(fields: [footballTeamId], references: [id])
+
+  @@unique([eventId, userId])
+  @@unique([eventId, footballTeamId])
+  @@index([eventId])
+}
+
+model Match {
+  id                      String    @id @default(uuid())
+  creatorId               Int
+  homeTeamId              Int
+  awayTeamId              Int
+  matchType               String    @default("friendly") // 'friendly' | 'tournament'
+  venueName               String?
+  playersPerTeam          Int
+  allowedSubs             Int
+  extraTimeAllowed        Boolean   @default(false)
+  duration                Int       // minutes, regulation time
+  homeRoster              Json      // snapshot: {startingXI:number[], bench:number[], captainId, subsUsed}
+  awayRoster              Json      // same shape
+  referees                Json      // string[] snapshot
+  status                  String    @default("scheduled") // scheduled | live | completed | abandoned
+  homeScore               Int       @default(0)
+  awayScore               Int       @default(0)
+  penaltyHomeScore        Int?
+  penaltyAwayScore        Int?      // set only when a tie must be broken (knockout fixtures)
+  currentMinute           Int       @default(0)
+  currentPossessionTeamId Int?
+  lastPossessionChangeSeconds Int   @default(0)
+  homePossessionSeconds   Int       @default(0)
+  awayPossessionSeconds   Int       @default(0)
+  startedAt               DateTime?
+  endedAt                 DateTime?
+  notes                   String?   @db.Text
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  creator  userInfo          @relation(fields: [creatorId], references: [id])
+  homeTeam footballTeam      @relation("HomeMatches", fields: [homeTeamId], references: [id])
+  awayTeam footballTeam      @relation("AwayMatches", fields: [awayTeamId], references: [id])
+  events   MatchEvent[]
+  stats    MatchPlayerStat[]
+  fixture  TournamentFixture?
+
+  @@index([status])
+  @@index([homeTeamId])
+  @@index([awayTeamId])
+}
+
+model MatchEvent {
+  id              String   @id @default(uuid())
+  matchId         String
+  teamId          Int
+  playerId        Int?     // footballProfile.id; null for team-level events
+  relatedPlayerId Int?     // assist provider / sub-in player
+  eventType       String   // 'goal' | 'own_goal' | 'yellow_card' | 'red_card' | 'substitution' | ...
+  eventSubType    String?
+  minute          Int
+  seconds         Int      @default(0)
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+}
+
+model MatchPlayerStat {
+  id            String  @id @default(uuid())
+  matchId       String
+  playerId      Int     // footballProfile.id
+  teamId        Int
+  goals         Int     @default(0)
+  assists       Int     @default(0)
+  yellowCards   Int     @default(0)
+  redCards      Int     @default(0)
+  minutesPlayed Int     @default(0)
+  isStarter     Boolean @default(true)
+
+  match  Match           @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player footballProfile @relation(fields: [playerId], references: [id])
+
+  @@unique([matchId, playerId])
+  @@index([playerId])
+}
+
+model Tournament {
+  id               String   @id @default(uuid())
+  creatorId        Int
+  name             String
+  description      String?  @db.Text
+  format           String                      // 'league' | 'knockout'
+  teamCount        Int
+  matchesPerPair   Int?     @default(1)         // league only
+  extraTimeAllowed Boolean  @default(false)      // knockout only
+  playersPerTeam   Int
+  allowedSubs      Int
+  venueName        String?
+  status           String   @default("draft")   // draft | ongoing | completed | cancelled
+  currentRound     Int      @default(1)          // knockout only
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  creator  userInfo            @relation(fields: [creatorId], references: [id])
+  entries  TournamentEntry[]
+  fixtures TournamentFixture[]
+
+  @@index([status])
+}
+
+model TournamentEntry {
+  id           String  @id @default(uuid())
+  tournamentId String
+  teamId       Int
+  groupName    String?              // league grouping; null = single table
+  seed         Int?                 // knockout bracket seed
+  played       Int     @default(0)
+  won          Int     @default(0)
+  drawn        Int     @default(0)
+  lost         Int     @default(0)
+  goalsFor     Int     @default(0)
+  goalsAgainst Int     @default(0)
+  points       Int     @default(0)
+  status       String  @default("active")   // knockout: active | eliminated | winner
+
+  tournament Tournament   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  team       footballTeam @relation(fields: [teamId], references: [id])
+
+  @@unique([tournamentId, teamId])
+  @@index([tournamentId])
+}
+
+model TournamentFixture {
+  id            String   @id @default(uuid())
+  tournamentId  String
+  round         Int
+  groupName     String?
+  homeTeamId    Int?                    // null until bracket resolves (later knockout rounds)
+  awayTeamId    Int?
+  nextFixtureId String?                 // knockout bracket progression; multiple fixtures (e.g. both semis) can advance into the same next fixture
+  matchId       String?  @unique         // set once played
+  status        String   @default("pending")  // pending | ready | completed
+  createdAt     DateTime @default(now())
+
+  tournament       Tournament          @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  homeTeam         footballTeam?       @relation("FixtureHome", fields: [homeTeamId], references: [id])
+  awayTeam         footballTeam?       @relation("FixtureAway", fields: [awayTeamId], references: [id])
+  match            Match?              @relation(fields: [matchId], references: [id])
+  nextFixture      TournamentFixture?  @relation("BracketAdvance", fields: [nextFixtureId], references: [id])
+  previousFixtures TournamentFixture[] @relation("BracketAdvance")
+
+  @@index([tournamentId])
 }

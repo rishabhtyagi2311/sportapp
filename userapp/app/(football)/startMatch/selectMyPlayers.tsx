@@ -13,32 +13,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFootballStore } from '@/store/footballTeamStore';
 import { useMatchCreationStore } from '@/store/footballMatchCreationStore';
-import { FootballPlayer, FootballPosition } from '@/types/addingMemberTypes';
+import { FootballProfile } from '@/types/football';
 
 export default function SelectMyTeamPlayersScreen() {
   const router = useRouter();
-  const { teams, players } = useFootballStore();
-  const { 
-    matchData, 
-    updateMyTeamPlayers, 
+  const { teams } = useFootballStore();
+  const {
+    matchData,
+    updateMyTeamPlayers,
     canProceedToNextStep,
-    setError 
+    setError
   } = useMatchCreationStore();
 
-  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [selectedPlayers, setSelectedPlayers] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Get my team data
   const myTeam = teams.find(team => team.id === matchData.myTeam.teamId);
-  
+
   // Get available players for my team
   const availablePlayers = useMemo(() => {
     if (!myTeam) return [];
-    
-    return myTeam.memberPlayerIds
-      .map(playerId => players.find(player => player.id === playerId))
-      .filter((player): player is FootballPlayer => player !== undefined && player.isRegistered);
-  }, [myTeam, players]);
+    return myTeam.members.map((m) => m.footballProfile);
+  }, [myTeam]);
 
   // Initialize with previously selected players if any
   useEffect(() => {
@@ -47,19 +44,19 @@ export default function SelectMyTeamPlayersScreen() {
     }
   }, [matchData.myTeam.selectedPlayers]);
 
-  // Group players by position
+  // Group players by role
   const playersByPosition = useMemo(() => {
-    const grouped: Record<FootballPosition, FootballPlayer[]> = {} as Record<FootballPosition, FootballPlayer[]>;
+    const grouped: Record<string, FootballProfile[]> = {};
     availablePlayers.forEach(player => {
-      if (!grouped[player.position]) {
-        grouped[player.position] = [];
+      if (!grouped[player.role]) {
+        grouped[player.role] = [];
       }
-      grouped[player.position].push(player);
+      grouped[player.role].push(player);
     });
     return grouped;
   }, [availablePlayers]);
 
-  const handlePlayerToggle = useCallback((playerId: string) => {
+  const handlePlayerToggle = useCallback((playerId: number) => {
     setSelectedPlayers(prev => {
       const isSelected = prev.includes(playerId);
       
@@ -118,7 +115,7 @@ export default function SelectMyTeamPlayersScreen() {
   }, [router]);
 
   // Render player card
-  const renderPlayerCard = useCallback((player: FootballPlayer) => {
+  const renderPlayerCard = useCallback((player: FootballProfile) => {
     const isSelected = selectedPlayers.includes(player.id);
     
     return (
@@ -146,7 +143,7 @@ export default function SelectMyTeamPlayersScreen() {
               <Text className={`text-lg font-bold ${
                 isSelected ? 'text-green-800' : 'text-slate-900'
               }`}>
-                {player.name}
+                {player.nickname}
               </Text>
               {player.experience && (
                 <View className={`ml-2 px-2 py-1 rounded-lg ${
@@ -161,31 +158,17 @@ export default function SelectMyTeamPlayersScreen() {
               )}
             </View>
             <View className="flex-row items-center mb-1">
-              <Ionicons 
-                name="football" 
-                size={14} 
-                color={isSelected ? '#166534' : '#64748b'} 
+              <Ionicons
+                name="football"
+                size={14}
+                color={isSelected ? '#166534' : '#64748b'}
               />
               <Text className={`text-sm ml-1 font-medium ${
                 isSelected ? 'text-green-700' : 'text-slate-600'
               }`}>
-                {player.position}
+                {player.role}
               </Text>
             </View>
-            {player.preferredFoot && (
-              <View className="flex-row items-center">
-                <Ionicons 
-                  name="footsteps" 
-                  size={14} 
-                  color={isSelected ? '#166534' : '#64748b'} 
-                />
-                <Text className={`text-xs ml-1 ${
-                  isSelected ? 'text-green-600' : 'text-slate-500'
-                }`}>
-                  {player.preferredFoot} foot
-                </Text>
-              </View>
-            )}
           </View>
           <View className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
             isSelected 
@@ -239,7 +222,7 @@ export default function SelectMyTeamPlayersScreen() {
             No Players Available
           </Text>
           <Text className="text-slate-600 text-center mb-6">
-            {myTeam.teamName} doesn't have any registered players.
+            {myTeam.name} doesn't have any registered players.
           </Text>
           <TouchableOpacity
             onPress={handleGoBack}
@@ -273,7 +256,7 @@ export default function SelectMyTeamPlayersScreen() {
               Select Players
             </Text>
             <Text className="text-slate-300 mt-1">
-              {myTeam.teamName} • {selectedPlayers.length}/{matchData.playersPerTeam} selected
+              {myTeam.name} • {selectedPlayers.length}/{matchData.playersPerTeam} selected
             </Text>
           </View>
           

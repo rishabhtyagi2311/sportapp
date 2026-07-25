@@ -6,45 +6,55 @@ import {
   TouchableOpacity,
   Alert,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Event } from '@/types/booking';
-import { useBookingStore } from '@/store/venueStore';
-import { useFootballStore, Team } from '@/store/footballTeamStore';
+import { useEventManagerStore } from '@/store/eventManagerStore';
 import { useRegistrationRequestStore } from '@/store/eventRegistrationRequestStore';
-
-const generateId = () =>
-  `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+import { useAuthStore } from '@/store/authStore';
+import { footballService } from '@/services/football';
 
 export default function FootballTournamentEventDetailsScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
   const router = useRouter();
 
-  const { getEventById, getVenueById } = useBookingStore();
-  const { currentPlayer, teams } = useFootballStore();
-  const { addRequest } = useRegistrationRequestStore();
+  const { getEventById, fetchEventById } = useEventManagerStore();
+  const { createRegistration } = useRegistrationRequestStore();
+  const user = useAuthStore((state) => state.user);
 
-  const [event, setEvent] = useState<Event | null>(null);
-  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [myTeams, setMyTeams] = useState<any[]>([]);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const event = getEventById(eventId!);
 
   useEffect(() => {
-    if (!eventId) return;
-    const found = getEventById(eventId);
-    if (found) setEvent(found);
+    if (eventId) fetchEventById(eventId);
   }, [eventId]);
+
+  useEffect(() => {
+    if (!user) return;
+    setLoadingTeams(true);
+    footballService
+      .fetchMyTeams()
+      .then((teams: any[]) => {
+        setMyTeams(teams.filter((t) => t.createdBy?.user?.id === user.id));
+      })
+      .finally(() => setLoadingTeams(false));
+  }, [user?.id]);
 
   if (!event) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-slate-100">
-        <Text className="text-slate-500">Tournament not found</Text>
+        <ActivityIndicator size="large" color="#0f172a" />
       </SafeAreaView>
     );
   }
 
-  const venue = getVenueById(event.venueId);
   const deadline = new Date(event.registrationDeadline);
 
   const isRegistrationOpen =
@@ -52,39 +62,28 @@ export default function FootballTournamentEventDetailsScreen() {
     new Date() < deadline &&
     event.currentParticipants < event.maxParticipants;
 
-  const captainTeams = currentPlayer
-    ? teams.filter(
-        (t) => t.captainId === currentPlayer.id && t.status === 'active'
-      )
-    : [];
+  const canRegister = !!user && myTeams.length > 0 && isRegistrationOpen;
 
-  const canRegister =
-    !!currentPlayer && captainTeams.length > 0 && isRegistrationOpen;
-
-  const handleRegister = () => {
-    if (!currentPlayer || !selectedTeam) {
+  const handleRegister = async () => {
+    if (!selectedTeamId) {
       Alert.alert('Select a team', 'Please select a team to continue.');
       return;
     }
 
-    addRequest({
-      id: generateId(),
-      domain: 'football_tournament',
-      eventId: event.id,
-      teamId: selectedTeam.id,
-      teamName: selectedTeam.teamName,
-      captainPlayerId: currentPlayer.id,
-      captainName: currentPlayer.name,
-      status: 'pending',
-      submittedAt: new Date().toISOString(),
-    });
-
-    Alert.alert(
-      'Registration Submitted',
-      'Your request has been sent to the organizer.'
-    );
-
-    setSelectedTeam(null);
+    setSubmitting(true);
+    try {
+      await createRegistration(event.id, {
+        participationType: 'team',
+        footballTeamId: selectedTeamId,
+      });
+      Alert.alert('Registration Submitted', 'Your request has been sent to the organizer.', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Could not submit registration');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -110,21 +109,15 @@ export default function FootballTournamentEventDetailsScreen() {
           <View className="flex-row items-center justify-between mb-3">
             <View
               className={`px-3 py-1 rounded-full ${
-                isRegistrationOpen
-                  ? 'bg-green-100'
-                  : 'bg-red-100'
+                isRegistrationOpen ? 'bg-green-100' : 'bg-red-100'
               }`}
             >
               <Text
                 className={`text-xs font-semibold uppercase ${
-                  isRegistrationOpen
-                    ? 'text-green-700'
-                    : 'text-red-700'
+                  isRegistrationOpen ? 'text-green-700' : 'text-red-700'
                 }`}
               >
-                {isRegistrationOpen
-                  ? 'Registration Open'
-                  : 'Registration Closed'}
+                {isRegistrationOpen ? 'Registration Open' : 'Registration Closed'}
               </Text>
             </View>
 
@@ -164,26 +157,32 @@ export default function FootballTournamentEventDetailsScreen() {
             <View className="flex-row items-center bg-slate-50 px-4 py-2 rounded-xl border border-slate-200">
               <Ionicons name="location" size={16} color="#334155" />
               <Text className="ml-2 text-slate-700 font-medium">
-                {venue?.name ?? 'Venue TBD'}
+                {event.venueName || event.locationName || 'Venue TBD'}
               </Text>
             </View>
           </View>
         </View>
 
         {/* Info Messages */}
-        {!currentPlayer && (
+        {!user && (
           <View className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
             <Text className="text-amber-800 font-medium">
-              Please sign in to your football profile to register.
+              Please sign in to register.
             </Text>
           </View>
         )}
 
-        {currentPlayer && captainTeams.length === 0 && (
+        {user && !loadingTeams && myTeams.length === 0 && (
           <View className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
             <Text className="text-blue-800 font-medium">
-              Only team captains can register for tournaments.
+              Only team captains can register for tournaments. Create a football team first to register.
             </Text>
+          </View>
+        )}
+
+        {loadingTeams && (
+          <View className="items-center py-6">
+            <ActivityIndicator size="small" color="#0f172a" />
           </View>
         )}
 
@@ -194,18 +193,16 @@ export default function FootballTournamentEventDetailsScreen() {
               Select Your Team
             </Text>
 
-            {captainTeams.map((team) => {
-              const selected = selectedTeam?.id === team.id;
+            {myTeams.map((team) => {
+              const selected = selectedTeamId === team.id;
 
               return (
                 <TouchableOpacity
                   key={team.id}
-                  onPress={() => setSelectedTeam(team)}
+                  onPress={() => setSelectedTeamId(team.id)}
                   activeOpacity={0.85}
                   className={`p-4 rounded-xl mb-3 border ${
-                    selected
-                      ? 'bg-slate-900 border-slate-900'
-                      : 'bg-white border-slate-300'
+                    selected ? 'bg-slate-900 border-slate-900' : 'bg-white border-slate-300'
                   }`}
                 >
                   <View className="flex-row items-center justify-between">
@@ -215,25 +212,19 @@ export default function FootballTournamentEventDetailsScreen() {
                           selected ? 'text-white' : 'text-slate-900'
                         }`}
                       >
-                        {team.teamName}
+                        {team.name}
                       </Text>
                       <Text
                         className={`text-sm mt-1 ${
-                          selected
-                            ? 'text-slate-200'
-                            : 'text-slate-500'
+                          selected ? 'text-slate-200' : 'text-slate-500'
                         }`}
                       >
-                        {team.city} • {team.memberPlayerIds.length} players
+                        {team.location} • {team.members?.length ?? 0} players
                       </Text>
                     </View>
 
                     <Ionicons
-                      name={
-                        selected
-                          ? 'checkmark-circle'
-                          : 'radio-button-off'
-                      }
+                      name={selected ? 'checkmark-circle' : 'radio-button-off'}
                       size={24}
                       color={selected ? '#ffffff' : '#cbd5f5'}
                     />
@@ -244,12 +235,17 @@ export default function FootballTournamentEventDetailsScreen() {
 
             <TouchableOpacity
               onPress={handleRegister}
+              disabled={submitting}
               activeOpacity={0.9}
               className="mt-5 bg-slate-900 py-4 rounded-xl items-center"
             >
-              <Text className="text-white font-semibold text-base">
-                Submit Registration Request
-              </Text>
+              {submitting ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text className="text-white font-semibold text-base">
+                  Submit Registration Request
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         )}

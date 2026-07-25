@@ -3,14 +3,17 @@ import { Tabs, useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { View, Platform } from 'react-native';
-import ActionModal from '../../components/actionModal'; 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ActionModal from '../../components/actionModal';
 
 export default function TabLayout() {
   const router = useRouter();
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
   const [isModalVisible, setModalVisible] = useState(false);
 
   const isHome = pathname === '/';
+  const tabBarBaseHeight = 60;
 
   return (
     <>
@@ -22,7 +25,9 @@ export default function TabLayout() {
           tabBarInactiveTintColor: '#94a3b8',
           tabBarStyle: {
             position: 'absolute',
-            height: 85,
+            height: tabBarBaseHeight + insets.bottom,
+            paddingBottom: insets.bottom,
+            paddingTop: 8,
             backgroundColor: 'black',
             borderTopWidth: 0,
             elevation: 0,

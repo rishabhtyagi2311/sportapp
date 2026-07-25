@@ -100,6 +100,88 @@ describe('Students', () => {
   });
 });
 
+describe('Enrollment approval', () => {
+  function fakePendingStudent(overrides: Partial<any> = {}) {
+    return {
+      id: 'student-1',
+      academyId: ACADEMY_ID,
+      childProfileId: 'child-1',
+      name: 'Timmy',
+      age: 10,
+      fatherName: 'Jane Doe',
+      fatherContact: '9999999999',
+      status: 'pending',
+      enrollmentDate: new Date(),
+      createdAt: new Date(),
+      ...overrides,
+    };
+  }
+
+  it('lists pending enrollments for an owned academy', async () => {
+    prismaMock.academy.findFirst.mockResolvedValue(fakeAcademy() as any);
+    prismaMock.student.findMany.mockResolvedValue([fakePendingStudent()] as any);
+
+    const res = await request(app)
+      .get(`/api/v1/partner/academies/${ACADEMY_ID}/students?status=pending`)
+      .set(authHeader(PARTNER_ID));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(prismaMock.student.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ academyId: ACADEMY_ID, status: 'pending' }) })
+    );
+  });
+
+  it('approves a pending enrollment', async () => {
+    prismaMock.academy.findFirst.mockResolvedValue(fakeAcademy() as any);
+    prismaMock.student.findFirst.mockResolvedValue(fakePendingStudent() as any);
+    prismaMock.student.update.mockResolvedValue(fakePendingStudent({ status: 'active' }) as any);
+
+    const res = await request(app)
+      .patch(`/api/v1/partner/academies/${ACADEMY_ID}/students/student-1/approve`)
+      .set(authHeader(PARTNER_ID));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('active');
+  });
+
+  it('rejects a pending enrollment', async () => {
+    prismaMock.academy.findFirst.mockResolvedValue(fakeAcademy() as any);
+    prismaMock.student.findFirst.mockResolvedValue(fakePendingStudent() as any);
+    prismaMock.student.update.mockResolvedValue(fakePendingStudent({ status: 'inactive' }) as any);
+
+    const res = await request(app)
+      .patch(`/api/v1/partner/academies/${ACADEMY_ID}/students/student-1/reject`)
+      .set(authHeader(PARTNER_ID));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('inactive');
+  });
+
+  it('refuses to approve an enrollment that is not pending', async () => {
+    prismaMock.academy.findFirst.mockResolvedValue(fakeAcademy() as any);
+    prismaMock.student.findFirst.mockResolvedValue(fakePendingStudent({ status: 'active' }) as any);
+
+    const res = await request(app)
+      .patch(`/api/v1/partner/academies/${ACADEMY_ID}/students/student-1/approve`)
+      .set(authHeader(PARTNER_ID));
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.student.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses to approve an enrollment for an academy owned by another partner', async () => {
+    prismaMock.academy.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .patch(`/api/v1/partner/academies/${ACADEMY_ID}/students/student-1/approve`)
+      .set(authHeader('partner-2'));
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.student.update).not.toHaveBeenCalled();
+  });
+});
+
 describe('Coaches', () => {
   it('adds a coach to an owned academy', async () => {
     prismaMock.academy.findFirst.mockResolvedValue(fakeAcademy() as any);

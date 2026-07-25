@@ -1,10 +1,10 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  
+
   StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,13 +19,18 @@ export default function ReviewsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const academyId = id as string;
 
-  const { getAcademyById } = useAcademyStore();
+  const { getAcademyById, fetchAcademyById } = useAcademyStore();
   const academy = getAcademyById(academyId);
 
-  const { getReviewsByAcademy, getAverageRatingForAcademy } = useReviewsStore();
+  const { getReviewsByAcademy, fetchReviewsForAcademy } = useReviewsStore();
 
   const reviews = getReviewsByAcademy(academyId);
-  const averageRating = getAverageRatingForAcademy(academyId) || 0;
+  const averageRating = academy?.averageRating || 0;
+
+  useEffect(() => {
+    fetchAcademyById(academyId);
+    fetchReviewsForAcademy(academyId);
+  }, [academyId]);
 
   if (!academy) {
     return (
@@ -147,18 +152,13 @@ export default function ReviewsScreen() {
               <View className="flex-row items-center flex-1">
                 <View className="w-10 h-10 bg-slate-900 rounded-xl items-center justify-center mr-3">
                   <Text className="text-white font-bold text-lg">
-                    {review.reviewerName?.charAt(0) ?? "P"}
+                    {review.childName?.charAt(0) ?? "P"}
                   </Text>
                 </View>
                 <View className="flex-1">
                   <Text className="text-slate-900 font-semibold text-sm">
-                    {review.reviewerName || "Parent"}
+                    {review.childName ? `Parent of ${review.childName}` : "Parent"}
                   </Text>
-                  {review.childName ? (
-                    <Text className="text-gray-500 text-xs mt-0.5">
-                      Parent of {review.childName}
-                    </Text>
-                  ) : null}
                   {review.createdAt && (
                     <Text className="text-gray-400 text-xs mt-0.5">
                       {formatReviewDate(review.createdAt)}

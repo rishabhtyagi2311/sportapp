@@ -1,96 +1,114 @@
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
-import { immer } from 'zustand/middleware/immer';
-import { Event } from '@/types/booking';
-import { useBookingStore } from '@/store/venueStore';
+import { EventItem } from '@/types/event';
+import { eventApiService } from '@/services/eventManagement/event';
 
 interface EventManagerState {
-  managedEvents: Event[];
+  events: EventItem[];
+  myEvents: EventItem[];
   isLoading: boolean;
   error: string | null;
 
-  // Core actions
-  createEvent: (event: Event) => void;
-  updateEvent: (eventId: string, update: Partial<Event>) => void;
-  completeEvent: (eventId: string) => void;
-  deleteEvent: (eventId: string) => void;
-
-  // Queries
-  getEventsByManager: (managerId: string) => Event[];
-  getUpcomingEvents: (managerId: string) => Event[];
-  getCompletedEvents: (managerId: string) => Event[];
+  fetchPublicEvents: (filters?: { sportName?: string; city?: string; eventType?: string; status?: string }) => Promise<void>;
+  fetchMyEvents: () => Promise<void>;
+  fetchEventById: (id: string) => Promise<EventItem | null>;
+  createEvent: (input: Record<string, any>) => Promise<EventItem>;
+  updateEvent: (id: string, input: Record<string, any>) => Promise<EventItem>;
+  deleteEvent: (id: string) => Promise<void>;
+  getEventById: (id: string) => EventItem | undefined;
 }
 
-export const useEventManagerStore = create<EventManagerState>()(
-  devtools(
-    immer((set, get) => ({
-      managedEvents: [],
-      isLoading: false,
-      error: null,
+export const useEventManagerStore = create<EventManagerState>((set, get) => ({
+  events: [],
+  myEvents: [],
+  isLoading: false,
+  error: null,
 
-      /* ---------------- CREATE ---------------- */
-      createEvent: (event) =>
-        set((state) => {
-          // 1. Update Manager Store
-          state.managedEvents.push(event);
+  fetchPublicEvents: async (filters) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await eventApiService.getEvents(filters);
+      set({ events: response.data, isLoading: false });
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || 'Could not load events', isLoading: false });
+    }
+  },
 
-          // 2. Sync Booking Store (Public View)
-          // We access the store directly to trigger the update
-          useBookingStore.getState().addEvent(event);
-        }),
+  fetchMyEvents: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await eventApiService.getMyEvents();
+      set({ myEvents: response.data, isLoading: false });
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || 'Could not load your events', isLoading: false });
+    }
+  },
 
-      /* ---------------- UPDATE ---------------- */
-      updateEvent: (eventId, update) =>
-        set((state) => {
-          const idx = state.managedEvents.findIndex((e) => e.id === eventId);
-          if (idx === -1) return;
+  fetchEventById: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await eventApiService.getEventById(id);
+      set((state) => {
+        const merge = (list: EventItem[]) => {
+          const idx = list.findIndex((e) => e.id === id);
+          if (idx === -1) return [...list, response.data];
+          const copy = [...list];
+          copy[idx] = response.data;
+          return copy;
+        };
+        return { events: merge(state.events), myEvents: merge(state.myEvents), isLoading: false };
+      });
+      return response.data;
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || 'Could not load event', isLoading: false });
+      return null;
+    }
+  },
 
-          // Generate one timestamp so both stores match exactly
-          const timestamp = new Date().toISOString();
-          const finalUpdate = { ...update, updatedAt: timestamp };
+  createEvent: async (input) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await eventApiService.createEvent(input);
+      set((state) => ({ myEvents: [response.data, ...state.myEvents], isLoading: false }));
+      return response.data;
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not create event';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
 
-          // 1. Update Manager Store
-          state.managedEvents[idx] = {
-            ...state.managedEvents[idx],
-            ...finalUpdate,
-          };
+  updateEvent: async (id, input) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await eventApiService.updateEvent(id, input);
+      set((state) => ({
+        myEvents: state.myEvents.map((e) => (e.id === id ? response.data : e)),
+        events: state.events.map((e) => (e.id === id ? response.data : e)),
+        isLoading: false,
+      }));
+      return response.data;
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not update event';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
 
-          // 2. Sync Booking Store
-          useBookingStore.getState().updateEvent(eventId, finalUpdate);
-        }),
+  deleteEvent: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      await eventApiService.deleteEvent(id);
+      set((state) => ({
+        myEvents: state.myEvents.filter((e) => e.id !== id),
+        events: state.events.filter((e) => e.id !== id),
+        isLoading: false,
+      }));
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not delete event';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
 
-      /* ---------------- COMPLETE ---------------- */
-      completeEvent: (eventId) => {
-        // We reuse updateEvent to ensure sync logic happens automatically
-        get().updateEvent(eventId, { status: 'completed' });
-      },
-
-      /* ---------------- DELETE ---------------- */
-      deleteEvent: (eventId) =>
-        set((state) => {
-          // 1. Update Manager Store
-          state.managedEvents = state.managedEvents.filter(
-            (e) => e.id !== eventId
-          );
-
-          // 2. Sync Booking Store
-          useBookingStore.getState().deleteEvent(eventId);
-        }),
-
-      /* ---------------- QUERIES ---------------- */
-      getEventsByManager: (managerId) =>
-        get().managedEvents.filter((e) => e.creatorId === managerId),
-
-      getUpcomingEvents: (managerId) =>
-        get().managedEvents.filter(
-          (e) => e.creatorId === managerId && e.status === 'upcoming'
-        ),
-
-      getCompletedEvents: (managerId) =>
-        get().managedEvents.filter(
-          (e) => e.creatorId === managerId && e.status === 'completed'
-        ),
-    })),
-    { name: 'event-manager-store' }
-  )
-);
+  getEventById: (id) => get().events.find((e) => e.id === id) || get().myEvents.find((e) => e.id === id),
+}));

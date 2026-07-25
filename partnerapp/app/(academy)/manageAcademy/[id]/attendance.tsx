@@ -47,7 +47,7 @@ export default function AttendanceScreen() {
   );
 
   const students = useMemo(
-    () => allStudents.filter((s) => s.academyId === id),
+    () => allStudents.filter((s) => s.academyId === id && s.status !== 'pending'),
     [allStudents, id]
   );
 

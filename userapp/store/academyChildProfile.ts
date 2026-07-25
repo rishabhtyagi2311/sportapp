@@ -1,63 +1,85 @@
 // store/academyChildProfile.ts
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-export interface ChildProfile {
-  id: string;
-  fatherName: string;
-  motherName: string;
-  childName: string;
-  childAge: string;
-  address: string;
-  city: string;
-  createdAt?: string;
-}
+import { ChildProfile } from '@/types/academy';
+import { academyApiService } from '@/services/academyManagement/academy';
 
 interface ChildStore {
   childProfiles: ChildProfile[];
-  addChildProfile: (profile: ChildProfile) => void;
-  updateChildProfile: (id: string, profile: Partial<ChildProfile>) => void;
-  deleteChildProfile: (id: string) => void;
+  isLoading: boolean;
+  error: string | null;
+
+  fetchMyChildProfiles: () => Promise<void>;
+  createChildProfile: (profile: {
+    childName: string;
+    childAge: number;
+    motherName?: string;
+    fatherName: string;
+    fatherContact?: string;
+    address?: string;
+    city?: string;
+  }) => Promise<ChildProfile>;
+  updateChildProfile: (id: string, profile: Partial<ChildProfile>) => Promise<void>;
+  deleteChildProfile: (id: string) => Promise<void>;
   hasProfiles: () => boolean;
 }
 
-export const usechildStore = create<ChildStore>()(
-  persist(
-    (set, get) => ({
-      childProfiles: [],
+export const usechildStore = create<ChildStore>((set, get) => ({
+  childProfiles: [],
+  isLoading: false,
+  error: null,
 
-      addChildProfile: (profile) =>
-        set((state) => ({
-          childProfiles: [
-            ...state.childProfiles,
-            {
-              ...profile,
-              createdAt: profile.createdAt || new Date().toISOString(),
-            },
-          ],
-        })),
-
-      updateChildProfile: (id, updates) =>
-        set((state) => ({
-          childProfiles: state.childProfiles.map((profile) =>
-            profile.id === id ? { ...profile, ...updates } : profile
-          ),
-        })),
-
-      deleteChildProfile: (id) =>
-        set((state) => ({
-          childProfiles: state.childProfiles.filter((profile) => profile.id !== id),
-        })),
-
-      hasProfiles: () => {
-        const state = get();
-        return state.childProfiles.length > 0;
-      },
-    }),
-    {
-      name: 'child-profiles-storage',
-      storage: createJSONStorage(() => AsyncStorage),
+  fetchMyChildProfiles: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.getMyChildProfiles();
+      set({ childProfiles: response.data, isLoading: false });
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || 'Could not load child profiles', isLoading: false });
     }
-  )
-);
+  },
+
+  createChildProfile: async (profile) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.createChildProfile(profile);
+      set((state) => ({ childProfiles: [response.data, ...state.childProfiles], isLoading: false }));
+      return response.data;
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not create child profile';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
+
+  updateChildProfile: async (id, updates) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.updateChildProfile(id, updates);
+      set((state) => ({
+        childProfiles: state.childProfiles.map((profile) => (profile.id === id ? response.data : profile)),
+        isLoading: false,
+      }));
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not update child profile';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
+
+  deleteChildProfile: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      await academyApiService.deleteChildProfile(id);
+      set((state) => ({
+        childProfiles: state.childProfiles.filter((profile) => profile.id !== id),
+        isLoading: false,
+      }));
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not delete child profile';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
+
+  hasProfiles: () => get().childProfiles.length > 0,
+}));

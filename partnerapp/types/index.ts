@@ -42,6 +42,7 @@ export type Student = {
   fatherName: string;
   fatherContact: string;
   academyId: string;
+  status?: 'active' | 'pending' | 'inactive';
   enrollmentDate: string;
 };
 

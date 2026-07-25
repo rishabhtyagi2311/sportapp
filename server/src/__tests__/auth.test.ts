@@ -1,6 +1,7 @@
 import { prismaMock, resetPrismaMock } from './helpers/prismaMock';
 import request from 'supertest';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import app from '../app';
 import { authHeader } from './helpers/auth';
 
@@ -132,6 +133,22 @@ describe('GET /api/v1/partner/auth/me', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.id).toBe('partner-1');
+  });
+
+  it('rejects a token with no type field (pre-migration legacy token)', async () => {
+    const legacyToken = jwt.sign({ id: 'partner-1' }, process.env.JWT_SECRET as string, { expiresIn: '1h' });
+
+    const res = await request(app).get('/api/v1/partner/auth/me').set('Authorization', `Bearer ${legacyToken}`);
+
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects a user-typed token on a partner route', async () => {
+    const userToken = jwt.sign({ id: 1, type: 'user' }, process.env.JWT_SECRET as string, { expiresIn: '1h' });
+
+    const res = await request(app).get('/api/v1/partner/auth/me').set('Authorization', `Bearer ${userToken}`);
+
+    expect(res.status).toBe(403);
   });
 });
 

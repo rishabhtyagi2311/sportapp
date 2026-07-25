@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -16,9 +16,13 @@ import { useEnrollmentStore } from "@/store/academyEnrollmentStore";
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const childProfiles = usechildStore((state) => state.childProfiles);
-  const deleteChildProfile = usechildStore((state) => state.deleteChildProfile);
-  const getEnrollmentsByChild = useEnrollmentStore((state) => state.getEnrollmentsByChild);
+  const { childProfiles, fetchMyChildProfiles, deleteChildProfile } = usechildStore();
+  const { getEnrollmentsByChild, fetchMyEnrollments } = useEnrollmentStore();
+
+  useEffect(() => {
+    fetchMyChildProfiles();
+    fetchMyEnrollments();
+  }, []);
 
   const navigateToForm = useMemo(() => {
     return (isEditing: boolean = false, profile?: any) => {
@@ -65,7 +69,9 @@ export default function ProfileScreen() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => deleteChildProfile(id),
+          onPress: () => {
+            deleteChildProfile(id).catch((err: any) => Alert.alert("Error", err.message));
+          },
         },
       ]
     );
@@ -73,7 +79,7 @@ export default function ProfileScreen() {
 
 const renderProfileCard = (profile: any) => {
     const childEnrollments = getEnrollmentsByChild(profile.id);
-    const enrollmentCount = childEnrollments.length;
+    const activeEnrollmentCount = childEnrollments.filter((e) => e.status === 'active').length;
 
     return (
       <TouchableOpacity
@@ -145,7 +151,7 @@ const renderProfileCard = (profile: any) => {
               <View className="w-[1px] h-8 bg-slate-200 mx-2" />
               <View>
                 <Text className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Enrollments</Text>
-                <Text className="text-slate-700 font-semibold">{enrollmentCount} Active</Text>
+                <Text className="text-slate-700 font-semibold">{activeEnrollmentCount} Active</Text>
               </View>
             </View>
             

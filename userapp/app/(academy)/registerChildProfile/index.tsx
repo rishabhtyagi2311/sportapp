@@ -1,24 +1,19 @@
 // app/(academy)/registerChildProfile/index.tsx
 import React, { useState, useEffect } from "react";
-import {
-  SafeAreaView,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  Platform,
-} from "react-native";
+import { View, Text, TextInput, TouchableOpacity, Alert, Platform, ActivityIndicator } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { usechildStore } from "@/store/academyChildProfile";
+import CurrentLocationButton from "@/components/CurrentLocationButton";
 
 export default function RegisterChildProfile() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const addChildProfile = usechildStore((state) => state.addChildProfile);
+  const createChildProfile = usechildStore((state) => state.createChildProfile);
   const updateChildProfile = usechildStore((state) => state.updateChildProfile);
+  const [submitting, setSubmitting] = useState(false);
 
   const isEditing = params.isEditing === "true";
   const profileId = params.profileId as string;
@@ -49,7 +44,7 @@ export default function RegisterChildProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (
       !formData.fatherName ||
       !formData.motherName ||
@@ -62,30 +57,31 @@ export default function RegisterChildProfile() {
       return;
     }
 
-    const age = parseInt(formData.childAge);
+    const age = parseInt(formData.childAge, 10);
     if (isNaN(age) || age < 1 || age > 18) {
       Alert.alert("Error", "Please enter a valid age between 1 and 18");
       return;
     }
 
-    if (isEditing && profileId) {
-      updateChildProfile(profileId, { ...formData });
-      Alert.alert("Success", "Profile updated successfully!", [
-        {
-          text: "OK",
-          onPress: () => router.back(),
-        },
-      ]);
-    } else {
-      const id = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-      const childData = { ...formData, id };
-      addChildProfile(childData);
-      Alert.alert("Success", "Profile created successfully!", [
-        {
-          text: "OK",
-          onPress: () => router.back(),
-        },
-      ]);
+    const payload = { ...formData, childAge: age };
+
+    setSubmitting(true);
+    try {
+      if (isEditing && profileId) {
+        await updateChildProfile(profileId, payload);
+        Alert.alert("Success", "Profile updated successfully!", [
+          { text: "OK", onPress: () => router.back() },
+        ]);
+      } else {
+        await createChildProfile(payload);
+        Alert.alert("Success", "Profile created successfully!", [
+          { text: "OK", onPress: () => router.back() },
+        ]);
+      }
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Could not save profile");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -214,6 +210,11 @@ export default function RegisterChildProfile() {
           {/* Address */}
           <View className="mb-5">
             <Text className="text-white font-semibold mb-2 text-sm">Address *</Text>
+            <CurrentLocationButton
+              onDetected={({ address, city }) =>
+                setFormData((prev) => ({ ...prev, address, city: city || prev.city }))
+              }
+            />
             <View className="bg-slate-800 rounded-xl border border-slate-700">
               <View className="flex-row items-start px-4 pt-4">
                 <Ionicons
@@ -259,18 +260,25 @@ export default function RegisterChildProfile() {
           {/* Submit Button */}
           <TouchableOpacity
             onPress={handleSubmit}
+            disabled={submitting}
             className="bg-white rounded-xl py-4 mb-6 shadow-lg"
             activeOpacity={0.8}
           >
             <View className="flex-row items-center justify-center">
-              <Text className="text-black font-bold text-lg mr-2">
-                {isEditing ? "Update Profile" : "Create Profile"}
-              </Text>
-              <Ionicons
-                name="checkmark-circle-outline"
-                size={22}
-                color="black"
-              />
+              {submitting ? (
+                <ActivityIndicator color="black" />
+              ) : (
+                <>
+                  <Text className="text-black font-bold text-lg mr-2">
+                    {isEditing ? "Update Profile" : "Create Profile"}
+                  </Text>
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={22}
+                    color="black"
+                  />
+                </>
+              )}
             </View>
           </TouchableOpacity>
 

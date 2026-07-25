@@ -19,6 +19,7 @@ export declare class AuthService {
             email: string | undefined;
             city: string | undefined;
             dob: string | undefined;
+            profileImage: string | undefined;
         };
     }>;
     static getById(partnerId: string): Promise<{
@@ -29,6 +30,7 @@ export declare class AuthService {
         email: string | undefined;
         city: string | undefined;
         dob: string | undefined;
+        profileImage: string | undefined;
     }>;
     static login(data: {
         contactNumber: string;
@@ -43,7 +45,25 @@ export declare class AuthService {
             email: string | undefined;
             city: string | undefined;
             dob: string | undefined;
+            profileImage: string | undefined;
         };
+    }>;
+    static updateProfile(partnerId: string, data: {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        city?: string;
+        dob?: string;
+        profileImage?: string;
+    }): Promise<{
+        id: string;
+        firstName: string;
+        lastName: string;
+        contactNumber: string;
+        email: string | undefined;
+        city: string | undefined;
+        dob: string | undefined;
+        profileImage: string | undefined;
     }>;
 }
 //# sourceMappingURL=auth.service.d.ts.map

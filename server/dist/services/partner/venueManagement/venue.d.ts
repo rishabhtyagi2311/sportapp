@@ -175,5 +175,74 @@ export declare class VenueService {
         updatedAt: any;
     }>;
     static deleteVenue(venueId: string, partnerId: string): Promise<void>;
+    /** Public, unauthenticated browse — no partnerId scoping, active venues only. */
+    static getPublicVenues(filters?: {
+        city?: string;
+    }): Promise<{
+        id: any;
+        name: any;
+        description: any;
+        address: {
+            coordinates?: {
+                latitude: any;
+                longitude: any;
+            } | undefined;
+            street: any;
+            city: any;
+            state: any;
+            pincode: any;
+        };
+        contactInfo: any;
+        sports: any;
+        amenities: any;
+        images: any;
+        rating: any;
+        reviewCount: number;
+        operatingHours: any;
+        peakPricing: any;
+        timeSlots: any;
+        timeSlotCount: any;
+        policies: {
+            cancellationPolicy: string;
+            advanceBookingDays: number;
+            minimumBookingHours: number;
+        };
+        isActive: any;
+        createdAt: any;
+        updatedAt: any;
+    }[]>;
+    static getPublicVenueById(venueId: string): Promise<{
+        id: any;
+        name: any;
+        description: any;
+        address: {
+            coordinates?: {
+                latitude: any;
+                longitude: any;
+            } | undefined;
+            street: any;
+            city: any;
+            state: any;
+            pincode: any;
+        };
+        contactInfo: any;
+        sports: any;
+        amenities: any;
+        images: any;
+        rating: any;
+        reviewCount: number;
+        operatingHours: any;
+        peakPricing: any;
+        timeSlots: any;
+        timeSlotCount: any;
+        policies: {
+            cancellationPolicy: string;
+            advanceBookingDays: number;
+            minimumBookingHours: number;
+        };
+        isActive: any;
+        createdAt: any;
+        updatedAt: any;
+    } | null>;
 }
 //# sourceMappingURL=venue.d.ts.map

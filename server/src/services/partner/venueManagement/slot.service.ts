@@ -76,6 +76,26 @@ export class SlotService {
     });
   }
 
+  /** Public, unauthenticated slot lookup — visible only for active venues. */
+  static async getPublicSlotsForVenue(params: { venueId: string; date?: string }) {
+    const venue = await globalClient.venue.findFirst({ where: { id: params.venueId, isActive: true } });
+
+    if (!venue) {
+      throw new Error('Venue not found');
+    }
+
+    const where: any = { venueId: params.venueId };
+
+    if (params.date) {
+      where.date = new Date(params.date);
+    }
+
+    return globalClient.timeSlot.findMany({
+      where,
+      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+    });
+  }
+
   static async generateSlotsForVenue(params: {
     venueId: string;
     partnerId: string;

@@ -1,18 +1,12 @@
 // app/create-team.tsx
 import React, { useState } from "react";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import {
-  SafeAreaView,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  Platform,
-} from "react-native";
+import { View, Text, TextInput, TouchableOpacity, Alert, Platform } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useFootballStore } from "@/store/footballTeamStore";
+import CurrentLocationButton from "@/components/CurrentLocationButton";
 
 export default function CreateTeamForm() {
   const [formData, setFormData] = useState({
@@ -20,8 +14,9 @@ export default function CreateTeamForm() {
     maxPlayers: "",
     city: "",
   });
+  const [submitting, setSubmitting] = useState(false);
 
-  const addTeam = useFootballStore((state) => state.addTeam); 
+  const createTeam = useFootballStore((state) => state.createTeam);
 
   const validateForm = () => {
     if (!formData.teamName.trim()) {
@@ -46,25 +41,24 @@ export default function CreateTeamForm() {
     return true;
   };
 
-  const handleAddMembers = () => {
+  const handleAddMembers = async () => {
     if (!validateForm()) return;
-   
-    const newTeam = addTeam({
-      
-      
-      teamName: formData.teamName.trim(),
-      maxPlayers: Number(formData.maxPlayers),
-      city: formData.city.trim(),
-      memberPlayerIds: [], // fresh team starts with no members
-      status: "active",
-      matchesPlayed: 0,
-      matchesWon: 0,
-      matchesLost: 0,
-      matchesDrawn: 0,
-    });
 
-    console.log("Team created and stored:", newTeam);
-    router.push("/(football)/landingScreen/teams");
+    setSubmitting(true);
+    try {
+      await createTeam({
+        name: formData.teamName.trim(),
+        location: formData.city.trim(),
+        maxPlayers: Number(formData.maxPlayers),
+        playerIds: [],
+      });
+
+      router.push("/(football)/landingScreen/teams");
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Failed to create team.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -141,6 +135,9 @@ export default function CreateTeamForm() {
             <Text className="text-gray-400 text-sm mb-3">
               The city where your team is based
             </Text>
+            <CurrentLocationButton
+              onDetected={({ city }) => setFormData((prev) => ({ ...prev, city: city || prev.city }))}
+            />
             <View className="bg-sky-100 rounded-xl border border-gray-200 flex-row items-center px-4">
               <Ionicons name="location-outline" size={20} color="#374151" />
               <TextInput
@@ -178,12 +175,13 @@ export default function CreateTeamForm() {
         <View className="px-6 pb-6 pt-4">
           <TouchableOpacity
             onPress={handleAddMembers}
+            disabled={submitting}
             className="bg-white rounded-xl py-4 shadow-lg"
             activeOpacity={0.8}
           >
             <View className="flex-row items-center justify-center">
               <Text className="text-black font-bold text-lg mr-2">
-                Done 
+                {submitting ? "Creating…" : "Done"}
               </Text>
             </View>
           </TouchableOpacity>

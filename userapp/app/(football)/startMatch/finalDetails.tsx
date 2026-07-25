@@ -16,16 +16,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFootballStore } from '@/store/footballTeamStore';
 import { useMatchCreationStore, MatchSettings } from '@/store/footballMatchCreationStore';
-import { FootballPlayer } from '@/types/addingMemberTypes';
+import { FootballProfile } from '@/types/football';
 
 export default function FinalMatchDetailsScreen() {
   const router = useRouter();
-  const { teams, players } = useFootballStore();
-  const { 
-    matchData, 
+  const { teams } = useFootballStore();
+  const {
+    matchData,
     updateMatchSettings,
     updateSubstitutes,
-    setError 
+    setError
   } = useMatchCreationStore();
 
   // Match settings state
@@ -40,8 +40,8 @@ export default function FinalMatchDetailsScreen() {
   const [maxSubstitutions, setMaxSubstitutions] = useState('3');
 
   // Substitute selection state
-  const [myTeamSubstitutes, setMyTeamSubstitutes] = useState<string[]>([]);
-  const [opponentTeamSubstitutes, setOpponentTeamSubstitutes] = useState<string[]>([]);
+  const [myTeamSubstitutes, setMyTeamSubstitutes] = useState<number[]>([]);
+  const [opponentTeamSubstitutes, setOpponentTeamSubstitutes] = useState<number[]>([]);
   const [showSubstituteSelection, setShowSubstituteSelection] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -51,27 +51,17 @@ export default function FinalMatchDetailsScreen() {
 
   const availableMyTeamSubstitutes = useMemo(() => {
     if (!myTeamData) return [];
-    
-    return myTeamData.memberPlayerIds
-      .map(playerId => players.find(player => player.id === playerId))
-      .filter((player): player is FootballPlayer => 
-        player !== undefined && 
-        player.isRegistered && 
-        !matchData.myTeam.selectedPlayers.includes(player.id)
-      );
-  }, [myTeamData, players, matchData.myTeam.selectedPlayers]);
+    return myTeamData.members
+      .map((m) => m.footballProfile)
+      .filter((player) => !matchData.myTeam.selectedPlayers.includes(player.id));
+  }, [myTeamData, matchData.myTeam.selectedPlayers]);
 
   const availableOpponentTeamSubstitutes = useMemo(() => {
     if (!opponentTeamData) return [];
-    
-    return opponentTeamData.memberPlayerIds
-      .map(playerId => players.find(player => player.id === playerId))
-      .filter((player): player is FootballPlayer => 
-        player !== undefined && 
-        player.isRegistered && 
-        !matchData.opponentTeam.selectedPlayers.includes(player.id)
-      );
-  }, [opponentTeamData, players, matchData.opponentTeam.selectedPlayers]);
+    return opponentTeamData.members
+      .map((m) => m.footballProfile)
+      .filter((player) => !matchData.opponentTeam.selectedPlayers.includes(player.id));
+  }, [opponentTeamData, matchData.opponentTeam.selectedPlayers]);
 
   // Get formatted time string
   const formattedTime = useMemo(() => {
@@ -144,7 +134,7 @@ export default function FinalMatchDetailsScreen() {
     }
   }, []);
 
-  const handleSubstituteToggle = useCallback((playerId: string, team: 'my' | 'opponent') => {
+  const handleSubstituteToggle = useCallback((playerId: number, team: 'my' | 'opponent') => {
     const maxSubs = parseInt(maxSubstitutions) || 3;
     
     if (team === 'my') {
@@ -266,7 +256,7 @@ export default function FinalMatchDetailsScreen() {
     router.back();
   }, [router]);
 
-  const renderSubstituteCard = useCallback((player: FootballPlayer, isSelected: boolean, team: 'my' | 'opponent') => {
+  const renderSubstituteCard = useCallback((player: FootballProfile, isSelected: boolean, team: 'my' | 'opponent') => {
     return (
       <TouchableOpacity
         key={player.id}
@@ -296,16 +286,16 @@ export default function FinalMatchDetailsScreen() {
                   ? team === 'my' ? 'text-green-800' : 'text-red-800'
                   : 'text-slate-900'
               }`}>
-                {player.name}
+                {player.nickname}
               </Text>
               {player.experience && (
                 <View className={`ml-2 px-2 py-1 rounded-lg ${
-                  isSelected 
+                  isSelected
                     ? team === 'my' ? 'bg-green-200' : 'bg-red-200'
                     : 'bg-slate-100'
                 }`}>
                   <Text className={`text-xs font-bold ${
-                    isSelected 
+                    isSelected
                       ? team === 'my' ? 'text-green-800' : 'text-red-800'
                       : 'text-slate-600'
                   }`}>
@@ -315,17 +305,17 @@ export default function FinalMatchDetailsScreen() {
               )}
             </View>
             <View className="flex-row items-center">
-              <Ionicons 
-                name="football" 
-                size={14} 
-                color={isSelected ? (team === 'my' ? '#166534' : '#991b1b') : '#64748b'} 
+              <Ionicons
+                name="football"
+                size={14}
+                color={isSelected ? (team === 'my' ? '#166534' : '#991b1b') : '#64748b'}
               />
               <Text className={`text-sm ml-1 font-medium ${
-                isSelected 
+                isSelected
                   ? team === 'my' ? 'text-green-700' : 'text-red-700'
                   : 'text-slate-600'
               }`}>
-                {player.position}
+                {player.role}
               </Text>
             </View>
           </View>

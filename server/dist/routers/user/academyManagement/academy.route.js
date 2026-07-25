@@ -1,0 +1,28 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const academy_controller_1 = require("../../../controllers/user/academyManagement/academy.controller");
+const demoBooking_controller_1 = require("../../../controllers/user/academyManagement/demoBooking.controller");
+const review_controller_1 = require("../../../controllers/user/academyManagement/review.controller");
+const auth_middleware_1 = require("../../../middlewares/auth.middleware");
+const router = (0, express_1.Router)();
+router.get("/academies", academy_controller_1.UserAcademyController.list);
+router.get("/academies/:academyId", academy_controller_1.UserAcademyController.getById);
+router.get("/academies/:academyId/announcements", academy_controller_1.UserAcademyController.getAnnouncements);
+router.get("/academies/:academyId/reviews", review_controller_1.ReviewController.listForAcademy);
+router.post("/child-profiles", auth_middleware_1.authenticateUser, academy_controller_1.ChildProfileController.create);
+router.get("/child-profiles", auth_middleware_1.authenticateUser, academy_controller_1.ChildProfileController.list);
+router.put("/child-profiles/:profileId", auth_middleware_1.authenticateUser, academy_controller_1.ChildProfileController.update);
+router.delete("/child-profiles/:profileId", auth_middleware_1.authenticateUser, academy_controller_1.ChildProfileController.remove);
+router.post("/enrollments", auth_middleware_1.authenticateUser, academy_controller_1.EnrollmentController.create);
+router.get("/enrollments", auth_middleware_1.authenticateUser, academy_controller_1.EnrollmentController.list);
+router.patch("/enrollments/:studentId/withdraw", auth_middleware_1.authenticateUser, academy_controller_1.EnrollmentController.withdraw);
+router.get("/students/:studentId/attendance", auth_middleware_1.authenticateUser, academy_controller_1.StudentRecordsController.getAttendance);
+router.get("/students/:studentId/certificates", auth_middleware_1.authenticateUser, academy_controller_1.StudentRecordsController.getCertificates);
+router.post("/demo-bookings", auth_middleware_1.authenticateUser, demoBooking_controller_1.UserDemoBookingController.create);
+router.get("/demo-bookings", auth_middleware_1.authenticateUser, demoBooking_controller_1.UserDemoBookingController.list);
+router.patch("/demo-bookings/:bookingId/cancel", auth_middleware_1.authenticateUser, demoBooking_controller_1.UserDemoBookingController.cancel);
+router.post("/reviews", auth_middleware_1.authenticateUser, review_controller_1.ReviewController.create);
+router.get("/reviews/mine", auth_middleware_1.authenticateUser, review_controller_1.ReviewController.mine);
+exports.default = router;
+//# sourceMappingURL=academy.route.js.map

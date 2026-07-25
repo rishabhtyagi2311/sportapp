@@ -1,50 +1,75 @@
-import React, { useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useMatchExecutionStore, MatchEvent } from '@/store/footballMatchEventStore';
+import { useMatchExecutionStore } from '@/store/footballMatchEventStore';
+import { useFootballStore } from '@/store/footballTeamStore';
+import { FootballMatch, FootballProfile } from '@/types/football';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const { width } = Dimensions.get('window');
+function computeTeamStats(events: FootballMatch['events'], teamId: number) {
+  const teamEvents = (events ?? []).filter((e) => e.teamId === teamId);
+  return {
+    goals: teamEvents.filter((e) => e.eventType === 'goal').length,
+    fouls: teamEvents.filter((e) => e.eventType === 'foul').length,
+    corners: teamEvents.filter((e) => e.eventType === 'corner').length,
+    yellowCards: teamEvents.filter((e) => e.eventType === 'yellow_card').length,
+    redCards: teamEvents.filter((e) => e.eventType === 'red_card').length,
+  };
+}
 
 export default function MatchDetailScreen() {
   const router = useRouter();
   const { matchId } = useLocalSearchParams();
-  const { getMatchById } = useMatchExecutionStore();
-  
-  const match = getMatchById(matchId as string);
+  const { fetchMatchById } = useMatchExecutionStore();
+  const { getTeamById, fetchTeamById } = useFootballStore();
 
-  if (!match) {
-    return (
-      <SafeAreaView className="flex-1 bg-slate-50 justify-center items-center p-6">
-        <Ionicons name="alert-circle-outline" size={64} color="#64748b" />
-        <Text className="text-xl font-bold text-slate-900 mt-4">Match Not Found</Text>
-        <TouchableOpacity onPress={() => router.back()} className="mt-6 bg-slate-900 px-6 py-3 rounded-xl">
-          <Text className="text-white font-semibold">Go Back</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
+  const [match, setMatch] = useState<FootballMatch | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!matchId) return;
+    fetchMatchById(matchId as string)
+      .then(async (m) => {
+        setMatch(m);
+        if (m) {
+          await Promise.all([fetchTeamById(m.homeTeamId), fetchTeamById(m.awayTeamId)]);
+        }
+      })
+      .finally(() => setIsLoading(false));
+  }, [matchId]);
+
+  const allRosterPlayers = useMemo(() => {
+    const map = new Map<number, FootballProfile>();
+    if (!match) return map;
+    getTeamById(match.homeTeamId)?.members.forEach((m) => map.set(m.footballProfile.id, m.footballProfile));
+    getTeamById(match.awayTeamId)?.members.forEach((m) => map.set(m.footballProfile.id, m.footballProfile));
+    return map;
+  }, [match, getTeamById]);
 
   const result = useMemo(() => {
-    const isHomeWin = match.homeTeamScore > match.awayTeamScore;
-    const isDraw = match.homeTeamScore === match.awayTeamScore;
+    if (!match) return { text: '', color: '', bgColor: '' };
+    const isHomeWin = match.homeScore > match.awayScore;
+    const isDraw = match.homeScore === match.awayScore;
     if (isDraw) return { text: 'Draw', color: 'text-slate-500', bgColor: 'bg-slate-100' };
-    return isHomeWin 
+    return isHomeWin
       ? { text: 'Win', color: 'text-emerald-600', bgColor: 'bg-emerald-100' }
       : { text: 'Loss', color: 'text-red-600', bgColor: 'bg-red-100' };
   }, [match]);
 
   const possession = useMemo(() => {
-    const home = (match as any).homePossessionSeconds || 50;
-    const away = (match as any).awayPossessionSeconds || 50;
+    const home = match?.homePossessionSeconds || 0;
+    const away = match?.awayPossessionSeconds || 0;
     const total = home + away || 1;
     return {
       home: Math.round((home / total) * 100),
       away: Math.round((away / total) * 100)
     };
   }, [match]);
+
+  const homeStats = useMemo(() => match ? computeTeamStats(match.events, match.homeTeamId) : null, [match]);
+  const awayStats = useMemo(() => match ? computeTeamStats(match.events, match.awayTeamId) : null, [match]);
 
   const StatRow = ({ label, home, away, isPercentage = false }: { label: string, home: number, away: number, isPercentage?: boolean }) => {
     const total = home + away || 1;
@@ -64,10 +89,30 @@ export default function MatchDetailScreen() {
     );
   };
 
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+        <ActivityIndicator size="large" color="#0f172a" />
+      </SafeAreaView>
+    );
+  }
+
+  if (!match || !homeStats || !awayStats) {
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50 justify-center items-center p-6">
+        <Ionicons name="alert-circle-outline" size={64} color="#64748b" />
+        <Text className="text-xl font-bold text-slate-900 mt-4">Match Not Found</Text>
+        <TouchableOpacity onPress={() => router.back()} className="mt-6 bg-slate-900 px-6 py-3 rounded-xl">
+          <Text className="text-white font-semibold">Go Back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <View className="flex-1 bg-slate-50">
       <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-        
+
         {/* --- SCOREBOARD HEADER --- */}
         <View className="rounded-b-[40px] overflow-hidden shadow-2xl">
           <LinearGradient colors={['#0f172a', '#1e293b']} className="pt-16 pb-10 px-6">
@@ -87,18 +132,20 @@ export default function MatchDetailScreen() {
                   <Ionicons name="shield" size={32} color="#10b981" />
                 </View>
                 <Text className="text-white font-black text-center text-[10px] uppercase" numberOfLines={1}>
-                  {match.matchSetup.myTeam.teamName}
+                  {match.homeTeam?.name}
                 </Text>
               </View>
 
               <View className="items-center px-4">
                 <View className="flex-row items-center">
-                  <Text className="text-white text-5xl font-black italic">{match.homeTeamScore}</Text>
+                  <Text className="text-white text-5xl font-black italic">{match.homeScore}</Text>
                   <Text className="text-blue-500 text-3xl font-black mx-3">-</Text>
-                  <Text className="text-white text-5xl font-black italic">{match.awayTeamScore}</Text>
+                  <Text className="text-white text-5xl font-black italic">{match.awayScore}</Text>
                 </View>
                 <View className="bg-blue-600 px-3 py-1 rounded-full mt-2 shadow-sm">
-                  <Text className="text-white font-black text-[9px] uppercase tracking-tighter">Full Time</Text>
+                  <Text className="text-white font-black text-[9px] uppercase tracking-tighter">
+                    {match.status === 'completed' ? 'Full Time' : match.status}
+                  </Text>
                 </View>
               </View>
 
@@ -107,7 +154,7 @@ export default function MatchDetailScreen() {
                   <Ionicons name="shield-outline" size={32} color="#ef4444" />
                 </View>
                 <Text className="text-white font-black text-center text-[10px] uppercase" numberOfLines={1}>
-                  {match.matchSetup.opponentTeam.teamName}
+                  {match.awayTeam?.name}
                 </Text>
               </View>
             </View>
@@ -119,11 +166,11 @@ export default function MatchDetailScreen() {
           <View className="bg-white rounded-3xl p-5 shadow-xl border border-slate-50 flex-row justify-between">
             <View className="items-center flex-1 border-r border-slate-100">
               <Text className="text-slate-400 font-bold text-[9px] uppercase mb-1">Time</Text>
-              <Text className="text-slate-900 font-black">{match.actualDuration}m</Text>
+              <Text className="text-slate-900 font-black">{match.duration}m</Text>
             </View>
             <View className="items-center flex-1 border-r border-slate-100">
               <Text className="text-slate-400 font-bold text-[9px] uppercase mb-1">Venue</Text>
-              <Text className="text-slate-900 font-black text-[10px]" numberOfLines={1}>{match.venue}</Text>
+              <Text className="text-slate-900 font-black text-[10px]" numberOfLines={1}>{match.venueName || 'TBD'}</Text>
             </View>
             <View className="items-center flex-1">
               <Text className="text-slate-400 font-bold text-[9px] uppercase mb-1">Result</Text>
@@ -137,26 +184,26 @@ export default function MatchDetailScreen() {
           <Text className="text-slate-900 font-black text-lg italic uppercase mb-4 tracking-tight">Match Statistics</Text>
           <View className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm">
             <StatRow label="Possession" home={possession.home} away={possession.away} isPercentage />
-            <StatRow label="Goals" home={match.homeTeamStats.goals} away={match.awayTeamStats.goals} />
-            <StatRow label="Fouls" home={match.homeTeamStats.fouls} away={match.awayTeamStats.fouls} />
-            <StatRow label="Corners" home={match.homeTeamStats.corners} away={match.awayTeamStats.corners} />
-            
+            <StatRow label="Goals" home={homeStats.goals} away={awayStats.goals} />
+            <StatRow label="Fouls" home={homeStats.fouls} away={awayStats.fouls} />
+            <StatRow label="Corners" home={homeStats.corners} away={awayStats.corners} />
+
             <View className="flex-row justify-between mt-2 pt-5 border-t border-slate-50">
                <View className="flex-row">
                   <View className="w-5 h-7 bg-yellow-400 rounded-md mr-1.5 items-center justify-center border-b-2 border-yellow-600">
-                    <Text className="text-white font-black text-[10px]">{match.homeTeamStats.yellowCards}</Text>
+                    <Text className="text-white font-black text-[10px]">{homeStats.yellowCards}</Text>
                   </View>
                   <View className="w-5 h-7 bg-red-500 rounded-md items-center justify-center border-b-2 border-red-700">
-                    <Text className="text-white font-black text-[10px]">{match.homeTeamStats.redCards}</Text>
+                    <Text className="text-white font-black text-[10px]">{homeStats.redCards}</Text>
                   </View>
                </View>
                <Text className="text-slate-300 font-black text-[10px] uppercase">Bookings</Text>
                <View className="flex-row">
                   <View className="w-5 h-7 bg-yellow-400 rounded-md mr-1.5 items-center justify-center border-b-2 border-yellow-600">
-                    <Text className="text-white font-black text-[10px]">{match.awayTeamStats.yellowCards}</Text>
+                    <Text className="text-white font-black text-[10px]">{awayStats.yellowCards}</Text>
                   </View>
                   <View className="w-5 h-7 bg-red-500 rounded-md items-center justify-center border-b-2 border-red-700">
-                    <Text className="text-white font-black text-[10px]">{match.awayTeamStats.redCards}</Text>
+                    <Text className="text-white font-black text-[10px]">{awayStats.redCards}</Text>
                   </View>
                </View>
             </View>
@@ -167,24 +214,26 @@ export default function MatchDetailScreen() {
         <View className="px-6 pb-6">
           <Text className="text-slate-900 font-black text-lg italic uppercase mb-4 tracking-tight">Timeline</Text>
           <View className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm">
-            {match.events.length === 0 ? (
+            {!match.events || match.events.length === 0 ? (
               <View className="items-center py-4">
                 <Text className="text-slate-400 font-bold italic">No events tracked</Text>
               </View>
             ) : (
-              match.events.map((event, idx) => (
+              match.events.map((event, idx) => {
+                const player = allRosterPlayers.get(event.playerId ?? -1);
+                return (
                 <View key={event.id} className="flex-row mb-6 last:mb-0">
                   <View className="items-center mr-4">
-                    <View className={`w-10 h-10 rounded-2xl items-center justify-center ${event.teamId === match.matchSetup.myTeam.teamId ? 'bg-emerald-50' : 'bg-red-50'}`}>
-                      {event.eventType === 'goal' && <Ionicons name="football" size={18} color="#10b981" />}
-                      {event.eventType === 'card' && <Ionicons name="card" size={18} color={event.eventSubType === 'yellow_card' ? '#eab308' : '#ef4444'} />}
+                    <View className={`w-10 h-10 rounded-2xl items-center justify-center ${event.teamId === match.homeTeamId ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                      {(event.eventType === 'goal' || event.eventType === 'own_goal') && <Ionicons name="football" size={18} color="#10b981" />}
+                      {(event.eventType === 'yellow_card' || event.eventType === 'red_card') && <Ionicons name="card" size={18} color={event.eventType === 'yellow_card' ? '#eab308' : '#ef4444'} />}
                       {event.eventType === 'substitution' && <Ionicons name="swap-horizontal" size={18} color="#3b82f6" />}
                     </View>
-                    {idx !== match.events.length - 1 && <View className="w-[1.5px] flex-1 bg-slate-100 my-2" />}
+                    {idx !== match.events!.length - 1 && <View className="w-[1.5px] flex-1 bg-slate-100 my-2" />}
                   </View>
                   <View className="flex-1 justify-center">
                     <View className="flex-row justify-between items-center">
-                      <Text className="text-slate-900 font-black text-sm">{event.playerName}</Text>
+                      <Text className="text-slate-900 font-black text-sm">{player?.nickname ?? '—'}</Text>
                       <Text className="text-blue-500 font-black text-xs italic">{event.minute}'</Text>
                     </View>
                     <Text className="text-slate-400 font-bold text-[9px] uppercase tracking-tighter">
@@ -192,7 +241,7 @@ export default function MatchDetailScreen() {
                     </Text>
                   </View>
                 </View>
-              ))
+              );})
             )}
           </View>
         </View>

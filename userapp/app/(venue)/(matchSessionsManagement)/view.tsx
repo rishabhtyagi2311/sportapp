@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, FlatList, TouchableOpacity, StatusBar } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StatusBar, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -8,7 +8,11 @@ import { format, parseISO } from 'date-fns';
 
 export default function MatchDiscoveryScreen() {
   const router = useRouter();
-  const sessions = useMatchSessionStore((state) => state.sessions);
+  const { sessions, isLoading, fetchAvailableSessions } = useMatchSessionStore();
+
+  useEffect(() => {
+    fetchAvailableSessions();
+  }, []);
 
   const renderMatchCard = ({ item }: { item: MatchSession }) => {
     const isLive = item.status === 'live';
@@ -70,18 +74,27 @@ export default function MatchDiscoveryScreen() {
           <Ionicons name="chevron-back" size={24} color="black" />
         </TouchableOpacity>
         <Text className="text-xl font-bold">Public Matches</Text>
-        <TouchableOpacity className="p-2 bg-white rounded-full shadow-sm">
-          <MaterialIcons name="filter-list" size={24} color="black" />
+        <TouchableOpacity onPress={() => router.push('./mySessions')} className="p-2 bg-white rounded-full shadow-sm">
+          <MaterialIcons name="event-available" size={24} color="black" />
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={sessions}
-        renderItem={renderMatchCard}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 24 }}
-        showsVerticalScrollIndicator={false}
-      />
+      {isLoading && sessions.length === 0 ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#3b82f6" />
+        </View>
+      ) : (
+        <FlatList
+          data={sessions}
+          renderItem={renderMatchCard}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: 24 }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <Text className="text-slate-400 text-center mt-10">No open matches right now.</Text>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }

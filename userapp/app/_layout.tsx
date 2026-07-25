@@ -1,10 +1,12 @@
 // app/_layout.tsx
 import "../global.css";
 import { Slot } from "expo-router";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 export default function RootLayout() {
-  console.log("🚀 RootLayout is rendering with RecoilRoot");
-
-  // No SplashScreen here, just the app tree
-  return <Slot />;
+  return (
+    <SafeAreaProvider>
+      <Slot />
+    </SafeAreaProvider>
+  );
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   View,
   Text,
@@ -6,9 +6,11 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
+  ActivityIndicator,
 } from 'react-native'
 import { KeyboardAvoidingView } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 
 // STORES
@@ -16,7 +18,7 @@ import { useRegistrationRequestStore } from '@/store/eventRegistrationRequestSto
 import { useEventManagerStore } from '@/store/eventManagerStore'
 
 // TYPES
-import { RegistrationRequest } from '@/store/eventRegistrationRequestStore'
+import { EventRegistration } from '@/types/event'
 
 type FilterKey = 'pending' | 'accepted' | 'rejected'
 
@@ -24,26 +26,41 @@ const EventRegistrationRequestsScreen: React.FC = () => {
   const router = useRouter()
   const { eventId } = useLocalSearchParams<{ eventId: string }>()
 
-  const { deleteEvent, managedEvents } = useEventManagerStore()
+  const { getEventById, fetchEventById, deleteEvent } = useEventManagerStore()
   const {
-    getRequestsByEvent,
+    getRegistrationsByEvent,
     getEventStats,
-    deleteRequestsByEvent,
+    fetchRegistrationsForEvent,
+    isLoading,
   } = useRegistrationRequestStore()
 
   const [activeFilter, setActiveFilter] = useState<FilterKey>('pending')
 
-  const event = managedEvents.find((e) => e.id === eventId)
-  const requests = getRequestsByEvent(eventId!)
+  const event = getEventById(eventId!)
+  const requests = getRegistrationsByEvent(eventId!)
   const stats = getEventStats(eventId!)
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!eventId) return
+      fetchEventById(eventId)
+      fetchRegistrationsForEvent(eventId)
+    }, [eventId])
+  )
 
   if (!event) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50">
-        <Text className="text-slate-500">Event not found</Text>
-        <TouchableOpacity onPress={() => router.back()} className="mt-4">
-          <Text className="text-blue-600">Go Back</Text>
-        </TouchableOpacity>
+        {isLoading ? (
+          <ActivityIndicator size="large" color="#0f172a" />
+        ) : (
+          <>
+            <Text className="text-slate-500">Event not found</Text>
+            <TouchableOpacity onPress={() => router.back()} className="mt-4">
+              <Text className="text-blue-600">Go Back</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     )
   }
@@ -52,7 +69,33 @@ const EventRegistrationRequestsScreen: React.FC = () => {
     (r) => r.status === activeFilter
   )
 
+  const acceptedTeamCount = requests.filter(
+    (r) => r.status === 'accepted' && !!r.footballTeamId
+  ).length
+
   /* ---------------- ACTIONS ---------------- */
+
+  const handleCreateTournament = () => {
+    if (acceptedTeamCount < 2) {
+      Alert.alert(
+        'Not Enough Teams',
+        'You need at least 2 accepted team registrations before you can create a tournament.'
+      )
+      return
+    }
+
+    if (event.tournamentFormat === 'knockout') {
+      router.push({
+        pathname: '/(football)/startKnockOutTournament/step1',
+        params: { eventId: event.id },
+      })
+    } else {
+      router.push({
+        pathname: '/(football)/startTournament/createTournament',
+        params: { eventId: event.id },
+      })
+    }
+  }
 
   const handleDeleteEvent = () => {
     Alert.alert(
@@ -63,10 +106,13 @@ const EventRegistrationRequestsScreen: React.FC = () => {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            deleteRequestsByEvent(event.id)
-            deleteEvent(event.id)
-            router.back()
+          onPress: async () => {
+            try {
+              await deleteEvent(event.id)
+              router.back()
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Could not delete event')
+            }
           },
         },
       ]
@@ -75,35 +121,23 @@ const EventRegistrationRequestsScreen: React.FC = () => {
 
   /* ---------------- HELPERS ---------------- */
 
-  const getRequestTitle = (req: RegistrationRequest) => {
-    if (req.domain === 'football_tournament') {
-      return req.teamName
-    }
-    return req.participationType === 'team'
-      ? req.teamName
-      : req.participantName
+  const getRequestTitle = (req: EventRegistration) => {
+    return req.teamName || req.registrantName || 'Registration'
   }
 
-  const getRequestSubtitle = (req: RegistrationRequest) => {
-    if (req.domain === 'football_tournament') {
-      return `Team • Captain: ${req.captainName}`
-    }
-
-    if (req.participationType === 'team') {
-      return `${req.teamSize} players • Team`
-    }
-
-    return `${req.contact} • Individual`
+  const getRequestSubtitle = (req: EventRegistration) => {
+    return req.footballTeamId ? 'Team registration' : 'Individual registration'
   }
 
   /* ---------------- UI ---------------- */
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-gray-50" behavior="padding">
+    <SafeAreaView className="flex-1 bg-gray-50">
+    <KeyboardAvoidingView className="flex-1" behavior="padding">
       <StatusBar barStyle="dark-content" />
 
       {/* HEADER */}
-      <View className="bg-white px-6 py-4 border-b border-gray-200 flex-row items-center pt-12">
+      <View className="bg-white px-6 py-4 border-b border-gray-200 flex-row items-center">
         <TouchableOpacity onPress={() => router.back()} className="mr-4">
           <Ionicons name="arrow-back" size={24} color="#475569" />
         </TouchableOpacity>
@@ -133,7 +167,7 @@ const EventRegistrationRequestsScreen: React.FC = () => {
       <View className="bg-white px-6 py-4 border-b border-gray-200">
         <View className="flex-row justify-between mb-2">
           <Text className="text-slate-700 font-semibold">
-            {event.sport.name}
+            {event.sportName}
           </Text>
           <Text className="text-slate-500 text-sm">
             {new Date(event.dateTime).toLocaleDateString('en-IN')}
@@ -145,7 +179,7 @@ const EventRegistrationRequestsScreen: React.FC = () => {
             {event.currentParticipants}/{event.maxParticipants} participants
           </Text>
           <Text className="text-green-700 font-semibold">
-            ₹{event.fees.amount}
+            ₹{event.feeAmount}
           </Text>
         </View>
       </View>
@@ -156,6 +190,21 @@ const EventRegistrationRequestsScreen: React.FC = () => {
         <Stat label="Accepted" value={stats.accepted} color="text-green-600" />
         <Stat label="Rejected" value={stats.rejected} color="text-red-600" />
       </View>
+
+      {/* CREATE TOURNAMENT — football-tournament events only */}
+      {event.eventType === 'footballtournament' && (
+        <View className="bg-white px-6 pb-4 border-b border-gray-200">
+          <TouchableOpacity
+            onPress={handleCreateTournament}
+            className="bg-green-600 rounded-xl py-3 flex-row items-center justify-center"
+          >
+            <Ionicons name="trophy-outline" size={18} color="white" />
+            <Text className="text-white font-bold ml-2">
+              Create Tournament ({acceptedTeamCount} team{acceptedTeamCount === 1 ? '' : 's'} accepted)
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* FILTER TABS */}
       <View className="bg-white px-6 flex-row border-b border-gray-200">
@@ -207,7 +256,7 @@ const EventRegistrationRequestsScreen: React.FC = () => {
 
               <View className="flex-row justify-between items-center mt-3 pt-3 border-t border-gray-100">
                 <Text className="text-xs text-slate-400">
-                  {new Date(req.submittedAt).toLocaleDateString('en-IN', {
+                  {new Date(req.createdAt).toLocaleDateString('en-IN', {
                     month: 'short',
                     day: 'numeric',
                     hour: '2-digit',
@@ -226,6 +275,7 @@ const EventRegistrationRequestsScreen: React.FC = () => {
         <View className="h-10" />
       </ScrollView>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   )
 }
 

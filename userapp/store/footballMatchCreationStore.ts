@@ -5,12 +5,12 @@ import { immer } from 'zustand/middleware/immer';
 
 // Types for match creation
 export interface MatchTeam {
-  teamId: string;
+  teamId: number;
   teamName: string;
-  selectedPlayers: string[]; // Player IDs
-  captain?: string; // Player ID
-  viceCaptain?: string; // Player ID
-  substitutes: string[]; // Player IDs for substitutes
+  selectedPlayers: number[]; // footballProfile ids
+  captain?: number; // footballProfile id
+  viceCaptain?: number; // footballProfile id
+  substitutes: number[]; // footballProfile ids
 }
 
 export interface MatchVenue {
@@ -22,7 +22,7 @@ export interface MatchVenue {
     state: string;
     pincode: string;
   };
-  isCustom: boolean; 
+  isCustom: boolean;
 }
 
 export interface MatchReferee {
@@ -43,28 +43,23 @@ export interface MatchCreationData {
   // Team Selection (from first screen)
   myTeam: MatchTeam;
   opponentTeam: MatchTeam;
-  
+
   // Match Details (from second screen)
   venue: MatchVenue | null;
   playersPerTeam: number;
   referees: MatchReferee[];
-  
+
   // Player Selection (from subsequent screens)
   isMyTeamPlayersSelected: boolean;
   isOpponentPlayersSelected: boolean;
-  
+
   // Captain Selection
   areCaptainsSelected: boolean;
-  
+
   // Match Settings (final screen)
   matchSettings: MatchSettings | null;
   areSubstitutesSelected: boolean;
-  
-  // Match timing and other details (kept for backward compatibility)
-  matchDate?: string;
-  matchTime?: string;
-  duration?: number;
-  
+
   // Match status
   currentStep: 'team-selection' | 'match-details' | 'my-players' | 'opponent-players' | 'captains' | 'final-details' | 'ready';
 }
@@ -73,26 +68,27 @@ export interface MatchCreationState {
   matchData: MatchCreationData;
   isLoading: boolean;
   error: string | null;
-  
+
   // Actions
-  initializeMatch: (myTeamId: string, myTeamName: string, opponentTeamId: string, opponentTeamName: string) => void;
+  initializeMatch: (myTeamId: number, myTeamName: string, opponentTeamId: number, opponentTeamName: string) => void;
   updateMatchDetails: (venue: MatchVenue, playersPerTeam: number, referees: MatchReferee[]) => void;
-  updateMyTeamPlayers: (playerIds: string[]) => void;
-  updateOpponentTeamPlayers: (playerIds: string[]) => void;
-  updateCaptains: (myTeamCaptain: string, opponentTeamCaptain: string, myTeamViceCaptain?: string, opponentTeamViceCaptain?: string) => void;
+  updateReferees: (referees: MatchReferee[]) => void;
+  updateMyTeamPlayers: (playerIds: number[]) => void;
+  updateOpponentTeamPlayers: (playerIds: number[]) => void;
+  updateCaptains: (myTeamCaptain: number, opponentTeamCaptain: number, myTeamViceCaptain?: number, opponentTeamViceCaptain?: number) => void;
   updateMatchSettings: (settings: MatchSettings) => void;
-  updateSubstitutes: (myTeamSubstitutes: string[], opponentTeamSubstitutes: string[]) => void;
+  updateSubstitutes: (myTeamSubstitutes: number[], opponentTeamSubstitutes: number[]) => void;
   setCurrentStep: (step: MatchCreationData['currentStep']) => void;
   clearMatchData: () => void;
   getMatchSummary: () => MatchCreationData;
-  
+
   // Helper methods for substitutes
-  getAvailableSubstitutes: (teamId: string, allPlayers: any[]) => any[];
-  
+  getAvailableSubstitutes: (teamId: number, allPlayers: any[]) => any[];
+
   // Validation helpers
   canProceedToNextStep: () => boolean;
   getCurrentStepData: () => any;
-  
+
   // Error handling
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
@@ -101,13 +97,13 @@ export interface MatchCreationState {
 // Initial state
 const initialMatchData: MatchCreationData = {
   myTeam: {
-    teamId: '',
+    teamId: 0,
     teamName: '',
     selectedPlayers: [],
     substitutes: [],
   },
   opponentTeam: {
-    teamId: '',
+    teamId: 0,
     teamName: '',
     selectedPlayers: [],
     substitutes: [],
@@ -149,6 +145,13 @@ export const useMatchCreationStore = create<MatchCreationState>()(
         state.error = null;
       }),
 
+      // Update referees only, without touching currentStep — used by the tournament
+      // flow, which collects referees at the end of its own wizard.
+      updateReferees: (referees) => set((state) => {
+        state.matchData.referees = referees;
+        state.error = null;
+      }),
+
       // Update my team players
       updateMyTeamPlayers: (playerIds) => set((state) => {
         state.matchData.myTeam.selectedPlayers = playerIds;
@@ -165,8 +168,25 @@ export const useMatchCreationStore = create<MatchCreationState>()(
         state.error = null;
       }),
 
-      // Update captains for both teams
+      // Update captains for both teams — captain/vice-captain must be one of the team's selected players
       updateCaptains: (myTeamCaptain, opponentTeamCaptain, myTeamViceCaptain, opponentTeamViceCaptain) => set((state) => {
+        if (!state.matchData.myTeam.selectedPlayers.includes(myTeamCaptain)) {
+          state.error = "Captain must be one of the selected players";
+          return;
+        }
+        if (!state.matchData.opponentTeam.selectedPlayers.includes(opponentTeamCaptain)) {
+          state.error = "Captain must be one of the selected players";
+          return;
+        }
+        if (myTeamViceCaptain && !state.matchData.myTeam.selectedPlayers.includes(myTeamViceCaptain)) {
+          state.error = "Vice-captain must be one of the selected players";
+          return;
+        }
+        if (opponentTeamViceCaptain && !state.matchData.opponentTeam.selectedPlayers.includes(opponentTeamViceCaptain)) {
+          state.error = "Vice-captain must be one of the selected players";
+          return;
+        }
+
         state.matchData.myTeam.captain = myTeamCaptain;
         state.matchData.opponentTeam.captain = opponentTeamCaptain;
         if (myTeamViceCaptain) state.matchData.myTeam.viceCaptain = myTeamViceCaptain;
@@ -202,15 +222,10 @@ export const useMatchCreationStore = create<MatchCreationState>()(
       getAvailableSubstitutes: (teamId, allPlayers) => {
         const { matchData } = get();
         const team = teamId === matchData.myTeam.teamId ? matchData.myTeam : matchData.opponentTeam;
-        
-        // Find the team's all players
-        const teamData = teamId === matchData.myTeam.teamId ? matchData.myTeam : matchData.opponentTeam;
-        
+
         // Filter out already selected players
-        return allPlayers.filter(player => 
-          // Player belongs to this team but is not in selected players
-          !team.selectedPlayers.includes(player.id) && 
-          player.isRegistered
+        return allPlayers.filter(player =>
+          !team.selectedPlayers.includes(player.id)
         );
       },
 
@@ -234,7 +249,7 @@ export const useMatchCreationStore = create<MatchCreationState>()(
       // Validation helper
       canProceedToNextStep: () => {
         const { matchData } = get();
-        
+
         switch (matchData.currentStep) {
           case 'team-selection':
             return !!(matchData.myTeam.teamId && matchData.opponentTeam.teamId);
@@ -256,7 +271,7 @@ export const useMatchCreationStore = create<MatchCreationState>()(
       // Get current step data
       getCurrentStepData: () => {
         const { matchData } = get();
-        
+
         switch (matchData.currentStep) {
           case 'team-selection':
             return { myTeam: matchData.myTeam, opponentTeam: matchData.opponentTeam };
@@ -267,8 +282,8 @@ export const useMatchCreationStore = create<MatchCreationState>()(
           case 'opponent-players':
             return { teamId: matchData.opponentTeam.teamId, selectedPlayers: matchData.opponentTeam.selectedPlayers };
           case 'captains':
-            return { 
-              myTeamCaptain: matchData.myTeam.captain, 
+            return {
+              myTeamCaptain: matchData.myTeam.captain,
               opponentTeamCaptain: matchData.opponentTeam.captain,
               myTeamViceCaptain: matchData.myTeam.viceCaptain,
               opponentTeamViceCaptain: matchData.opponentTeam.viceCaptain

@@ -1,25 +1,22 @@
 // screens/RequestDetailsScreen.tsx
 
-import React, { useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  
   StatusBar,
   Alert,
   TextInput,
+  ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 
 // STORES
-import {
-  useRegistrationRequestStore,
-  RegistrationRequest,
-} from '@/store/eventRegistrationRequestStore'
+import { useRegistrationRequestStore } from '@/store/eventRegistrationRequestStore'
 import { useEventManagerStore } from '@/store/eventManagerStore'
 
 const RequestDetailsScreen: React.FC = () => {
@@ -29,77 +26,50 @@ const RequestDetailsScreen: React.FC = () => {
     eventId: string
   }>()
 
-  const { getRequestById, updateRequestStatus } =
+  const { getRegistrationsByEvent, fetchRegistrationsForEvent, processRegistration } =
     useRegistrationRequestStore()
-  const { managedEvents, updateEvent } = useEventManagerStore()
+  const { getEventById, fetchEventById } = useEventManagerStore()
 
-  const request = getRequestById(requestId!)
-  const event = managedEvents.find((e) => e.id === eventId)
+  useFocusEffect(
+    useCallback(() => {
+      if (!eventId) return
+      fetchEventById(eventId)
+      fetchRegistrationsForEvent(eventId)
+    }, [eventId])
+  )
+
+  const request = getRegistrationsByEvent(eventId!).find((r) => r.id === requestId)
+  const event = getEventById(eventId!)
 
   const [isProcessing, setIsProcessing] = useState(false)
   const [notes, setNotes] = useState('')
   const [showNotesInput, setShowNotesInput] = useState(false)
 
-  const managerId = 'manager-123'
-
   if (!request || !event) {
     return (
       <SafeAreaView className="flex-1 bg-gray-100">
         <View className="flex-1 items-center justify-center">
-          <Text className="text-gray-600 text-lg">
-            Request or Event not found
-          </Text>
-          <TouchableOpacity onPress={() => router.back()} className="mt-4">
-            <Text className="text-blue-600">Go Back</Text>
-          </TouchableOpacity>
+          <ActivityIndicator size="large" color="#0f172a" />
         </View>
       </SafeAreaView>
     )
   }
 
-  /* ---------------- DOMAIN CHECK ---------------- */
-
-  const isFootballTournament = request.domain === 'football_tournament'
-  const isRegularTeam =
-    request.domain === 'regular' &&
-    request.participationType === 'team'
-
   /* ---------------- HELPERS ---------------- */
 
+  const isTeamRegistration = !!request.footballTeamId
+
   const getDisplayTitle = () => {
-    if (isFootballTournament) return 'Football Tournament Registration'
-    if (isRegularTeam) return 'Team Registration'
-    return 'Individual Registration'
+    return isTeamRegistration ? 'Team Registration' : 'Individual Registration'
   }
 
   const getPrimaryName = () => {
-    if (isFootballTournament) return request.teamName
-    if (isRegularTeam) return request.teamName
-    return request.participantName
-  }
-
-  const getSlotCount = () => {
-    if (isFootballTournament) return 1
-    if (isRegularTeam) return request.teamSize
-    return 1
+    return request.teamName || request.registrantName || 'Registration'
   }
 
   /* ---------------- ACCEPT ---------------- */
 
   const handleAccept = () => {
-    const addCount = getSlotCount()
-    const newTotal = event.currentParticipants + addCount
-
-    if (newTotal > event.maxParticipants) {
-      Alert.alert(
-        'Capacity Full',
-        `Only ${
-          event.maxParticipants - event.currentParticipants
-        } slots remaining`
-      )
-      return
-    }
-
     Alert.alert(
       'Accept Registration',
       `Accept "${getPrimaryName()}"?`,
@@ -107,26 +77,18 @@ const RequestDetailsScreen: React.FC = () => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Accept',
-          onPress: () => {
+          onPress: async () => {
             setIsProcessing(true)
-
-            setTimeout(() => {
-              updateRequestStatus(
-                request.id,
-                'accepted',
-                managerId,
-                notes || undefined
-              )
-
-              updateEvent(event.id, {
-                currentParticipants: newTotal,
-              })
-
-              setIsProcessing(false)
+            try {
+              await processRegistration(eventId!, request.id, { status: 'accepted', notes: notes || undefined })
               Alert.alert('Success', 'Registration accepted', [
                 { text: 'OK', onPress: () => router.back() },
               ])
-            }, 400)
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Could not accept registration')
+            } finally {
+              setIsProcessing(false)
+            }
           },
         },
       ]
@@ -150,22 +112,21 @@ const RequestDetailsScreen: React.FC = () => {
     )
   }
 
-  const confirmReject = () => {
+  const confirmReject = async () => {
     setIsProcessing(true)
-
-    setTimeout(() => {
-      updateRequestStatus(
-        request.id,
-        'rejected',
-        managerId,
-        notes || 'No reason provided'
-      )
-
-      setIsProcessing(false)
+    try {
+      await processRegistration(eventId!, request.id, {
+        status: 'rejected',
+        notes: notes || 'No reason provided',
+      })
       Alert.alert('Success', 'Registration rejected', [
         { text: 'OK', onPress: () => router.back() },
       ])
-    }, 400)
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Could not reject registration')
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   /* ---------------- UI ---------------- */
@@ -195,12 +156,6 @@ const RequestDetailsScreen: React.FC = () => {
           <Text className="text-lg font-bold text-slate-900 mt-1">
             {getPrimaryName()}
           </Text>
-
-          {isFootballTournament && (
-            <Text className="text-sm text-slate-600 mt-1">
-              Captain: {request.captainName}
-            </Text>
-          )}
         </View>
 
         {/* Rejection Notes */}
@@ -219,17 +174,21 @@ const RequestDetailsScreen: React.FC = () => {
             <View className="flex-row gap-3">
               <TouchableOpacity
                 onPress={() => setShowNotesInput(false)}
+                disabled={isProcessing}
                 className="flex-1 bg-gray-200 py-3 rounded-lg items-center"
               >
                 <Text className="font-semibold">Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={confirmReject}
+                disabled={isProcessing}
                 className="flex-1 bg-red-600 py-3 rounded-lg items-center"
               >
-                <Text className="text-white font-semibold">
-                  Confirm
-                </Text>
+                {isProcessing ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text className="text-white font-semibold">Confirm</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -242,17 +201,21 @@ const RequestDetailsScreen: React.FC = () => {
           <View className="flex-row gap-3">
             <TouchableOpacity
               onPress={handleReject}
+              disabled={isProcessing}
               className="flex-1 border border-red-300 py-4 rounded-xl items-center"
             >
               <Text className="text-red-600 font-bold">Reject</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleAccept}
+              disabled={isProcessing}
               className="flex-1 bg-green-600 py-4 rounded-xl items-center"
             >
-              <Text className="text-white font-bold">
-                Accept
-              </Text>
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text className="text-white font-bold">Accept</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>

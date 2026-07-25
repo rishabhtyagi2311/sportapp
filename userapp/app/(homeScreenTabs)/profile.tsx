@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   View,
   Text,
@@ -12,21 +12,15 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialIcons, Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
-import signUpStore from '@/store/signUpStore'
+import { useAuthStore } from '@/store/authStore'
 
 export default function ProfileScreen() {
   const router = useRouter()
   const { width } = useWindowDimensions()
 
-  const {
-    name,
-    nickName,
-    email,
-    contact,
-    city,
-    profileImage,
-    setProfileImage,
-  } = signUpStore()
+  const user = useAuthStore((state) => state.user)
+  const logout = useAuthStore((state) => state.logout)
+  const [profileImage, setProfileImage] = useState('')
 
   const isSmallScreen = width < 380
   const profilePicSize = isSmallScreen ? 110 : 140
@@ -64,16 +58,9 @@ export default function ProfileScreen() {
       {
         text: 'Logout',
         style: 'destructive',
-        onPress: () => {
-          signUpStore.setState({
-            name: '',
-            nickName: '',
-            email: '',
-            contact: '',
-            city: '',
-            profileImage: '',
-          })
-          router.replace('/(onboardingStack)/basicInfoRegisterOne')
+        onPress: async () => {
+          await logout()
+          router.replace('/(onboardingStack)/login')
         },
       },
     ])
@@ -146,14 +133,14 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   )
 
-  const fullName = `${name} aka  ${nickName}`.trim() || 'User Profile'
-  const displayCity = city || 'City not set'
-  const displayEmail = email || 'email@example.com'
-  const displayContact = contact || 'Not provided'
+  const fullName = user ? `${user.firstname} ${user.lastname}`.trim() : 'User Profile'
+  const displayCity = user?.city || 'City not set'
+  const displayEmail = user?.email || 'email@example.com'
+  const displayContact = user?.contact || 'Not provided'
 
   return (
     <SafeAreaView className="flex-1 bg-slate-900">
-      <ScrollView showsVerticalScrollIndicator={false} className='mb-12'>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
         {/* ---------------- Header ---------------- */}
         <View className="pt-10 pb-8 px-5 bg-slate-900 ">
           <View className="items-center">
@@ -218,6 +205,22 @@ export default function ProfileScreen() {
             <Text className="text-white text-sm mt-2">Stats</Text>
           </TouchableOpacity>
         </View>
+
+        {/* ---------------- Bookings ---------------- */}
+        <ProfileSection title="Bookings">
+          <ActionItem
+            icon={<MaterialIcons name="event-available" size={24} color="#22c55e" />}
+            label="My Venue Bookings"
+            value="View and manage your slot bookings"
+            onPress={() => router.push('/(venue)/VenueBooking/myBookings')}
+          />
+          <ActionItem
+            icon={<MaterialIcons name="groups" size={24} color="#22c55e" />}
+            label="My Match Sessions"
+            value="Pickup matches you've joined"
+            onPress={() => router.push('/(venue)/(matchSessionsManagement)/mySessions')}
+          />
+        </ProfileSection>
 
         {/* ---------------- Contact ---------------- */}
         <ProfileSection title="Contact Information">

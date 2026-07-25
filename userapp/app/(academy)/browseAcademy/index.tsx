@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
 
@@ -12,42 +12,28 @@ import {
   FlatList,
   Dimensions,
   ImageBackground,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAcademyStore } from '@/store/academyStore';
+import { Academy } from '@/types/academy';
 import { router } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 const cardWidth = width - 32;
 
-type Academy = {
-  id: string;
-  academyName: string;
-  sportType: string;
-  address: string;
-  coachName: string;
-  contactNumber: string;
-  facilities: string;
-  Fee: string;
-  city: string;
-};
-
 type FilterType = 'all' | 'sport' | 'city';
 
 export default function BrowseAcademies() {
-  const { academies } = useAcademyStore();
+  const { academies, isLoading, fetchAcademies } = useAcademyStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilter, setShowFilter] = useState(false);
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [selectedFilter, setSelectedFilter] = useState<string>('');
 
-  const generateRating = (academyName: string): number => {
-    const hash = academyName.split('').reduce((a, b) => {
-      a = (a << 5) - a + b.charCodeAt(0);
-      return a & a;
-    }, 0);
-    return 3.5 + (Math.abs(hash) % 15) / 10;
-  };
+  useEffect(() => {
+    fetchAcademies();
+  }, []);
 
   const uniqueSports = [...new Set(academies.map(academy => academy.sportType))];
   const uniqueCities = [...new Set(academies.map(academy => academy.city))];
@@ -103,7 +89,7 @@ export default function BrowseAcademies() {
   };
 
   const AcademyCard = ({ academy }: { academy: Academy }) => {
-    const rating = generateRating(academy.academyName);
+    const rating = academy.averageRating;
 
     return (
       <TouchableOpacity
@@ -126,8 +112,7 @@ export default function BrowseAcademies() {
 
           <View className="absolute top-3 right-3 bg-white px-3 py-1 rounded-full shadow-sm">
             <Text className="text-slate-900 text-xs font-bold">
-              ₹{academy.Fee}
-              /month
+              ₹{academy.fee}/{academy.feeStructure?.toLowerCase() || 'month'}
             </Text>
           </View>
         </View>
@@ -241,9 +226,13 @@ export default function BrowseAcademies() {
           contentContainerStyle={{ padding: 16 }}
           showsVerticalScrollIndicator={false}
         >
-          {filteredAcademies.length > 0 ? (
-            filteredAcademies.map((academy, index) => (
-              <AcademyCard key={index} academy={academy} />
+          {isLoading && academies.length === 0 ? (
+            <View className="items-center justify-center py-16">
+              <ActivityIndicator size="large" color="#0f172a" />
+            </View>
+          ) : filteredAcademies.length > 0 ? (
+            filteredAcademies.map((academy) => (
+              <AcademyCard key={academy.id} academy={academy} />
             ))
           ) : (
             <View className="flex-1 items-center justify-center py-16">

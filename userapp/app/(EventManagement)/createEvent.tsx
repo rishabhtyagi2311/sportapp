@@ -13,26 +13,21 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import uuid from 'react-native-uuid';
-import { Event, Sport } from '@/types/booking';
 import { useEventManagerStore } from '@/store/eventManagerStore';
-import { useBookingStore } from '@/store/venueStore';
-import { CURRENT_USER } from './usercontext';
+import VenueLocationPicker, { VenueLocationValue } from '@/components/VenueLocationPicker';
 
 /* -------------------------------------------------------------------------- */
 /* TYPES */
 /* -------------------------------------------------------------------------- */
 
-type EventType = 'tournament' | 'practice' | 'friendly' | 'training' | 'league';
 type ParticipationType = 'individual' | 'team';
 type FeeType = 'per_person' | 'per_team' | 'total';
 
 interface FormState {
   name: string;
   description: string;
-  venueId: string;
+  location: VenueLocationValue;
   sportId: string;
-  eventType: EventType | '';
   participationType: ParticipationType | '';
   teamSize: string;
   maxParticipants: string;
@@ -48,17 +43,14 @@ interface FormState {
 /* -------------------------------------------------------------------------- */
 
 export default function CreateEventScreen() {
-  // We strictly use createEvent from the Manager Store
   const { createEvent } = useEventManagerStore();
-  // We use booking store only for reference data (sports list)
-  const { sports } = useBookingStore();
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState<FormState>({
     name: '',
     description: '',
-    venueId: '',
+    location: {},
     sportId: '',
-    eventType: '',
     participationType: '',
     teamSize: '',
     maxParticipants: '',
@@ -114,8 +106,8 @@ export default function CreateEventScreen() {
       Alert.alert('Error', 'Please enter event name');
       return false;
     }
-    if (!formData.venueId.trim()) {
-      Alert.alert('Error', 'Please enter venue');
+    if (!formData.location.venueId && !formData.location.locationName?.trim()) {
+      Alert.alert('Error', 'Please choose a venue or enter a custom location');
       return false;
     }
     if (!formData.sportId.trim()) {
@@ -174,68 +166,43 @@ export default function CreateEventScreen() {
 
   /* ----------------------------- SUBMIT ------------------------------------ */
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
 
+    setSubmitting(true);
     try {
       // Parse date and time
       const [year, month, day] = formData.date.split('-').map(Number);
       const [hours, minutes] = formData.time.split(':').map(Number);
       const dateTime = new Date(year, month - 1, day, hours, minutes);
 
-      // Calculate registration deadline 
+      // Calculate registration deadline
       const deadline = new Date(dateTime);
       deadline.setDate(deadline.getDate() - 1);
 
-      // Create sport object
-      const sport: Sport =
-        sports.find((s) => s.id === formData.sportId) ?? {
-          id: formData.sportId,
-          name: formData.sportId,
-          category: 'outdoor',
-          varieties: [],
-        };
-
-      // Create event object with store logic
-      const event: Event = {
-        id: uuid.v4().toString(),
-        creatorId: CURRENT_USER.id,
-        venueId: formData.venueId,
+      await createEvent({
+        eventType: 'regular',
+        venueId: formData.location.venueId,
+        locationName: formData.location.venueId ? undefined : formData.location.locationName?.trim(),
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
-        eventType: 'regular',
-        sport,
-        participationType: formData.participationType as ParticipationType,
+        sportName: formData.sportId.trim(),
+        participationType: formData.participationType,
         teamSize:
-          formData.participationType === 'team'
-            ? parseInt(formData.teamSize)
-            : undefined,
-        maxParticipants: parseInt(formData.maxParticipants),
-        currentParticipants: 0,
+          formData.participationType === 'team' ? parseInt(formData.teamSize, 10) : undefined,
+        maxParticipants: parseInt(formData.maxParticipants, 10),
         dateTime: dateTime.toISOString(),
-        duration: parseFloat(formData.duration || '2'),
-        fees: {
-          amount: parseFloat(formData.feeAmount),
-          currency: 'INR',
-          type: formData.feeType as FeeType,
-        },
-        organizer: {
-          name: CURRENT_USER.name,
-          contact: CURRENT_USER.phone,
-        },
-        status: 'upcoming',
-        isPublic: true,
+        duration: Math.round(parseFloat(formData.duration || '2') * 60),
+        feeAmount: parseFloat(formData.feeAmount),
+        feeType: formData.feeType,
         registrationDeadline: deadline.toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      });
 
-      // Create event (uses Manager store logic which auto-syncs to booking store)
-      createEvent(event);
-      router.push("/(EventManagement)/organizerDashboard");
-    } catch (error) {
-      console.error('Error creating event:', error);
-      Alert.alert('Error', 'Failed to create event. Please check your inputs.');
+      router.push('/(EventManagement)/organizerDashboard');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to create event. Please check your inputs.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -289,16 +256,10 @@ export default function CreateEventScreen() {
               <Text className="text-white font-semibold mb-2 text-base">
                 Venue *
               </Text>
-              <View className="bg-sky-100 rounded-xl border border-gray-200 flex-row items-center px-4">
-                <Ionicons name="location-outline" size={20} color="#374151" />
-                <TextInput
-                  className="flex-1 text-black py-4 px-3 text-base"
-                  placeholder="Enter venue"
-                  placeholderTextColor="#6b7280"
-                  value={formData.venueId}
-                  onChangeText={(text) => updateForm('venueId', text)}
-                />
-              </View>
+              <VenueLocationPicker
+                value={formData.location}
+                onChange={(location) => setFormData((prev) => ({ ...prev, location }))}
+              />
             </View>
 
             {/* Sport Selection */}
@@ -529,12 +490,13 @@ export default function CreateEventScreen() {
             {/* Submit Button */}
             <TouchableOpacity
               onPress={handleSubmit}
+              disabled={submitting}
               className="bg-blue-300 rounded-xl py-4 mb-6 shadow-lg"
               activeOpacity={0.8}
             >
               <View className="flex-row items-center justify-center">
                 <Text className="text-black font-bold text-lg mr-2">
-                  Create Event
+                  {submitting ? 'Creating…' : 'Create Event'}
                 </Text>
                 <Ionicons
                   name="checkmark-circle-outline"

@@ -16,6 +16,8 @@ class AcademyService {
             fee: academy.fee,
             feeStructure: academy.feeStructure,
             isActive: academy.isActive,
+            averageRating: academy.averageRating,
+            reviewCount: academy.reviewCount,
             coaches: (academy.coaches || []).map((coach) => ({
                 id: coach.id,
                 name: coach.name,
@@ -53,7 +55,7 @@ class AcademyService {
             where: { partnerId },
             include: {
                 coaches: true,
-                _count: { select: { students: true } },
+                _count: { select: { students: { where: { status: 'active' } } } },
                 photos: { orderBy: { createdAt: 'desc' }, take: 1 },
             },
             orderBy: { createdAt: 'desc' },
@@ -96,6 +98,30 @@ class AcademyService {
             throw new Error('Academy not found or not owned by partner');
         }
         await index_1.prisma.academy.delete({ where: { id: academyId } });
+    }
+    /** Public, unauthenticated browse — no partnerId scoping, active academies only. */
+    static async getPublicAcademies(filters = {}) {
+        const academies = await index_1.prisma.academy.findMany({
+            where: {
+                isActive: true,
+                ...(filters.city ? { city: { equals: filters.city, mode: 'insensitive' } } : {}),
+                ...(filters.sportType ? { sportType: { equals: filters.sportType, mode: 'insensitive' } } : {}),
+            },
+            include: {
+                coaches: true,
+                _count: { select: { students: { where: { status: 'active' } } } },
+                photos: { orderBy: { createdAt: 'desc' } },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        return academies.map((academy) => this.mapAcademyForClient(academy));
+    }
+    static async getPublicAcademyById(academyId) {
+        const academy = await index_1.prisma.academy.findFirst({
+            where: { id: academyId, isActive: true },
+            include: { coaches: true, photos: { orderBy: { createdAt: 'desc' } } },
+        });
+        return academy ? this.mapAcademyForClient(academy) : null;
     }
     static async addCoach(academyId, partnerId, data) {
         const academy = await index_1.prisma.academy.findFirst({ where: { id: academyId, partnerId } });
@@ -155,6 +181,7 @@ class AcademyService {
             age: student.age,
             fatherName: student.fatherName,
             fatherContact: student.fatherContact,
+            status: student.status,
             enrollmentDate: student.enrollmentDate.toISOString().split('T')[0],
         };
     }
@@ -174,16 +201,52 @@ class AcademyService {
         });
         return this.mapStudentForClient(student);
     }
-    static async getStudentsByAcademy(academyId, partnerId) {
+    static async getStudentsByAcademy(academyId, partnerId, status) {
         const academy = await index_1.prisma.academy.findFirst({ where: { id: academyId, partnerId } });
         if (!academy) {
             throw new Error('Academy not found or not owned by partner');
         }
         const students = await index_1.prisma.student.findMany({
-            where: { academyId },
+            where: { academyId, ...(status ? { status } : {}) },
             orderBy: { createdAt: 'desc' },
         });
         return students.map((student) => this.mapStudentForClient(student));
+    }
+    static async approveEnrollment(academyId, partnerId, studentId) {
+        const academy = await index_1.prisma.academy.findFirst({ where: { id: academyId, partnerId } });
+        if (!academy) {
+            throw new Error('Academy not found or not owned by partner');
+        }
+        const student = await index_1.prisma.student.findFirst({ where: { id: studentId, academyId } });
+        if (!student) {
+            throw new Error('Student not found');
+        }
+        if (student.status !== 'pending') {
+            throw new Error(`Cannot approve a '${student.status}' enrollment`);
+        }
+        const updated = await index_1.prisma.student.update({
+            where: { id: studentId },
+            data: { status: 'active' },
+        });
+        return this.mapStudentForClient(updated);
+    }
+    static async rejectEnrollment(academyId, partnerId, studentId) {
+        const academy = await index_1.prisma.academy.findFirst({ where: { id: academyId, partnerId } });
+        if (!academy) {
+            throw new Error('Academy not found or not owned by partner');
+        }
+        const student = await index_1.prisma.student.findFirst({ where: { id: studentId, academyId } });
+        if (!student) {
+            throw new Error('Student not found');
+        }
+        if (student.status !== 'pending') {
+            throw new Error(`Cannot reject a '${student.status}' enrollment`);
+        }
+        const updated = await index_1.prisma.student.update({
+            where: { id: studentId },
+            data: { status: 'inactive' },
+        });
+        return this.mapStudentForClient(updated);
     }
     static async updateStudent(academyId, partnerId, studentId, data) {
         const academy = await index_1.prisma.academy.findFirst({ where: { id: academyId, partnerId } });
@@ -338,6 +401,134 @@ class AcademyService {
             orderBy: { date: 'desc' },
         });
         return certificates.map((cert) => this.mapCertificateForClient(cert));
+    }
+    /* ------------------------------------------------------------------ */
+    /* ANNOUNCEMENTS                                                       */
+    /* ------------------------------------------------------------------ */
+    static mapAnnouncementForClient(announcement) {
+        return {
+            id: announcement.id,
+            academyId: announcement.academyId,
+            content: announcement.content,
+            createdAt: announcement.createdAt.toISOString(),
+        };
+    }
+    static async createAnnouncement(academyId, partnerId, content) {
+        const academy = await index_1.prisma.academy.findFirst({ where: { id: academyId, partnerId } });
+        if (!academy) {
+            throw new Error('Academy not found or not owned by partner');
+        }
+        const announcement = await index_1.prisma.announcement.create({ data: { academyId, content } });
+        return this.mapAnnouncementForClient(announcement);
+    }
+    static async getAnnouncementsByAcademy(academyId, partnerId) {
+        const academy = await index_1.prisma.academy.findFirst({ where: { id: academyId, partnerId } });
+        if (!academy) {
+            throw new Error('Academy not found or not owned by partner');
+        }
+        const announcements = await index_1.prisma.announcement.findMany({
+            where: { academyId },
+            orderBy: { createdAt: 'desc' },
+        });
+        return announcements.map((a) => this.mapAnnouncementForClient(a));
+    }
+    /** Public, unauthenticated read — no sensitive data on Announcement. */
+    static async getPublicAnnouncements(academyId) {
+        const academy = await index_1.prisma.academy.findFirst({ where: { id: academyId, isActive: true } });
+        if (!academy) {
+            throw new Error('Academy not found');
+        }
+        const announcements = await index_1.prisma.announcement.findMany({
+            where: { academyId },
+            orderBy: { createdAt: 'desc' },
+        });
+        return announcements.map((a) => this.mapAnnouncementForClient(a));
+    }
+    static async removeAnnouncement(academyId, partnerId, announcementId) {
+        const academy = await index_1.prisma.academy.findFirst({ where: { id: academyId, partnerId } });
+        if (!academy) {
+            throw new Error('Academy not found or not owned by partner');
+        }
+        const announcement = await index_1.prisma.announcement.findFirst({ where: { id: announcementId, academyId } });
+        if (!announcement) {
+            throw new Error('Announcement not found');
+        }
+        await index_1.prisma.announcement.delete({ where: { id: announcementId } });
+    }
+    /* ------------------------------------------------------------------ */
+    /* DEMO BOOKINGS                                                       */
+    /* ------------------------------------------------------------------ */
+    static mapDemoBookingForClient(booking) {
+        const { childProfile, ...rest } = booking;
+        return {
+            ...rest,
+            bookingDate: booking.bookingDate.toISOString().split('T')[0],
+            ...(childProfile
+                ? { childName: childProfile.childName, fatherName: childProfile.fatherName, fatherContact: childProfile.fatherContact }
+                : {}),
+        };
+    }
+    static async getDemoBookingsForAcademy(academyId, partnerId, status) {
+        const academy = await index_1.prisma.academy.findFirst({ where: { id: academyId, partnerId } });
+        if (!academy) {
+            throw new Error('Academy not found or not owned by partner');
+        }
+        const where = { academyId };
+        if (status) {
+            where.status = status;
+        }
+        const bookings = await index_1.prisma.demoBooking.findMany({
+            where,
+            include: { childProfile: true },
+            orderBy: { bookingDate: 'asc' },
+        });
+        return bookings.map((b) => this.mapDemoBookingForClient(b));
+    }
+    static async assertDemoBookingOwnedByPartner(bookingId, partnerId) {
+        const booking = await index_1.prisma.demoBooking.findFirst({
+            where: { id: bookingId, academy: { partnerId } },
+            include: { childProfile: true },
+        });
+        if (!booking) {
+            throw new Error('Demo booking not found or not owned by partner');
+        }
+        return booking;
+    }
+    static async confirmDemoBooking(bookingId, partnerId) {
+        const booking = await this.assertDemoBookingOwnedByPartner(bookingId, partnerId);
+        if (booking.status !== 'pending') {
+            throw new Error(`Cannot confirm a '${booking.status}' demo booking`);
+        }
+        const updated = await index_1.prisma.demoBooking.update({
+            where: { id: bookingId },
+            data: { status: 'confirmed' },
+            include: { childProfile: true },
+        });
+        return this.mapDemoBookingForClient(updated);
+    }
+    static async completeDemoBooking(bookingId, partnerId) {
+        const booking = await this.assertDemoBookingOwnedByPartner(bookingId, partnerId);
+        if (booking.status !== 'confirmed') {
+            throw new Error(`Cannot complete a '${booking.status}' demo booking`);
+        }
+        const updated = await index_1.prisma.demoBooking.update({
+            where: { id: bookingId },
+            data: { status: 'completed' },
+            include: { childProfile: true },
+        });
+        return this.mapDemoBookingForClient(updated);
+    }
+    static async cancelDemoBooking(bookingId, partnerId) {
+        const booking = await this.assertDemoBookingOwnedByPartner(bookingId, partnerId);
+        if (booking.status === 'cancelled' || booking.status === 'completed') {
+            throw new Error(`Demo booking is already ${booking.status}`);
+        }
+        const updated = await index_1.prisma.demoBooking.update({
+            where: { id: bookingId },
+            data: { status: 'cancelled' },
+            include: { childProfile: true },
+        });
+        return this.mapDemoBookingForClient(updated);
     }
 }
 exports.AcademyService = AcademyService;

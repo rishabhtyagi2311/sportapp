@@ -1,113 +1,91 @@
 import { create } from 'zustand';
-import { Academy, Student, Attendance, Certificate, Coach } from '../types';
-import { dummyAcademies, dummyStudents } from '../constants/dummyData';
+import { Academy, AttendanceRecord, Certificate } from '../types/academy';
+import { academyApiService } from '@/services/academyManagement/academy';
 
 interface AcademyStore {
   academies: Academy[];
-  students: Student[];
-  attendance: Attendance[];
+  attendance: AttendanceRecord[];
   certificates: Certificate[];
-  
-  // Academy actions
-  updateAcademy: (academy: Academy) => void;
-  addAcademy: (academy: Academy) => void;
-  getAcademies: () => Academy[];
-  clearAcademies: () => void;
+  isLoading: boolean;
+  error: string | null;
+
+  fetchAcademies: (filters?: { city?: string; sportType?: string }) => Promise<void>;
+  fetchAcademyById: (id: string) => Promise<Academy | null>;
   getAcademyById: (id: string) => Academy | undefined;
 
-  // Student actions
-  addStudent: (student: Student) => void;
-  getStudentsByAcademy: (academyId: string) => Student[];
-  
-  // Attendance actions
-  markAttendance: (studentId: string, date: string, present: boolean) => void;
+  fetchChildAttendance: (studentId: string) => Promise<void>;
   getAttendanceStatus: (studentId: string, date: string) => boolean | undefined;
-  
-  // Certificate actions
-  addCertificate: (certificate: Certificate) => void;
-  getCertificatesByAcademy: (academyId: string) => Certificate[];
 
-  // Coach actions
-  addCoach: (academyId: string, coach: Coach) => void;
-  removeCoach: (academyId: string, coachId: string) => void;
+  fetchChildCertificates: (studentId: string) => Promise<void>;
+  getCertificatesByStudent: (studentId: string) => Certificate[];
 }
 
 export const useAcademyStore = create<AcademyStore>((set, get) => ({
-  academies: dummyAcademies,
-  students: dummyStudents,
+  academies: [],
   attendance: [],
   certificates: [],
+  isLoading: false,
+  error: null,
 
-  addAcademy: (academy) =>
-    set((state) => ({
-      academies: [...state.academies, academy],
-    })),
-  getAcademies: () => get().academies,
-  getAcademyById: (id) => get().academies.find((academy) => academy.id === id),
-  clearAcademies: () => set({ academies: [] }),
-  
-  updateAcademy: (academy) =>
-    set((state) => ({
-      academies: state.academies.map((a) => (a.id === academy.id ? academy : a)),
-    })),
-  
-  addStudent: (student) =>
-    set((state) => ({
-      students: [...state.students, student],
-    })),
-  
-  getStudentsByAcademy: (academyId) => {
-    return get().students.filter((student) => student.academyId === academyId);
+  fetchAcademies: async (filters) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.getAcademies(filters);
+      set({ academies: response.data, isLoading: false });
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || 'Could not load academies', isLoading: false });
+    }
   },
-  
-  markAttendance: (studentId, date, present) =>
-    set((state) => {
-      const existing = state.attendance.findIndex(
-        (a) => a.studentId === studentId && a.date === date
-      );
-      if (existing >= 0) {
-        const updated = [...state.attendance];
-        updated[existing] = { studentId, date, present };
-        return { attendance: updated };
-      }
-      return { attendance: [...state.attendance, { studentId, date, present }] };
-    }),
-  
+
+  fetchAcademyById: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.getAcademyById(id);
+      set((state) => {
+        const index = state.academies.findIndex((a) => a.id === id);
+        const academies = [...state.academies];
+        if (index !== -1) {
+          academies[index] = response.data;
+        } else {
+          academies.push(response.data);
+        }
+        return { academies, isLoading: false };
+      });
+      return response.data;
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || 'Could not load academy', isLoading: false });
+      return null;
+    }
+  },
+
+  getAcademyById: (id) => get().academies.find((academy) => academy.id === id),
+
+  fetchChildAttendance: async (studentId) => {
+    try {
+      const response = await academyApiService.getChildAttendance(studentId);
+      set((state) => ({
+        attendance: [...state.attendance.filter((a) => a.studentId !== studentId), ...response.data],
+      }));
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || 'Could not load attendance' });
+    }
+  },
+
   getAttendanceStatus: (studentId, date) => {
-    const record = get().attendance.find(
-      (a) => a.studentId === studentId && a.date === date
-    );
+    const record = get().attendance.find((a) => a.studentId === studentId && a.date === date);
     return record?.present;
   },
-  
-  addCertificate: (certificate) =>
-    set((state) => ({
-      certificates: [...state.certificates, certificate],
-    })),
-  
-  getCertificatesByAcademy: (academyId) => {
-    const students = get().getStudentsByAcademy(academyId);
-    return get().certificates.filter((cert) =>
-      students.some((student) => student.id === cert.studentId)
-    );
+
+  fetchChildCertificates: async (studentId) => {
+    try {
+      const response = await academyApiService.getChildCertificates(studentId);
+      set((state) => ({
+        certificates: [...state.certificates.filter((c) => c.studentId !== studentId), ...response.data],
+      }));
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || 'Could not load certificates' });
+    }
   },
 
-  // --- Coach actions ---
-  addCoach: (academyId, coach) =>
-    set((state) => ({
-      academies: state.academies.map((a) =>
-        a.id === academyId
-          ? { ...a, coaches: [...(a.coaches || []), coach] }
-          : a
-      ),
-    })),
-
-  removeCoach: (academyId, coachId) =>
-    set((state) => ({
-      academies: state.academies.map((a) =>
-        a.id === academyId
-          ? { ...a, coaches: a.coaches?.filter((c) => c.id !== coachId) }
-          : a
-      ),
-    })),
+  getCertificatesByStudent: (studentId) => get().certificates.filter((c) => c.studentId === studentId),
 }));

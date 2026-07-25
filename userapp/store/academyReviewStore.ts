@@ -1,83 +1,67 @@
 // store/academyReviewStore.ts
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-export interface AcademyReview {
-  id: string;
-  academyId: string;
-  academyName: string;
-  childId: string;
-  childName: string;
-  reviewerName: string; // father's name
-  rating: number; // 1-5
-  title?: string;
-  comment: string;
-  createdAt: string;
-}
+import { Review } from "@/types/academy";
+import { academyApiService } from "@/services/academyManagement/academy";
 
 interface ReviewsStore {
-  reviews: AcademyReview[];
-  addReview: (review: Omit<AcademyReview, "id" | "createdAt">) => void;
-  updateReview: (id: string, updates: Partial<AcademyReview>) => void;
-  deleteReview: (id: string) => void;
-  getReviewsByAcademy: (academyId: string) => AcademyReview[];
-  getReviewsByChild: (childId: string) => AcademyReview[];
-  getAverageRatingForAcademy: (academyId: string) => number;
+  reviews: Review[];
+  myReviews: Review[];
+  isLoading: boolean;
+  error: string | null;
+
+  fetchReviewsForAcademy: (academyId: string) => Promise<void>;
+  fetchMyReviews: () => Promise<void>;
+  submitReview: (payload: {
+    academyId: string;
+    childProfileId: string;
+    rating: number;
+    title?: string;
+    comment: string;
+  }) => Promise<Review>;
+  getReviewsByAcademy: (academyId: string) => Review[];
 }
 
-export const useReviewsStore = create<ReviewsStore>()(
-  persist(
-    (set, get) => ({
-      reviews: [],
+export const useReviewsStore = create<ReviewsStore>((set, get) => ({
+  reviews: [],
+  myReviews: [],
+  isLoading: false,
+  error: null,
 
-      addReview: (reviewInput) =>
-        set((state) => {
-          const newReview: AcademyReview = {
-            ...reviewInput,
-            id: `${reviewInput.academyId}-${reviewInput.childId}-${Date.now()}`,
-            createdAt: new Date().toISOString(),
-          };
-          return {
-            reviews: [newReview, ...state.reviews],
-          };
-        }),
-
-      updateReview: (id, updates) =>
-        set((state) => ({
-          reviews: state.reviews.map((review) =>
-            review.id === id ? { ...review, ...updates } : review
-          ),
-        })),
-
-      deleteReview: (id) =>
-        set((state) => ({
-          reviews: state.reviews.filter((review) => review.id !== id),
-        })),
-
-      getReviewsByAcademy: (academyId) => {
-        const { reviews } = get();
-        return reviews.filter((r) => r.academyId === academyId);
-      },
-
-      getReviewsByChild: (childId) => {
-        const { reviews } = get();
-        return reviews.filter((r) => r.childId === childId);
-      },
-
-      getAverageRatingForAcademy: (academyId) => {
-        const { reviews } = get();
-        const academyReviews = reviews.filter(
-          (r) => r.academyId === academyId && typeof r.rating === "number"
-        );
-        if (academyReviews.length === 0) return 0;
-        const total = academyReviews.reduce((sum, r) => sum + r.rating, 0);
-        return total / academyReviews.length;
-      },
-    }),
-    {
-      name: "academy-reviews-storage",
-      storage: createJSONStorage(() => AsyncStorage),
+  fetchReviewsForAcademy: async (academyId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.getReviewsForAcademy(academyId);
+      set((state) => ({
+        reviews: [...state.reviews.filter((r) => r.academyId !== academyId), ...response.data],
+        isLoading: false,
+      }));
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || "Could not load reviews", isLoading: false });
     }
-  )
-);
+  },
+
+  fetchMyReviews: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.getMyReviews();
+      set({ myReviews: response.data, isLoading: false });
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || "Could not load your reviews", isLoading: false });
+    }
+  },
+
+  submitReview: async (payload) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.createReview(payload);
+      set((state) => ({ reviews: [response.data, ...state.reviews], isLoading: false }));
+      return response.data;
+    } catch (err: any) {
+      const message = err.response?.data?.message || "Could not submit review";
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
+
+  getReviewsByAcademy: (academyId) => get().reviews.filter((r) => r.academyId === academyId),
+}));

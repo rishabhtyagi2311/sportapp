@@ -8,15 +8,30 @@ export declare class SlotService {
         varietyId?: string;
         status?: string;
     }): Promise<{
-        date: Date;
         id: string;
+        status: string;
         venueId: string;
-        startTime: string;
-        endTime: string;
         price: number;
         varietyId: string;
         varietyName: string;
+        date: Date;
+        startTime: string;
+        endTime: string;
+    }[]>;
+    /** Public, unauthenticated slot lookup — visible only for active venues. */
+    static getPublicSlotsForVenue(params: {
+        venueId: string;
+        date?: string;
+    }): Promise<{
+        id: string;
         status: string;
+        venueId: string;
+        price: number;
+        varietyId: string;
+        varietyName: string;
+        date: Date;
+        startTime: string;
+        endTime: string;
     }[]>;
     static generateSlotsForVenue(params: {
         venueId: string;
@@ -32,15 +47,15 @@ export declare class SlotService {
         price?: number;
         reason?: string;
     }): Promise<{
-        date: Date;
         id: string;
+        status: string;
         venueId: string;
-        startTime: string;
-        endTime: string;
         price: number;
         varietyId: string;
         varietyName: string;
-        status: string;
+        date: Date;
+        startTime: string;
+        endTime: string;
     }>;
     static createBlock(params: {
         partnerId: string;
@@ -50,12 +65,12 @@ export declare class SlotService {
         date?: string;
     }): Promise<{
         id: string;
+        venueId: string;
         createdAt: Date;
         updatedAt: Date;
-        createdById: string;
-        venueId: string;
         slotId: string;
         reason: string;
+        createdById: string;
     }>;
     static removeBlock(params: {
         partnerId: string;
@@ -71,16 +86,16 @@ export declare class SlotService {
             name: string;
             phone: string;
         };
-        userId: string | null;
-        date: Date;
         id: string;
+        status: string;
+        venueId: string;
         createdAt: Date;
         updatedAt: Date;
-        venueId: string;
+        date: Date;
         startTime: string;
         endTime: string;
-        status: string;
         slotId: string | null;
+        userId: number | null;
         totalAmount: number;
         paymentStatus: string;
         bookingType: string;
@@ -97,16 +112,16 @@ export declare class SlotService {
             name: string;
             phone: string;
         };
-        userId: string | null;
-        date: Date;
         id: string;
+        status: string;
+        venueId: string;
         createdAt: Date;
         updatedAt: Date;
-        venueId: string;
+        date: Date;
         startTime: string;
         endTime: string;
-        status: string;
         slotId: string | null;
+        userId: number | null;
         totalAmount: number;
         paymentStatus: string;
         bookingType: string;

@@ -4,7 +4,7 @@ import { prisma as globalClient } from "../../../index";
 
 export class AuthService {
   private static signToken(partnerId: string): string {
-    return jwt.sign({ id: partnerId }, process.env.JWT_SECRET as string, {
+    return jwt.sign({ id: partnerId, type: "partner" }, process.env.JWT_SECRET as string, {
       expiresIn: (process.env.JWT_EXPIRES_IN || "7d") as any,
     });
   }

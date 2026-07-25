@@ -42,8 +42,10 @@ export default function StudentsScreen() {
   );
 
   /* ---------------- Derived State (SAFE) ---------------- */
+  // Pending (not-yet-approved) enrollments live on the dedicated Enrollment
+  // Requests screen, not the general roster.
   const students = useMemo(
-    () => allStudents.filter((s) => s.academyId === id),
+    () => allStudents.filter((s) => s.academyId === id && s.status !== 'pending'),
     [allStudents, id]
   );
 

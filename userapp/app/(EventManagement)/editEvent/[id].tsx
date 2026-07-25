@@ -7,18 +7,17 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Sport } from '@/types/booking';
 import { useEventManagerStore } from '@/store/eventManagerStore';
-import { useBookingStore } from '@/store/venueStore';
+import VenueLocationPicker, { VenueLocationValue } from '@/components/VenueLocationPicker';
 
 /* -------------------------------------------------------------------------- */
 /* TYPES */
 /* -------------------------------------------------------------------------- */
-type EventType = 'tournament' | 'practice' | 'friendly' | 'training' | 'league';
 type ParticipationType = 'individual' | 'team';
 type FeeType = 'per_person' | 'per_team' | 'total';
 type EventStatus = 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
@@ -26,9 +25,8 @@ type EventStatus = 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
 interface FormState {
   name: string;
   description: string;
-  venueId: string;
+  location: VenueLocationValue;
   sportId: string;
-  eventType: EventType;
   participationType: ParticipationType;
   teamSize: string;
   maxParticipants: string;
@@ -45,42 +43,46 @@ interface FormState {
 /* -------------------------------------------------------------------------- */
 export default function EditEventScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  
-  // 1. USE MANAGER STORE FOR ACTIONS (Syncs automatically)
-  const { managedEvents, updateEvent, deleteEvent } = useEventManagerStore();
-  // 2. USE BOOKING STORE FOR READ-ONLY DATA
-  const { sports } = useBookingStore();
-  
-  const event = managedEvents.find((e) => e.id === id);
+
+  const { getEventById, fetchEventById, updateEvent, deleteEvent } = useEventManagerStore();
+  const event = getEventById(id!);
   const [form, setForm] = useState<FormState | null>(null);
+  const [saving, setSaving] = useState(false);
 
   /* ---------------------------- INITIAL LOAD ------------------------------ */
   useEffect(() => {
-    if (!event) {
-      Alert.alert('Error', 'Event not found');
-      router.back();
-      return;
-    }
+    if (id) fetchEventById(id);
+  }, [id]);
+
+  useEffect(() => {
+    if (!event) return;
     const dt = new Date(event.dateTime);
     setForm({
       name: event.name,
       description: event.description ?? '',
-      venueId: event.venueId,
-      sportId: event.sport.id,
-      eventType: event.eventType,
+      location: event.venueId
+        ? { venueId: event.venueId, venueName: event.venueName }
+        : { locationName: event.locationName ?? '' },
+      sportId: event.sportName,
       participationType: event.participationType,
       teamSize: event.teamSize?.toString() ?? '',
       maxParticipants: event.maxParticipants.toString(),
       date: dt.toISOString().slice(0, 10),
       time: dt.toISOString().slice(11, 16),
-      duration: event.duration.toString(),
-      feeAmount: event.fees.amount.toString(),
-      feeType: event.fees.type,
+      duration: (event.duration / 60).toString(),
+      feeAmount: event.feeAmount.toString(),
+      feeType: event.feeType,
       status: event.status,
     });
   }, [event]);
 
-  if (!form) return null;
+  if (!form) {
+    return (
+      <SafeAreaView className="flex-1 bg-slate-900 items-center justify-center">
+        <ActivityIndicator size="large" color="white" />
+      </SafeAreaView>
+    );
+  }
 
   /* ----------------------------- HELPERS -------------------------------- */
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -118,9 +120,8 @@ export default function EditEventScreen() {
   /* ----------------------------- VALIDATION -------------------------------- */
   const validateForm = (): boolean => {
     if (!form.name.trim()) { Alert.alert('Error', 'Please enter event name'); return false; }
-    if (!form.venueId.trim()) { Alert.alert('Error', 'Please enter venue'); return false; }
+    if (!form.location.venueId && !form.location.locationName?.trim()) { Alert.alert('Error', 'Please choose a venue or enter a custom location'); return false; }
     if (!form.sportId.trim()) { Alert.alert('Error', 'Please enter sport'); return false; }
-    if (!form.eventType) { Alert.alert('Error', 'Please select event type'); return false; }
     if (!form.participationType) { Alert.alert('Error', 'Please select participation type'); return false; }
     if (form.participationType === 'team' && !form.teamSize) { Alert.alert('Error', 'Please enter team size'); return false; }
     if (!form.maxParticipants) { Alert.alert('Error', 'Please enter maximum participants'); return false; }
@@ -135,55 +136,41 @@ export default function EditEventScreen() {
   };
 
   /* ------------------------------ SAVE ------------------------------------ */
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!id) return;
     if (!validateForm()) return;
 
+    setSaving(true);
     try {
       const [y, m, d] = form.date.split('-').map(Number);
       const [hh, mm] = form.time.split(':').map(Number);
       const dateTime = new Date(y, m - 1, d, hh, mm);
 
       const deadline = new Date(dateTime);
-      deadline.setDate(deadline.getDate() - 7);
+      deadline.setDate(deadline.getDate() - 1);
 
-      const sport: Sport =
-        sports.find((s) => s.id === form.sportId) ?? {
-          id: form.sportId,
-          name: form.sportId,
-          category: 'outdoor',
-          varieties: [],
-        };
-
-      // TRIGGER UPDATE IN MANAGER STORE (Auto-syncs to BookingStore)
-      updateEvent(id, {
+      await updateEvent(id, {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
-        venueId: form.venueId,
-        sport,
-        eventType: form.eventType,
-        participationType: form.participationType,
-        teamSize:
-          form.participationType === 'team'
-            ? Number(form.teamSize)
-            : undefined,
+        venueId: form.location.venueId ?? null,
+        locationName: form.location.venueId ? null : form.location.locationName?.trim() || null,
+        sportName: form.sportId.trim(),
+        teamSize: form.participationType === 'team' ? Number(form.teamSize) : undefined,
         maxParticipants: Number(form.maxParticipants),
         dateTime: dateTime.toISOString(),
-        duration: Number(form.duration),
-        fees: {
-          amount: Number(form.feeAmount),
-          currency: 'INR',
-          type: form.feeType,
-        },
+        duration: Math.round(Number(form.duration) * 60),
+        feeAmount: Number(form.feeAmount),
+        feeType: form.feeType,
         status: form.status,
         registrationDeadline: deadline.toISOString(),
       });
 
       Alert.alert('Success', 'Event updated successfully');
       router.back();
-    } catch (error) {
-      console.error('Error updating event:', error);
-      Alert.alert('Error', 'Failed to update event. Please check your inputs.');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to update event. Please check your inputs.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -194,14 +181,12 @@ export default function EditEventScreen() {
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
           try {
-            // TRIGGER DELETE IN MANAGER STORE (Auto-syncs to BookingStore)
-            deleteEvent(id!);
+            await deleteEvent(id!);
             router.back();
-          } catch (error) {
-            console.error('Error deleting event:', error);
-            Alert.alert('Error', 'Failed to delete event');
+          } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to delete event');
           }
         },
       },
@@ -252,16 +237,10 @@ export default function EditEventScreen() {
             <Text className="text-white font-semibold mb-2 text-base">
               Venue *
             </Text>
-            <View className="bg-sky-100 rounded-xl border border-gray-200 flex-row items-center px-4">
-              <Ionicons name="location-outline" size={20} color="#374151" />
-              <TextInput
-                className="flex-1 text-black py-4 px-3 text-base"
-                placeholder="Enter venue"
-                placeholderTextColor="#6b7280"
-                value={form.venueId}
-                onChangeText={(text) => update('venueId', text)}
-              />
-            </View>
+            <VenueLocationPicker
+              value={form.location}
+              onChange={(location) => setForm((prev) => (prev ? { ...prev, location } : prev))}
+            />
           </View>
 
           {/* Sport Selection */}
@@ -278,42 +257,6 @@ export default function EditEventScreen() {
                 value={form.sportId}
                 onChangeText={(text) => update('sportId', text)}
               />
-            </View>
-          </View>
-
-          {/* Event Type Selection */}
-          <View className="mb-6">
-            <Text className="text-white font-semibold mb-2 text-base">
-              Event Type *
-            </Text>
-            <Text className="text-gray-400 text-sm mb-3">
-              Select the type of event
-            </Text>
-            <View className="flex-row flex-wrap mb-3">
-              {['tournament', 'practice', 'friendly', 'training', 'league'].map(
-                (type) => (
-                  <TouchableOpacity
-                    key={type}
-                    onPress={() => update('eventType', type as EventType)}
-                    className={`rounded-lg px-3 py-2 mr-2 mb-2 border ${
-                      form.eventType === type
-                        ? 'bg-green-600 border-green-500'
-                        : 'bg-sky-100 border-gray-300'
-                    }`}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      className={`text-sm ${
-                        form.eventType === type
-                          ? 'text-white font-semibold'
-                          : 'text-gray-700'
-                      }`}
-                    >
-                      {type.charAt(0).toUpperCase() + type.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              )}
             </View>
           </View>
 
@@ -336,36 +279,13 @@ export default function EditEventScreen() {
             </View>
           </View>
 
-          {/* Participation Type */}
+          {/* Participation Type (read-only after creation) */}
           <View className="mb-6">
             <Text className="text-white font-semibold mb-2 text-base">
-              Participation Type *
+              Participation Type
             </Text>
-            <View className="flex-row">
-              {['individual', 'team'].map((type) => (
-                <TouchableOpacity
-                  key={type}
-                  onPress={() =>
-                    update('participationType', type as ParticipationType)
-                  }
-                  className={`flex-1 rounded-lg py-3 px-2 mr-2 border ${
-                    form.participationType === type
-                      ? 'bg-green-600 border-green-500'
-                      : 'bg-sky-100 border-gray-300'
-                  }`}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    className={`text-center text-sm ${
-                      form.participationType === type
-                        ? 'text-white font-semibold'
-                        : 'text-gray-700'
-                    }`}
-                  >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <View className="bg-slate-800 rounded-xl px-4 py-4">
+              <Text className="text-slate-300 text-sm capitalize">{form.participationType}</Text>
             </View>
           </View>
 
@@ -551,12 +471,13 @@ export default function EditEventScreen() {
           {/* Save Button */}
           <TouchableOpacity
             onPress={handleSave}
+            disabled={saving}
             className="bg-blue-300 rounded-xl py-4 mb-4 shadow-lg"
             activeOpacity={0.8}
           >
             <View className="flex-row items-center justify-center">
               <Text className="text-black font-bold text-lg mr-2">
-                Save Changes
+                {saving ? 'Saving…' : 'Save Changes'}
               </Text>
               <Ionicons
                 name="checkmark-circle-outline"

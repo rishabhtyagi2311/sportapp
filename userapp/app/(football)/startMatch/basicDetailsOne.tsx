@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { dummyVenues } from '@/constants/venueData';
 import { useMatchCreationStore, MatchVenue, MatchReferee, } from '@/store/footballMatchCreationStore';
+import { useFootballStore } from '@/store/footballTeamStore';
 interface Venue {
   id: string;
   name: string;
@@ -31,28 +32,29 @@ interface Venue {
 export default function MatchDetailsForm() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { 
-    initializeMatch, 
-    updateMatchDetails, 
-    matchData, 
-    canProceedToNextStep 
+  const {
+    initializeMatch,
+    updateMatchDetails,
+    matchData,
+    canProceedToNextStep
   } = useMatchCreationStore();
-  
+  const { getTeamById } = useFootballStore();
+
   // Initialize match data from route params
   useEffect(() => {
-    console.log(params);
-    console.log(matchData);
-    
-    
     if (params.myTeamId && params.opponentTeamId) {
+      const myTeamId = parseInt(params.myTeamId as string, 10);
+      const opponentTeamId = parseInt(params.opponentTeamId as string, 10);
+      const myTeam = getTeamById(myTeamId);
+      const opponentTeam = getTeamById(opponentTeamId);
       initializeMatch(
-        params.myTeamId as string,
-        params.myTeamName as string || 'My Team',
-        params.opponentTeamId as string,
-        params.opponentTeamName as string || 'Opponent Team'
+        myTeamId,
+        myTeam?.name || 'My Team',
+        opponentTeamId,
+        opponentTeam?.name || 'Opponent Team'
       );
     }
-  }, [params, initializeMatch]);
+  }, [params.myTeamId, params.opponentTeamId]);
   
   const [venueInput, setVenueInput] = useState('');
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>([]);

@@ -1,34 +1,31 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
-  StatusBar,
-  ActivityIndicator
-} from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useDemoBookingStore, DemoBooking } from "@/store/demobookingstore";
+import { useDemoBookingStore } from "@/store/demobookingstore";
+import { DemoBooking } from "@/types/academy";
 import { format, parseISO } from "date-fns";
 
 export default function DemoBookingsScreen() {
   const router = useRouter();
-  const demoBookings = useDemoBookingStore((state) => state.demoBookings);
-  const updateDemoBookingStatus = useDemoBookingStore((state) => state.updateDemoBookingStatus);
+  const { demoBookings, fetchMyDemoBookings, cancelDemoBooking } = useDemoBookingStore();
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    fetchMyDemoBookings();
+  }, []);
+
   // Group bookings by status
-  const upcomingBookings = demoBookings.filter(booking => 
-    booking.status === 'confirmed' && new Date(booking.bookingDate) >= new Date()
+  const upcomingBookings = demoBookings.filter(booking =>
+    (booking.status === 'pending' || booking.status === 'confirmed') && new Date(booking.bookingDate) >= new Date()
   ).sort((a, b) => new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime());
-  
-  const pastBookings = demoBookings.filter(booking => 
-    booking.status === 'completed' || (booking.status === 'confirmed' && new Date(booking.bookingDate) < new Date())
+
+  const pastBookings = demoBookings.filter(booking =>
+    booking.status === 'completed' || ((booking.status === 'pending' || booking.status === 'confirmed') && new Date(booking.bookingDate) < new Date())
   ).sort((a, b) => new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime());
-  
-  const cancelledBookings = demoBookings.filter(booking => 
+
+  const cancelledBookings = demoBookings.filter(booking =>
     booking.status === 'cancelled'
   ).sort((a, b) => new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime());
 
@@ -36,26 +33,11 @@ export default function DemoBookingsScreen() {
     router.back();
   };
 
-  const markAsCompleted = async (id: string) => {
-    setIsLoading(true);
-    try {
-      // Simulate API call with timeout
-      await new Promise(resolve => setTimeout(resolve, 500));
-      updateDemoBookingStatus(id, 'completed');
-    } catch (error) {
-      console.error("Failed to mark as completed", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const cancelBooking = async (id: string) => {
     setIsLoading(true);
     try {
-      // Simulate API call with timeout
-      await new Promise(resolve => setTimeout(resolve, 500));
-      updateDemoBookingStatus(id, 'cancelled');
-    } catch (error) {
+      await cancelDemoBooking(id);
+    } catch (error: any) {
       console.error("Failed to cancel booking", error);
     } finally {
       setIsLoading(false);
@@ -90,31 +72,37 @@ export default function DemoBookingsScreen() {
         {/* Status Badge */}
         <View className="absolute top-4 right-4 z-10">
           <View className={`rounded-full px-3 py-1 ${
-            booking.status === 'confirmed' 
-              ? 'bg-blue-50' 
-              : booking.status === 'completed' 
-                ? 'bg-green-50' 
-                : 'bg-red-50'
+            booking.status === 'pending'
+              ? 'bg-amber-50'
+              : booking.status === 'confirmed'
+                ? 'bg-blue-50'
+                : booking.status === 'completed'
+                  ? 'bg-green-50'
+                  : 'bg-red-50'
           }`}>
             <Text className={`text-xs font-medium ${
-              booking.status === 'confirmed' 
-                ? 'text-blue-600' 
-                : booking.status === 'completed' 
-                  ? 'text-green-600' 
-                  : 'text-red-600'
+              booking.status === 'pending'
+                ? 'text-amber-600'
+                : booking.status === 'confirmed'
+                  ? 'text-blue-600'
+                  : booking.status === 'completed'
+                    ? 'text-green-600'
+                    : 'text-red-600'
             }`}>
-              {booking.status === 'confirmed' 
-                ? (isPast ? 'Overdue' : 'Confirmed') 
-                : booking.status === 'completed' 
-                  ? 'Completed' 
-                  : 'Cancelled'}
+              {booking.status === 'pending'
+                ? 'Awaiting Confirmation'
+                : booking.status === 'confirmed'
+                  ? (isPast ? 'Overdue' : 'Confirmed')
+                  : booking.status === 'completed'
+                    ? 'Completed'
+                    : 'Cancelled'}
             </Text>
           </View>
         </View>
 
         {/* Child & Academy Info */}
         <Text className="text-slate-900 font-bold text-xl">
-          {booking.childName}
+          {booking.childName || "Demo Booking"}
         </Text>
         <Text className="text-blue-600 font-medium mt-1">
           {booking.academyName}
@@ -130,26 +118,13 @@ export default function DemoBookingsScreen() {
           </Text>
         </View>
 
-        {/* Contact Info */}
-        <View className="flex-row items-center mt-3">
-          <View className="bg-green-50 rounded-full p-2 mr-3">
-            <Ionicons name="call-outline" size={16} color="#10b981" />
-          </View>
-          <View>
-            <Text className="text-slate-500 text-xs">Contact</Text>
-            <Text className="text-slate-700">
-              {booking.fatherName}: {booking.contactNumber}
-            </Text>
-          </View>
-        </View>
-
-        {/* Action Buttons - Only for confirmed and not past bookings */}
-        {booking.status === 'confirmed' && !isPast && (
+        {/* Action Buttons - Only while pending/confirmed and not past */}
+        {(booking.status === 'pending' || booking.status === 'confirmed') && !isPast && (
           <View className="flex-row justify-end mt-4 pt-3 border-t border-gray-100">
             <TouchableOpacity
               onPress={() => cancelBooking(booking.id)}
               disabled={isLoading}
-              className="bg-red-50 rounded-full px-4 py-2 mr-3 flex-row items-center"
+              className="bg-red-50 rounded-full px-4 py-2 flex-row items-center"
             >
               {isLoading ? (
                 <ActivityIndicator size="small" color="#ef4444" />
@@ -157,20 +132,6 @@ export default function DemoBookingsScreen() {
                 <>
                   <Ionicons name="close-circle-outline" size={16} color="#ef4444" />
                   <Text className="text-red-600 font-medium ml-1">Cancel</Text>
-                </>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => markAsCompleted(booking.id)}
-              disabled={isLoading}
-              className="bg-green-50 rounded-full px-4 py-2 flex-row items-center"
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#10b981" />
-              ) : (
-                <>
-                  <Ionicons name="checkmark-circle-outline" size={16} color="#10b981" />
-                  <Text className="text-green-600 font-medium ml-1">Complete</Text>
                 </>
               )}
             </TouchableOpacity>

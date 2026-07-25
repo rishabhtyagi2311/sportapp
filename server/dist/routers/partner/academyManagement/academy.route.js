@@ -16,6 +16,8 @@ router.post('/academies/:academyId/students', auth_middleware_1.authenticatePart
 router.get('/academies/:academyId/students', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.getStudents);
 router.put('/academies/:academyId/students/:studentId', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.updateStudent);
 router.delete('/academies/:academyId/students/:studentId', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.removeStudent);
+router.patch('/academies/:academyId/students/:studentId/approve', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.approveEnrollment);
+router.patch('/academies/:academyId/students/:studentId/reject', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.rejectEnrollment);
 router.get('/academies/:academyId/attendance', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.getAcademyAttendance);
 router.post('/students/:studentId/attendance', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.markAttendance);
 router.get('/students/:studentId/attendance', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.getStudentAttendance);
@@ -24,5 +26,12 @@ router.get('/academies/:academyId/photos', auth_middleware_1.authenticatePartner
 router.delete('/academies/:academyId/photos/:photoId', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.removePhoto);
 router.post('/students/:studentId/certificates', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.createCertificate);
 router.get('/academies/:academyId/certificates', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.getAcademyCertificates);
+router.post('/academies/:academyId/announcements', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.createAnnouncement);
+router.get('/academies/:academyId/announcements', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.getAnnouncements);
+router.delete('/academies/:academyId/announcements/:announcementId', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.removeAnnouncement);
+router.get('/academies/:academyId/demo-bookings', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.getDemoBookings);
+router.patch('/demo-bookings/:bookingId/confirm', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.confirmDemoBooking);
+router.patch('/demo-bookings/:bookingId/complete', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.completeDemoBooking);
+router.patch('/demo-bookings/:bookingId/cancel', auth_middleware_1.authenticatePartner, academy_controller_1.AcademyController.cancelDemoBooking);
 exports.default = router;
 //# sourceMappingURL=academy.route.js.map

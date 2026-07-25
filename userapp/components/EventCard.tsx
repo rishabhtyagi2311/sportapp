@@ -2,26 +2,23 @@
 
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { Event } from './../types/booking';
-import { useBookingStore } from '@/store/venueStore';
+import { EventItem } from '@/types/event';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 interface EventCardProps {
-  event: Event;
+  event: EventItem;
   onPress?: () => void;
 }
 
 const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
-  const { getVenueById } = useBookingStore();
-  const venue = getVenueById(event.venueId);
   const router = useRouter();
-  
+
   const eventDate = new Date(event.dateTime);
   const isUpcoming = event.status === 'upcoming';
   const spotsLeft = event.maxParticipants - event.currentParticipants;
   const progressPercentage = (event.currentParticipants / event.maxParticipants) * 100;
-  
+
  const handlePress = () => {
   if (onPress) {
     onPress();
@@ -53,11 +50,8 @@ const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
 
   const getEventTypeColor = (type: string) => {
     switch (type) {
-      case 'tournament': return 'text-orange-600 bg-orange-50';
-      case 'league': return 'text-purple-600 bg-purple-50';
-      case 'practice': return 'text-blue-600 bg-blue-50';
-      case 'friendly': return 'text-green-600 bg-green-50';
-      case 'training': return 'text-yellow-600 bg-yellow-50';
+      case 'footballtournament': return 'text-orange-600 bg-orange-50';
+      case 'regular': return 'text-blue-600 bg-blue-50';
       default: return 'text-gray-600 bg-gray-50';
     }
   };
@@ -71,15 +65,15 @@ const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
       <View className="p-4">
         {/* Header with Event Type and Status */}
         <View className="flex-row items-center justify-between mb-3">
-          <View 
+          <View
             className={`px-2 py-1 rounded-md ${getEventTypeColor(event.eventType)}`}
           >
             <Text className={`text-xs font-medium capitalize ${getEventTypeColor(event.eventType).split(' ')[0]}`}>
-              {event.eventType}
+              {event.eventType === 'footballtournament' ? 'Tournament' : 'Event'}
             </Text>
           </View>
-          
-          <View 
+
+          <View
             className={`px-2 py-1 rounded-md ${getStatusColor(event.status)}`}
           >
             <Text className={`text-xs font-medium capitalize ${getStatusColor(event.status).split(' ')[0]}`}>
@@ -92,19 +86,19 @@ const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
         <Text className="text-lg font-bold text-slate-900 mb-1">
           {event.name}
         </Text>
-        
+
         <View className="flex-row items-center mb-3">
           <View className="bg-green-100 px-2 py-1 rounded-md mr-2">
             <Text className="text-green-700 text-xs font-medium">
-              {event.sport.name}
+              {event.sportName}
             </Text>
           </View>
-          
+
           <View className="flex-row items-center">
             <Ionicons name="people-outline" size={14} color="#6b7280" />
             <Text className="text-gray-600 text-xs ml-1">
-              {event.participationType === 'team' 
-                ? `Team (${event.teamSize} players)` 
+              {event.participationType === 'team'
+                ? `Team (${event.teamSize} players)`
                 : 'Individual'
               }
             </Text>
@@ -112,11 +106,11 @@ const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
         </View>
 
         {/* Venue and Location */}
-        {venue && (
+        {(event.venueName || event.locationName) && (
           <View className="flex-row items-center mb-3">
             <Ionicons name="location-outline" size={16} color="#6b7280" />
             <Text className="text-gray-600 text-sm ml-1 flex-1">
-              {venue.name}, {venue.address.city}
+              {event.venueName || event.locationName}
             </Text>
           </View>
         )}
@@ -125,16 +119,16 @@ const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
         <View className="flex-row items-center mb-3">
           <Ionicons name="calendar-outline" size={16} color="#6b7280" />
           <Text className="text-gray-700 text-sm ml-1 font-medium">
-            {eventDate.toLocaleDateString('en-IN', { 
+            {eventDate.toLocaleDateString('en-IN', {
               weekday: 'short',
               day: 'numeric',
               month: 'short'
             })}
           </Text>
-          
+
           <Ionicons name="time-outline" size={16} color="#6b7280" className="ml-4" />
           <Text className="text-gray-700 text-sm ml-1 font-medium">
-            {eventDate.toLocaleTimeString('en-IN', { 
+            {eventDate.toLocaleTimeString('en-IN', {
               hour: '2-digit',
               minute: '2-digit'
             })}
@@ -151,10 +145,10 @@ const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
               {spotsLeft} spot{spotsLeft !== 1 ? 's' : ''} left
             </Text>
           </View>
-          
+
           {/* Progress Bar */}
           <View className="w-full bg-gray-200 rounded-full h-2">
-            <View 
+            <View
               className={`h-2 rounded-full ${
                 progressPercentage >= 80 ? 'bg-orange-500' : 'bg-green-500'
               }`}
@@ -167,13 +161,13 @@ const EventCard: React.FC<EventCardProps> = ({ event, onPress }) => {
         <View className="flex-row items-center justify-between pt-3 border-t border-gray-100">
           <View>
             <Text className="text-orange-600 text-lg font-bold">
-              ₹{event.fees.amount}
+              ₹{event.feeAmount}
             </Text>
             <Text className="text-gray-500 text-xs">
-              {event.fees.type.replace('_', ' ')}
+              {event.feeType.replace('_', ' ')}
             </Text>
           </View>
-          
+
           <View className="items-end">
             {isUpcoming && spotsLeft > 0 ? (
               <TouchableOpacity className="bg-green-600 px-4 py-2 rounded-lg">

@@ -61,5 +61,6 @@ exports.updateVenueSchema = zod_1.z.object({
     peakPricing: peakPricingSchema.optional(),
     sports: zod_1.z.array(zod_1.z.any()).optional(),
     amenities: zod_1.z.array(zod_1.z.any()).optional(),
+    images: zod_1.z.array(zod_1.z.string()).optional(),
 });
 //# sourceMappingURL=venue.js.map

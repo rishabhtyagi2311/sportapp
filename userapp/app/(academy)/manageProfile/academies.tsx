@@ -1,12 +1,6 @@
-import React from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-} from "react-native";
+import React, { useEffect } from "react";
+import { View, Text, ScrollView, TouchableOpacity, StatusBar } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { usechildStore } from "@/store/academyChildProfile";
@@ -21,20 +15,25 @@ export default function ChildAcademiesScreen() {
   }>();
 
   const childProfiles = usechildStore((state) => state.childProfiles);
-  const getEnrollmentsByChild = useEnrollmentStore((state) => state.getEnrollmentsByChild);
-  const getAcademyById = useAcademyStore((state) => state.getAcademyById);
+  const { getEnrollmentsByChild, fetchMyEnrollments } = useEnrollmentStore();
+  const { getAcademyById, fetchAcademies } = useAcademyStore();
+
+  useEffect(() => {
+    fetchMyEnrollments(childId);
+    fetchAcademies();
+  }, [childId]);
 
   const childProfile = childProfiles.find((profile) => profile.id === childId);
   const resolvedChildName = childProfile?.childName || childName || "Child";
-  const childEnrollments = getEnrollmentsByChild(childId);
-  const childAcademyIds = [...new Set(childEnrollments.map((e) => e.academyId))];
+  // Withdrawn/rejected enrollments don't clutter the visible list.
+  const childEnrollments = getEnrollmentsByChild(childId).filter((e) => e.status !== 'inactive');
 
   const handleBackPress = () => router.navigate("/(homeScreenTabs)/academy");
 
-  const handleAcademyPress = (academyId: string, academyName: string) => {
+  const handleAcademyPress = (studentId: string, academyId: string, academyName: string, status: string) => {
     router.push({
       pathname: "/(academy)/manageProfile/academyDashboard",
-      params: { childId, academyId, academyName },
+      params: { childId, studentId, academyId, academyName, status },
     });
   };
 
@@ -52,7 +51,7 @@ export default function ChildAcademiesScreen() {
         </TouchableOpacity>
         <View className="items-end">
           <Text className="text-slate-400 text-xs font-bold uppercase tracking-widest">Enrolled In</Text>
-          <Text className="text-slate-900 font-black text-xl">{childAcademyIds.length} {childAcademyIds.length === 1 ? 'Academy' : 'Academies'}</Text>
+          <Text className="text-slate-900 font-black text-xl">{childEnrollments.length} {childEnrollments.length === 1 ? 'Academy' : 'Academies'}</Text>
         </View>
       </View>
 
@@ -63,20 +62,20 @@ export default function ChildAcademiesScreen() {
       >
       
 
-        {childAcademyIds.map((academyId) => {
-          const academy = getAcademyById(academyId);
+        {childEnrollments.map((enrollment) => {
+          const academy = getAcademyById(enrollment.academyId);
           if (!academy) return null;
           return (
             <TouchableOpacity
-              key={academyId}
-              onPress={() => handleAcademyPress(academyId, academy.academyName)}
+              key={enrollment.id}
+              onPress={() => handleAcademyPress(enrollment.id, enrollment.academyId, academy.academyName, enrollment.status)}
               activeOpacity={0.95}
               className="mb-6"
             >
               <View className="bg-white rounded-[28px] flex-row overflow-hidden shadow-md shadow-slate-200 border border-slate-100">
                 {/* Left Accent Bar - Uses a sport-themed color */}
-                <View className="w-3 bg-slate-900" />
-                
+                <View className={`w-3 ${enrollment.status === 'pending' ? 'bg-amber-400' : 'bg-slate-900'}`} />
+
                 <View className="flex-1 p-5">
                   <View className="flex-row justify-between items-start">
                     <View className="flex-1">
@@ -86,6 +85,11 @@ export default function ChildAcademiesScreen() {
                       <Text className="text-slate-900 text-2xl font-black mb-4 leading-7">
                         {academy.academyName}
                       </Text>
+                      {enrollment.status === 'pending' && (
+                        <View className="bg-amber-50 self-start px-3 py-1 rounded-full mb-2 -mt-2">
+                          <Text className="text-amber-700 text-[10px] font-bold uppercase">Awaiting Approval</Text>
+                        </View>
+                      )}
                     </View>
                     <View className="bg-slate-50 p-2 rounded-xl">
                       <Ionicons name="rocket-sharp" size={20} color="#6366f1" />

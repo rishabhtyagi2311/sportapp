@@ -13,15 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { useFootballStore } from '@/store/footballTeamStore';
-
-interface Team {
-  id: string;
-  teamName: string;
-  city: string;
-  memberPlayerIds: string[];
-  maxPlayers: number;
-  status: string;
-}
+import { FootballTeam as Team } from '@/types/football';
 
 // Safe navigation utility with fallback
 const createSafeNavigation = () => {
@@ -74,11 +66,16 @@ const createSafeNavigation = () => {
 
 export default function SelectTeamsScreen() {
   // State management
-  const { teams } = useFootballStore();
+  const { myTeams, teams, fetchMyTeams, fetchAllTeams } = useFootballStore();
   const [selectedMyTeam, setSelectedMyTeam] = useState<Team | null>(null);
   const [selectedOpponentTeam, setSelectedOpponentTeam] = useState<Team | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [navigationReady, setNavigationReady] = useState(false);
+
+  useEffect(() => {
+    fetchMyTeams();
+    fetchAllTeams();
+  }, []);
   
   // Router instances - hybrid approach for maximum reliability
   const contextRouter = useRouter();
@@ -100,7 +97,7 @@ export default function SelectTeamsScreen() {
   // Safe team selection handlers
   const handleMyTeamSelection = useCallback((team: Team) => {
     try {
-      console.log('Selecting my team:', team.teamName);
+      console.log('Selecting my team:', team.name);
       setSelectedMyTeam(team);
       
       // Clear opponent if same team selected
@@ -115,7 +112,7 @@ export default function SelectTeamsScreen() {
 
   const handleOpponentTeamSelection = useCallback((team: Team) => {
     try {
-      console.log('Selecting opponent team:', team.teamName);
+      console.log('Selecting opponent team:', team.name);
       setSelectedOpponentTeam(team);
       
       // Clear my team if same team selected
@@ -164,11 +161,11 @@ export default function SelectTeamsScreen() {
     try {
       setIsNavigating(true);
       console.log('Proceeding to match setup with teams:', {
-        myTeam: selectedMyTeam.teamName,
-        opponent: selectedOpponentTeam.teamName
+        myTeam: selectedMyTeam.name,
+        opponent: selectedOpponentTeam.name
       });
 
-      const url = `/startMatch/basicDetailsOne?myTeamId=${selectedMyTeam.id}&opponentTeamId=${selectedOpponentTeam.id}`;
+      const url = `/(football)/startMatch/basicDetailsOne?myTeamId=${selectedMyTeam.id}&opponentTeamId=${selectedOpponentTeam.id}`;
       
       // Use context router first, fallback to global
       try {
@@ -207,7 +204,7 @@ export default function SelectTeamsScreen() {
     <TouchableOpacity
       key={team.id}
       onPress={() => {
-        console.log(`Team card clicked: ${team.teamName} (${teamType})`);
+        console.log(`Team card clicked: ${team.name} (${teamType})`);
         try {
           onSelect();
         } catch (error) {
@@ -235,15 +232,12 @@ export default function SelectTeamsScreen() {
         <View className="flex-1">
           <View className="flex-row items-center mb-2">
             <Text className={`text-lg font-bold ${
-              isSelected 
+              isSelected
                 ? teamType === 'my' ? 'text-green-800' : 'text-blue-800'
                 : 'text-gray-900'
             }`}>
-              {team.teamName}
+              {team.name}
             </Text>
-            {team.status === 'active' && (
-              <View className="ml-2 w-2 h-2 bg-green-500 rounded-full" />
-            )}
           </View>
           <View className="flex-row items-center mb-2">
             <Ionicons 
@@ -256,21 +250,21 @@ export default function SelectTeamsScreen() {
                 ? teamType === 'my' ? 'text-green-700' : 'text-blue-700'
                 : 'text-gray-600'
             }`}>
-              {team.city}
+              {team.location}
             </Text>
           </View>
           <View className="flex-row items-center">
-            <Ionicons 
-              name="people-outline" 
-              size={14} 
-              color={isSelected ? (teamType === 'my' ? '#166534' : '#1e40af') : '#6b7280'} 
+            <Ionicons
+              name="people-outline"
+              size={14}
+              color={isSelected ? (teamType === 'my' ? '#166534' : '#1e40af') : '#6b7280'}
             />
             <Text className={`text-sm ml-1 ${
-              isSelected 
+              isSelected
                 ? teamType === 'my' ? 'text-green-700' : 'text-blue-700'
                 : 'text-gray-600'
             }`}>
-              {team.memberPlayerIds.length}/{team.maxPlayers} Players
+              {team.members.length}/{team.maxPlayers} Players
             </Text>
           </View>
         </View>
@@ -298,12 +292,12 @@ export default function SelectTeamsScreen() {
     !isNavigating
   , [selectedMyTeam, selectedOpponentTeam, navigationReady, isNavigating]);
 
-  const availableOpponentTeams = useMemo(() => 
+  const availableOpponentTeams = useMemo(() =>
     teams.filter(team => team.id !== selectedMyTeam?.id)
   , [teams, selectedMyTeam]);
 
   // Error state handling
-  if (!teams || teams.length === 0) {
+  if (!myTeams || myTeams.length === 0) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50 justify-center items-center">
         <View className="items-center">
@@ -374,7 +368,7 @@ export default function SelectTeamsScreen() {
             </View>
             <Text className="text-xs text-green-600 font-semibold mb-1">MY TEAM</Text>
             <Text className="text-sm font-bold text-gray-900 text-center" numberOfLines={1}>
-              {selectedMyTeam ? selectedMyTeam.teamName : 'Select Team'}
+              {selectedMyTeam ? selectedMyTeam.name : 'Select Team'}
             </Text>
           </View>
           
@@ -396,7 +390,7 @@ export default function SelectTeamsScreen() {
             </View>
             <Text className="text-xs text-blue-600 font-semibold mb-1">OPPONENT</Text>
             <Text className="text-sm font-bold text-gray-900 text-center" numberOfLines={1}>
-              {selectedOpponentTeam ? selectedOpponentTeam.teamName : 'Select Team'}
+              {selectedOpponentTeam ? selectedOpponentTeam.name : 'Select Team'}
             </Text>
           </View>
         </View>
@@ -416,7 +410,7 @@ export default function SelectTeamsScreen() {
             </View>
             <Text className="text-lg font-bold text-gray-900">Select My Team</Text>
           </View>
-          {teams.map(team => 
+          {myTeams.map(team =>
             renderTeamCard(
               team,
               selectedMyTeam?.id === team.id,

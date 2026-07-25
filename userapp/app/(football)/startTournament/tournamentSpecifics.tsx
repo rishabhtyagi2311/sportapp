@@ -1,76 +1,59 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useTournamentStore, TournamentSettings } from '@/store/footballTournamentStore';
+import { useTournamentStore } from '@/store/tournamentStore';
 import { useFootballStore } from '@/store/footballTeamStore';
 
 export default function TournamentSettingsScreen() {
   const router = useRouter();
-  const { creationDraft, setTournamentSettings, createTournament } = useTournamentStore();
+  const { draft, updateDraft, createTournament } = useTournamentStore();
   const { getTeamById } = useFootballStore();
 
   const [venue, setVenue] = useState('');
   const [numberOfPlayers, setNumberOfPlayers] = useState('11');
   const [numberOfSubstitutes, setNumberOfSubstitutes] = useState('5');
-  const [numberOfReferees, setNumberOfReferees] = useState('1');
   const [matchDuration, setMatchDuration] = useState('90');
-  const [isLoadingDraft, setIsLoadingDraft] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const teamLimits = useMemo(() => {
-    if (!creationDraft || creationDraft.selectedTeamIds.length === 0) {
-      return { minPlayers: 0, maxPlayers: 11 };
+    if (!draft || draft.teamIds.length === 0) {
+      return { minPlayers: 0, maxPlayers: 11, teamPlayerCounts: [] as { name: string; count: number }[] };
     }
 
-    const teams = creationDraft.selectedTeamIds
-      .map(id => getTeamById(id))
-      .filter(team => team !== undefined);
+    const teams = draft.teamIds.map((id) => getTeamById(id)).filter((team) => team !== undefined);
 
     if (teams.length === 0) {
-      return { minPlayers: 0, maxPlayers: 11 };
+      return { minPlayers: 0, maxPlayers: 11, teamPlayerCounts: [] as { name: string; count: number }[] };
     }
 
-    const minPlayersInTeams = Math.min(...teams.map(team => team.memberPlayerIds?.length || 0));
+    const minPlayersInTeams = Math.min(...teams.map((team) => team!.members?.length || 0));
     const maxPlayers = Math.min(minPlayersInTeams, 11);
 
     return {
       minPlayers: minPlayersInTeams,
-      maxPlayers: maxPlayers,
-      teamPlayerCounts: teams.map(team => ({
-        name: team.teamName,
-        count: team.memberPlayerIds?.length || 0
-      }))
+      maxPlayers,
+      teamPlayerCounts: teams.map((team) => ({ name: team!.name, count: team!.members?.length || 0 })),
     };
-  }, [creationDraft, getTeamById]);
+  }, [draft, getTeamById]);
 
   useEffect(() => {
-    if (creationDraft?.settings) {
-      setVenue(creationDraft.settings.venue || '');
-      setNumberOfPlayers(String(creationDraft.settings.numberOfPlayers || Math.min(11, teamLimits.maxPlayers)));
-      setNumberOfSubstitutes(String(creationDraft.settings.numberOfSubstitutes || 5));
-      setNumberOfReferees(String(creationDraft.settings.numberOfReferees || 1));
-      setMatchDuration(String(creationDraft.settings.matchDuration || 90));
-    } else {
-      setNumberOfPlayers(String(Math.min(11, teamLimits.maxPlayers)));
-    }
-    setIsLoadingDraft(false);
-  }, [creationDraft, teamLimits.maxPlayers]);
+    setNumberOfPlayers(String(Math.min(11, teamLimits.maxPlayers)));
+  }, [teamLimits.maxPlayers]);
 
-  // Calculate total matches (league-only)
   const totalMatches = useMemo(() => {
-    if (!creationDraft) return 0;
-
-    const matchesPerPair = creationDraft.settings?.matchesPerPair || 1;
-    const teamCount = creationDraft.teamCount ?? 0;
-
+    if (!draft) return 0;
+    const teamCount = draft.teamIds.length;
     if (teamCount > 1) {
-      return (teamCount * (teamCount - 1) / 2) * matchesPerPair;
+      return (teamCount * (teamCount - 1) / 2) * draft.matchesPerPair;
     }
     return 0;
-  }, [creationDraft]);
+  }, [draft]);
 
-  const handleCreateTournament = () => {
+  const handleCreateTournament = async () => {
+    if (!draft) return;
+
     if (!venue.trim()) {
       Alert.alert('Error', 'Please enter a venue');
       return;
@@ -78,7 +61,6 @@ export default function TournamentSettingsScreen() {
 
     const players = parseInt(numberOfPlayers, 10);
     const substitutes = parseInt(numberOfSubstitutes, 10);
-    const referees = parseInt(numberOfReferees, 10);
     const duration = parseInt(matchDuration, 10);
 
     if (isNaN(players) || players < 1) {
@@ -89,7 +71,7 @@ export default function TournamentSettingsScreen() {
     if (players > teamLimits.maxPlayers) {
       Alert.alert(
         'Error',
-        `Number of players cannot exceed ${teamLimits.maxPlayers}.\n\nThe team "${teamLimits.teamPlayerCounts?.find(t => t.count === teamLimits.minPlayers)?.name}" only has ${teamLimits.minPlayers} registered players.`
+        `Number of players cannot exceed ${teamLimits.maxPlayers}.\n\nThe team "${teamLimits.teamPlayerCounts.find((t) => t.count === teamLimits.minPlayers)?.name}" only has ${teamLimits.minPlayers} registered players.`
       );
       return;
     }
@@ -99,34 +81,26 @@ export default function TournamentSettingsScreen() {
       return;
     }
 
-    if (isNaN(referees) || referees < 1 || referees > 3) {
-      Alert.alert('Error', 'Number of referees must be between 1 and 3');
-      return;
-    }
-
     if (isNaN(duration) || duration < 1) {
       Alert.alert('Error', 'Match duration must be at least 1 minute');
       return;
     }
 
-    const settings: TournamentSettings = {
-      venue: venue.trim(),
-      numberOfPlayers: players,
-      numberOfSubstitutes: substitutes,
-      numberOfReferees: referees,
-      matchDuration: duration,
-      format: 'league',
-      winPoints: 3,
-      drawPoints: 1,
-      lossPoints: 0,
-      matchesPerPair: (creationDraft!.settings?.matchesPerPair as 1 | 2) || 1,
-    };
+    updateDraft({
+      venueName: venue.trim(),
+      playersPerTeam: players,
+      allowedSubs: substitutes,
+      duration,
+    });
 
-    setTournamentSettings(settings);
-    const tournamentId = createTournament();
-
-    if (tournamentId && creationDraft) {
+    setIsSubmitting(true);
+    try {
+      await createTournament();
       router.navigate('/(football)/landingScreen/tournament');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to create tournament.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -152,9 +126,7 @@ export default function TournamentSettingsScreen() {
     );
   }
 
-  if (creationDraft) {
-    const matchesPerPair = creationDraft.settings?.matchesPerPair || 1;
-
+  if (draft) {
     return (
       <SafeAreaView className="flex-1 bg-slate-50">
         {/* Header */}
@@ -203,7 +175,7 @@ export default function TournamentSettingsScreen() {
                   Tournament Overview
                 </Text>
                 <Text className="text-xl font-bold text-slate-900 mb-2">
-                  {creationDraft.name}
+                  {draft.name}
                 </Text>
                 <View className="flex-row items-center flex-wrap">
                   <View className="bg-blue-50 px-3 py-1.5 rounded-lg mr-2 mb-2">
@@ -213,7 +185,7 @@ export default function TournamentSettingsScreen() {
                     <View className="flex-row items-center">
                       <Ionicons name="people" size={12} color="#475569" />
                       <Text className="text-xs font-bold text-slate-700 ml-1">
-                        {creationDraft.selectedTeamIds.length} Teams
+                        {draft.teamIds.length} Teams
                       </Text>
                     </View>
                   </View>
@@ -229,7 +201,7 @@ export default function TournamentSettingsScreen() {
               <View className="flex-row items-center justify-between">
                 <View className="flex-1 items-center py-2">
                   <Text className="text-2xl font-bold text-slate-900">
-                    {creationDraft.selectedTeamIds.length}
+                    {draft.teamIds.length}
                   </Text>
                   <Text className="text-xs text-slate-500 mt-0.5">Teams</Text>
                 </View>
@@ -240,15 +212,6 @@ export default function TournamentSettingsScreen() {
                   </Text>
                   <Text className="text-xs text-slate-500 mt-0.5">
                     Matches
-                  </Text>
-                </View>
-                <View className="w-px h-10 bg-slate-200" />
-                <View className="flex-1 items-center py-2">
-                  <Text className="text-2xl font-bold text-slate-900">
-                    1
-                  </Text>
-                  <Text className="text-xs text-slate-500 mt-0.5">
-                    Round
                   </Text>
                 </View>
               </View>
@@ -339,25 +302,6 @@ export default function TournamentSettingsScreen() {
                 />
               </View>
 
-              {/* Referees */}
-              <View className="flex-row items-center justify-between p-4 border-b border-slate-100">
-                <View className="flex-row items-center flex-1">
-                  <View className="w-10 h-10 bg-amber-50 rounded-lg items-center justify-center mr-3">
-                    <Ionicons name="person" size={20} color="#f59e0b" />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-sm font-semibold text-slate-900">Referees</Text>
-                    <Text className="text-xs text-slate-500">1-3 officials</Text>
-                  </View>
-                </View>
-                <TextInput
-                  value={numberOfReferees}
-                  onChangeText={setNumberOfReferees}
-                  keyboardType="numeric"
-                  className="w-16 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-center text-base font-bold text-slate-900"
-                />
-              </View>
-
               {/* Match Duration */}
               <View className="flex-row items-center justify-between p-4">
                 <View className="flex-row items-center flex-1">
@@ -386,18 +330,9 @@ export default function TournamentSettingsScreen() {
           <View className="bg-white rounded-xl p-4 mb-6 border border-slate-200">
             <Text className="text-sm font-semibold text-slate-700 mb-2">Match Breakdown</Text>
 
-            <View className="space-y-2">
-              <View className="flex-row justify-between">
-                <Text className="text-xs text-slate-600">League Matches:</Text>
-                <Text className="text-xs font-medium text-slate-800">
-                  {totalMatches}
-                </Text>
-              </View>
-
-              <View className="flex-row justify-between pt-1 border-t border-slate-100">
-                <Text className="text-xs font-semibold text-slate-700">Total Matches:</Text>
-                <Text className="text-xs font-bold text-slate-900">{totalMatches}</Text>
-              </View>
+            <View className="flex-row justify-between pt-1">
+              <Text className="text-xs font-semibold text-slate-700">Total Matches:</Text>
+              <Text className="text-xs font-bold text-slate-900">{totalMatches}</Text>
             </View>
           </View>
 
@@ -406,7 +341,7 @@ export default function TournamentSettingsScreen() {
             <View className="flex-row items-start">
               <Ionicons name="information-circle" size={18} color="#475569" />
               <Text className="flex-1 text-xs text-slate-600 ml-2 leading-5">
-                These settings will apply to all league matches. The tournament winner will be determined by the final standings.
+                These settings will apply to all league matches. Referees are entered per match. The tournament winner will be determined by the final standings.
               </Text>
             </View>
           </View>
@@ -418,11 +353,18 @@ export default function TournamentSettingsScreen() {
         <View className="bg-white px-4 py-4 border-t border-slate-200">
           <TouchableOpacity
             onPress={handleCreateTournament}
+            disabled={isSubmitting}
             className="bg-green-600 rounded-xl py-4 items-center"
           >
             <View className="flex-row items-center">
-              <Ionicons name="checkmark-circle" size={20} color="white" />
-              <Text className="text-white font-bold text-base ml-2">Create Tournament</Text>
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={20} color="white" />
+                  <Text className="text-white font-bold text-base ml-2">Create Tournament</Text>
+                </>
+              )}
             </View>
           </TouchableOpacity>
         </View>

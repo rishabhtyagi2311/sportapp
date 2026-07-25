@@ -11,6 +11,8 @@ export declare class AcademyService {
         fee: any;
         feeStructure: any;
         isActive: any;
+        averageRating: any;
+        reviewCount: any;
         coaches: any;
         studentCount: any;
         photos: any;
@@ -29,6 +31,8 @@ export declare class AcademyService {
         fee: any;
         feeStructure: any;
         isActive: any;
+        averageRating: any;
+        reviewCount: any;
         coaches: any;
         studentCount: any;
         photos: any;
@@ -47,6 +51,8 @@ export declare class AcademyService {
         fee: any;
         feeStructure: any;
         isActive: any;
+        averageRating: any;
+        reviewCount: any;
         coaches: any;
         studentCount: any;
         photos: any;
@@ -65,6 +71,8 @@ export declare class AcademyService {
         fee: any;
         feeStructure: any;
         isActive: any;
+        averageRating: any;
+        reviewCount: any;
         coaches: any;
         studentCount: any;
         photos: any;
@@ -83,6 +91,8 @@ export declare class AcademyService {
         fee: any;
         feeStructure: any;
         isActive: any;
+        averageRating: any;
+        reviewCount: any;
         coaches: any;
         studentCount: any;
         photos: any;
@@ -90,21 +100,65 @@ export declare class AcademyService {
         updatedAt: any;
     }>;
     static deleteAcademy(academyId: string, partnerId: string): Promise<void>;
+    /** Public, unauthenticated browse — no partnerId scoping, active academies only. */
+    static getPublicAcademies(filters?: {
+        city?: string;
+        sportType?: string;
+    }): Promise<{
+        id: any;
+        academyName: any;
+        sportType: any;
+        address: any;
+        city: any;
+        coachName: any;
+        contactNumber: any;
+        facilities: any;
+        fee: any;
+        feeStructure: any;
+        isActive: any;
+        averageRating: any;
+        reviewCount: any;
+        coaches: any;
+        studentCount: any;
+        photos: any;
+        createdAt: any;
+        updatedAt: any;
+    }[]>;
+    static getPublicAcademyById(academyId: string): Promise<{
+        id: any;
+        academyName: any;
+        sportType: any;
+        address: any;
+        city: any;
+        coachName: any;
+        contactNumber: any;
+        facilities: any;
+        fee: any;
+        feeStructure: any;
+        isActive: any;
+        averageRating: any;
+        reviewCount: any;
+        coaches: any;
+        studentCount: any;
+        photos: any;
+        createdAt: any;
+        updatedAt: any;
+    } | null>;
     static addCoach(academyId: string, partnerId: string, data: any): Promise<{
-        contact: string | null;
-        experience: string | null;
-        name: string;
         id: string;
+        name: string;
         academyId: string;
         specialization: string;
+        experience: string | null;
+        contact: string | null;
     }>;
     static updateCoach(academyId: string, partnerId: string, coachId: string, data: any): Promise<{
-        contact: string | null;
-        experience: string | null;
-        name: string;
         id: string;
+        name: string;
         academyId: string;
         specialization: string;
+        experience: string | null;
+        contact: string | null;
     }>;
     static removeCoach(academyId: string, partnerId: string, coachId: string): Promise<void>;
     static mapStudentForClient(student: any): {
@@ -114,6 +168,7 @@ export declare class AcademyService {
         age: any;
         fatherName: any;
         fatherContact: any;
+        status: any;
         enrollmentDate: any;
     };
     static addStudent(academyId: string, partnerId: string, data: any): Promise<{
@@ -123,17 +178,39 @@ export declare class AcademyService {
         age: any;
         fatherName: any;
         fatherContact: any;
+        status: any;
         enrollmentDate: any;
     }>;
-    static getStudentsByAcademy(academyId: string, partnerId: string): Promise<{
+    static getStudentsByAcademy(academyId: string, partnerId: string, status?: string): Promise<{
         id: any;
         academyId: any;
         name: any;
         age: any;
         fatherName: any;
         fatherContact: any;
+        status: any;
         enrollmentDate: any;
     }[]>;
+    static approveEnrollment(academyId: string, partnerId: string, studentId: string): Promise<{
+        id: any;
+        academyId: any;
+        name: any;
+        age: any;
+        fatherName: any;
+        fatherContact: any;
+        status: any;
+        enrollmentDate: any;
+    }>;
+    static rejectEnrollment(academyId: string, partnerId: string, studentId: string): Promise<{
+        id: any;
+        academyId: any;
+        name: any;
+        age: any;
+        fatherName: any;
+        fatherContact: any;
+        status: any;
+        enrollmentDate: any;
+    }>;
     static updateStudent(academyId: string, partnerId: string, studentId: string, data: any): Promise<{
         id: any;
         academyId: any;
@@ -141,6 +218,7 @@ export declare class AcademyService {
         age: any;
         fatherName: any;
         fatherContact: any;
+        status: any;
         enrollmentDate: any;
     }>;
     static deleteStudent(academyId: string, partnerId: string, studentId: string): Promise<void>;
@@ -214,5 +292,37 @@ export declare class AcademyService {
         date: any;
         certificateNumber: any;
     }[]>;
+    static mapAnnouncementForClient(announcement: any): {
+        id: any;
+        academyId: any;
+        content: any;
+        createdAt: any;
+    };
+    static createAnnouncement(academyId: string, partnerId: string, content: string): Promise<{
+        id: any;
+        academyId: any;
+        content: any;
+        createdAt: any;
+    }>;
+    static getAnnouncementsByAcademy(academyId: string, partnerId: string): Promise<{
+        id: any;
+        academyId: any;
+        content: any;
+        createdAt: any;
+    }[]>;
+    /** Public, unauthenticated read — no sensitive data on Announcement. */
+    static getPublicAnnouncements(academyId: string): Promise<{
+        id: any;
+        academyId: any;
+        content: any;
+        createdAt: any;
+    }[]>;
+    static removeAnnouncement(academyId: string, partnerId: string, announcementId: string): Promise<void>;
+    static mapDemoBookingForClient(booking: any): any;
+    static getDemoBookingsForAcademy(academyId: string, partnerId: string, status?: string): Promise<any[]>;
+    private static assertDemoBookingOwnedByPartner;
+    static confirmDemoBooking(bookingId: string, partnerId: string): Promise<any>;
+    static completeDemoBooking(bookingId: string, partnerId: string): Promise<any>;
+    static cancelDemoBooking(bookingId: string, partnerId: string): Promise<any>;
 }
 //# sourceMappingURL=academy.d.ts.map

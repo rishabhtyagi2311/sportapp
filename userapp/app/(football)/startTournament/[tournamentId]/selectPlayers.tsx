@@ -1,131 +1,98 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useTournamentStore } from '@/store/footballTournamentStore';
+import { useTournamentStore } from '@/store/tournamentStore';
+import { useMatchCreationStore } from '@/store/footballMatchCreationStore';
 import { useFootballStore } from '@/store/footballTeamStore';
 
 export default function TournamentSelectPlayersScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const tournamentId = params.tournamentId as string;
-  const fixtureId = params.fixtureId as string;
-  
-  const { 
-    getTournament,
-    activeTournamentMatch, 
-    setTournamentMatchPlayers,
-    initializeTournamentMatch
-  } = useTournamentStore();
-  
-  const { getTeamPlayers } = useFootballStore();
-  
-  const [homeSelectedPlayers, setHomeSelectedPlayers] = useState<string[]>([]);
-  const [awaySelectedPlayers, setAwaySelectedPlayers] = useState<string[]>([]);
-  const [currentTeam, setCurrentTeam] = useState<'home' | 'away'>('home');
-  
+  const { tournamentId, fixtureId } = useLocalSearchParams<{ tournamentId: string; fixtureId: string }>();
+
+  const { getTournament } = useTournamentStore();
+  const { matchData, initializeMatch, updateMatchDetails, updateMyTeamPlayers, updateOpponentTeamPlayers } = useMatchCreationStore();
+  const { getTeamById } = useFootballStore();
+
   const tournament = getTournament(tournamentId);
-  // These are the STARTERS
-  const requiredPlayers = tournament?.settings.numberOfPlayers || 11;
-  
+  const fixture = tournament?.fixtures.find((f) => f.id === fixtureId);
+  const requiredPlayers = tournament?.playersPerTeam ?? 11;
+
+  const [currentTeam, setCurrentTeam] = useState<'home' | 'away'>('home');
+  const [homeSelectedPlayers, setHomeSelectedPlayers] = useState<number[]>([]);
+  const [awaySelectedPlayers, setAwaySelectedPlayers] = useState<number[]>([]);
+
+  // Initialize the (shared) match wizard for this fixture's teams, once.
   useEffect(() => {
-    if (!activeTournamentMatch && tournamentId && fixtureId) {
-      initializeTournamentMatch(tournamentId, fixtureId);
-    }
-  }, [tournamentId, fixtureId, activeTournamentMatch, initializeTournamentMatch]);
-  
+    if (!fixture?.homeTeamId || !fixture?.awayTeamId) return;
+    if (matchData.myTeam.teamId === fixture.homeTeamId && matchData.opponentTeam.teamId === fixture.awayTeamId) return;
+
+    initializeMatch(fixture.homeTeamId, fixture.homeTeam?.name ?? 'Home', fixture.awayTeamId, fixture.awayTeam?.name ?? 'Away');
+    updateMatchDetails({ name: tournament?.venueName || 'TBD', isCustom: true }, requiredPlayers, []);
+  }, [fixture?.homeTeamId, fixture?.awayTeamId]);
+
   const homeTeamPlayers = useMemo(() => {
-    if (!activeTournamentMatch || !tournament) return [];
-    const tournamentTeam = tournament.teams.find(t => t.id === activeTournamentMatch.homeTeamId);
-    if (!tournamentTeam) return [];
-    return getTeamPlayers(tournamentTeam.teamId);
-  }, [activeTournamentMatch, tournament, getTeamPlayers]);
-  
+    if (!fixture?.homeTeamId) return [];
+    return getTeamById(fixture.homeTeamId)?.members.map((m) => m.footballProfile) ?? [];
+  }, [fixture?.homeTeamId, getTeamById]);
+
   const awayTeamPlayers = useMemo(() => {
-    if (!activeTournamentMatch || !tournament) return [];
-    const tournamentTeam = tournament.teams.find(t => t.id === activeTournamentMatch.awayTeamId);
-    if (!tournamentTeam) return [];
-    return getTeamPlayers(tournamentTeam.teamId);
-  }, [activeTournamentMatch, tournament, getTeamPlayers]);
-  
-  const availablePlayers = useMemo(() => {
-    return currentTeam === 'home' ? homeTeamPlayers : awayTeamPlayers;
-  }, [currentTeam, homeTeamPlayers, awayTeamPlayers]);
-  
-  const isPlayerSelected = (playerId: string) => {
-    return currentTeam === 'home' 
-      ? homeSelectedPlayers.includes(playerId)
-      : awaySelectedPlayers.includes(playerId);
-  };
-  
-  const togglePlayer = (playerId: string) => {
-    if (currentTeam === 'home') {
-      if (homeSelectedPlayers.includes(playerId)) {
-        setHomeSelectedPlayers(prev => prev.filter(id => id !== playerId));
-      } else {
-        if (homeSelectedPlayers.length >= requiredPlayers) {
-          Alert.alert('Maximum Reached', `You have selected all ${requiredPlayers} starting players.`);
-          return;
-        }
-        setHomeSelectedPlayers(prev => [...prev, playerId]);
+    if (!fixture?.awayTeamId) return [];
+    return getTeamById(fixture.awayTeamId)?.members.map((m) => m.footballProfile) ?? [];
+  }, [fixture?.awayTeamId, getTeamById]);
+
+  const availablePlayers = currentTeam === 'home' ? homeTeamPlayers : awayTeamPlayers;
+  const selectedPlayers = currentTeam === 'home' ? homeSelectedPlayers : awaySelectedPlayers;
+  const setSelectedPlayers = currentTeam === 'home' ? setHomeSelectedPlayers : setAwaySelectedPlayers;
+
+  const togglePlayer = (playerId: number) => {
+    setSelectedPlayers((prev) => {
+      if (prev.includes(playerId)) return prev.filter((id) => id !== playerId);
+      if (prev.length >= requiredPlayers) {
+        Alert.alert('Maximum Reached', `You have selected all ${requiredPlayers} starting players.`);
+        return prev;
       }
-    } else {
-      if (awaySelectedPlayers.includes(playerId)) {
-        setAwaySelectedPlayers(prev => prev.filter(id => id !== playerId));
-      } else {
-        if (awaySelectedPlayers.length >= requiredPlayers) {
-          Alert.alert('Maximum Reached', `You have selected all ${requiredPlayers} starting players.`);
-          return;
-        }
-        setAwaySelectedPlayers(prev => [...prev, playerId]);
-      }
-    }
+      return [...prev, playerId];
+    });
   };
-  
+
   const handleContinue = () => {
+    if (selectedPlayers.length !== requiredPlayers) {
+      Alert.alert('Incomplete Selection', `Please select exactly ${requiredPlayers} starters.`);
+      return;
+    }
+
     if (currentTeam === 'home') {
-      if (homeSelectedPlayers.length !== requiredPlayers) {
-        Alert.alert('Incomplete Selection', `Please select exactly ${requiredPlayers} starters for ${activeTournamentMatch?.homeTeamName}`);
-        return;
-      }
+      updateMyTeamPlayers(homeSelectedPlayers);
       setCurrentTeam('away');
     } else {
-      if (awaySelectedPlayers.length !== requiredPlayers) {
-        Alert.alert('Incomplete Selection', `Please select exactly ${requiredPlayers} starters for ${activeTournamentMatch?.awayTeamName}`);
-        return;
-      }
-      
-      // Save STARTERS to store
-      setTournamentMatchPlayers(homeSelectedPlayers, awaySelectedPlayers);
-      
-      // Navigate to SUBSTITUTES selection
-      router.push(`/(football)/startTournament/${tournamentId}/selectSubstitutes?fixtureId=${fixtureId}`);
+      updateOpponentTeamPlayers(awaySelectedPlayers);
+      router.push({
+        pathname: '/(football)/startTournament/[tournamentId]/selectSubstitutes',
+        params: { tournamentId, fixtureId },
+      });
     }
   };
-  
+
   const handleBack = () => {
-    if (currentTeam === 'away') {
-      setCurrentTeam('home');
-    } else {
-      router.back();
-    }
+    if (currentTeam === 'away') setCurrentTeam('home');
+    else router.back();
   };
-  
-  const getCurrentTeamName = () => currentTeam === 'home' ? activeTournamentMatch?.homeTeamName : activeTournamentMatch?.awayTeamName;
-  const getCurrentCount = () => currentTeam === 'home' ? homeSelectedPlayers.length : awaySelectedPlayers.length;
-  
-  if (!activeTournamentMatch) {
+
+  const getCurrentTeamName = () => (currentTeam === 'home' ? matchData.myTeam.teamName : matchData.opponentTeam.teamName);
+
+  if (!fixture) {
     return (
       <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
-        <Text className="text-slate-500">No active match found</Text>
+        <Text className="text-slate-500">Fixture not found</Text>
         <TouchableOpacity onPress={() => router.back()} className="mt-4 bg-blue-600 px-6 py-3 rounded-xl">
           <Text className="text-white font-semibold">Go Back</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
   }
-  
+
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
       <View className="bg-white px-4 py-4 border-b border-slate-200">
@@ -147,7 +114,7 @@ export default function TournamentSelectPlayersScreen() {
               <View className="w-16 h-16 bg-blue-100 rounded-full items-center justify-center mb-2">
                 <Ionicons name="shirt" size={28} color="#1e40af" />
               </View>
-              <Text className="text-sm font-bold text-blue-900">{getCurrentCount()} / {requiredPlayers}</Text>
+              <Text className="text-sm font-bold text-blue-900">{selectedPlayers.length} / {requiredPlayers}</Text>
             </View>
           </View>
         </View>
@@ -156,7 +123,7 @@ export default function TournamentSelectPlayersScreen() {
       <ScrollView className="flex-1 px-4 pt-4" showsVerticalScrollIndicator={false}>
         <Text className="text-sm font-semibold text-slate-700 mb-3">Available Players</Text>
         {availablePlayers.map((player) => {
-          const selected = isPlayerSelected(player.id);
+          const selected = selectedPlayers.includes(player.id);
           return (
             <TouchableOpacity
               key={player.id}
@@ -169,8 +136,8 @@ export default function TournamentSelectPlayersScreen() {
                     <Ionicons name="person" size={24} color={selected ? '#3b82f6' : '#64748b'} />
                   </View>
                   <View>
-                    <Text className="text-base font-bold text-slate-900">{player.name}</Text>
-                    <Text className="text-xs text-slate-500">{player.position}</Text>
+                    <Text className="text-base font-bold text-slate-900">{player.nickname}</Text>
+                    <Text className="text-xs text-slate-500">{player.role}</Text>
                   </View>
                 </View>
                 <View className={`w-6 h-6 rounded-full items-center justify-center border-2 ${selected ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
@@ -186,8 +153,8 @@ export default function TournamentSelectPlayersScreen() {
       <View className="bg-white px-4 py-4 border-t border-slate-200">
         <TouchableOpacity
           onPress={handleContinue}
-          className={`rounded-xl py-4 items-center ${getCurrentCount() === requiredPlayers ? 'bg-blue-600' : 'bg-slate-300'}`}
-          disabled={getCurrentCount() !== requiredPlayers}
+          className={`rounded-xl py-4 items-center ${selectedPlayers.length === requiredPlayers ? 'bg-blue-600' : 'bg-slate-300'}`}
+          disabled={selectedPlayers.length !== requiredPlayers}
         >
           <Text className="text-white font-bold text-base">
             {currentTeam === 'home' ? 'Continue to Away Starters' : 'Continue to Substitutes'}

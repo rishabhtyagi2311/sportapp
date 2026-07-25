@@ -1,13 +1,6 @@
 import React from "react";
-import {
-    View,
-    Text,
-    TouchableOpacity,
-    SafeAreaView,
-    StatusBar,
-    ScrollView,
-    Image,
-} from "react-native";
+import { View, Text, TouchableOpacity, StatusBar, ScrollView, Image } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 
@@ -15,10 +8,10 @@ export default function ViewCertificateScreen() {
     const router = useRouter();
     const params = useLocalSearchParams<{
         academyName: string;
-        recipientName: string;
-        achievementText: string;
+        studentName: string;
+        achievement: string;
         date: string;
-        headCoachName: string;
+        certificateNumber: string;
     }>();
 
     return (
@@ -79,13 +72,13 @@ export default function ViewCertificateScreen() {
                         <Text className="text-slate-400 italic text-sm mb-2">This is to certify that</Text>
 
                         <Text className="text-slate-900 text-3xl font-black mb-1 text-center" style={{ fontFamily: 'serif' }}>
-                            {params.recipientName}
+                            {params.studentName}
                         </Text>
                         <View className="h-[1px] w-48 bg-slate-200 mb-6" />
 
                         <Text className="text-slate-500 text-center text-sm leading-6 px-4 mb-8">
                             has been recognized for their exceptional performance and dedication, resulting in the title of{" "}
-                            <Text className="text-slate-900 font-bold italic">"{params.achievementText}"</Text>
+                            <Text className="text-slate-900 font-bold italic">"{params.achievement}"</Text>
                         </Text>
 
                         {/* Footer: Date & Signatures */}
@@ -105,10 +98,10 @@ export default function ViewCertificateScreen() {
 
                             <View className="items-center">
                                 <Text className="text-slate-900 font-bold text-xs" style={{ fontFamily: 'serif' }}>
-                                    {params.headCoachName}
+                                    {params.certificateNumber}
                                 </Text>
                                 <View className="h-[1px] w-24 bg-slate-300 my-1" />
-                                <Text className="text-slate-400 text-[8px] uppercase font-bold">Head Coach</Text>
+                                <Text className="text-slate-400 text-[8px] uppercase font-bold">Certificate No.</Text>
                             </View>
                         </View>
 

@@ -34,23 +34,19 @@ export default function tournamentDashboardLayout
         }}
       />
       <Stack.Screen
+        name="selectSubstitutes"
+        options={{
+          title: 'Select Substitutes',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="enterReferee"
         options={{
           title: 'Referee Names',
           headerShown: false,
         }}
       />
-       <Stack.Screen
-        name="scoringScreen"
-        options={{
-          title: 'Score Screen',
-          headerShown: false,
-        }}
-      />
-
-
-    
-    
     </Stack>
   );
 }

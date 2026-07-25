@@ -66,4 +66,7 @@ export declare const createCertificateSchema: z.ZodObject<{
     template: z.ZodString;
     achievement: z.ZodString;
 }, z.core.$strip>;
+export declare const createAnnouncementSchema: z.ZodObject<{
+    content: z.ZodString;
+}, z.core.$strip>;
 //# sourceMappingURL=academy.d.ts.map

@@ -25,6 +25,7 @@
     "expo-image-picker": "~17.0.8",
     "expo-linear-gradient": "~15.0.7",
     "expo-router": "~6.0.4",
+    "expo-secure-store": "^55.0.16",
     "expo-status-bar": "~3.0.8",
     "expo-web-browser": "~15.0.7",
     "immer": "^10.1.1",
@@ -49,7 +50,8 @@
     "recoil": "^0.7.7",
     "tailwindcss": "^3.4.17",
     "uuid": "^11.1.0",
-    "zustand": "^5.0.7"
+    "zustand": "^5.0.7",
+    "expo-location": "~19.0.8"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

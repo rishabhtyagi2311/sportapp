@@ -1,86 +1,74 @@
-// store/enrollmentStore.ts
+// store/academyEnrollmentStore.ts
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-export interface Enrollment {
-  id: string;
-  childId: string;
-  childName: string;
-  academyId: string;
-  academyName: string;
-  enrolledAt: string;
-  status: 'active' | 'pending' | 'inactive';
-}
+import { Enrollment } from '@/types/academy';
+import { academyApiService } from '@/services/academyManagement/academy';
 
 interface EnrollmentStore {
   enrollments: Enrollment[];
-  
-  // Add enrollment
-  enrollChild: (enrollment: Omit<Enrollment, 'id' | 'enrolledAt'>) => void;
-  
-  // Get enrollments by child
-  getEnrollmentsByChild: (childId: string) => Enrollment[];
-  
-  // Get enrollments by academy
-  getEnrollmentsByAcademy: (academyId: string) => Enrollment[];
-  
-  // Check if child is enrolled in academy
-  isChildEnrolled: (childId: string, academyId: string) => boolean;
-  
-  // Remove enrollment
-  removeEnrollment: (enrollmentId: string) => void;
-  
-  // Update enrollment status
-  updateEnrollmentStatus: (enrollmentId: string, status: 'active' | 'pending' | 'inactive') => void;
+  isLoading: boolean;
+  error: string | null;
+
+  fetchMyEnrollments: (childProfileId?: string) => Promise<void>;
+  enrollChild: (childProfileId: string, academyId: string) => Promise<Enrollment>;
+  withdrawEnrollment: (studentId: string) => Promise<void>;
+  getEnrollmentsByChild: (childProfileId: string) => Enrollment[];
+  isChildEnrolled: (childProfileId: string, academyId: string) => boolean;
 }
 
-export const useEnrollmentStore = create<EnrollmentStore>()(
-  persist(
-    (set, get) => ({
-      enrollments: [],
+export const useEnrollmentStore = create<EnrollmentStore>((set, get) => ({
+  enrollments: [],
+  isLoading: false,
+  error: null,
 
-      enrollChild: (enrollment) =>
-        set((state) => ({
-          enrollments: [
-            ...state.enrollments,
-            {
-              ...enrollment,
-              id: `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
-              enrolledAt: new Date().toISOString(),
-            },
-          ],
-        })),
-
-      getEnrollmentsByChild: (childId) => {
-        return get().enrollments.filter((e) => e.childId === childId);
-      },
-
-      getEnrollmentsByAcademy: (academyId) => {
-        return get().enrollments.filter((e) => e.academyId === academyId);
-      },
-
-      isChildEnrolled: (childId, academyId) => {
-        return get().enrollments.some(
-          (e) => e.childId === childId && e.academyId === academyId
-        );
-      },
-
-      removeEnrollment: (enrollmentId) =>
-        set((state) => ({
-          enrollments: state.enrollments.filter((e) => e.id !== enrollmentId),
-        })),
-
-      updateEnrollmentStatus: (enrollmentId, status) =>
-        set((state) => ({
-          enrollments: state.enrollments.map((e) =>
-            e.id === enrollmentId ? { ...e, status } : e
-          ),
-        })),
-    }),
-    {
-      name: 'enrollment-storage',
-      storage: createJSONStorage(() => AsyncStorage),
+  fetchMyEnrollments: async (childProfileId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.getMyEnrollments(childProfileId);
+      set((state) => ({
+        enrollments: childProfileId
+          ? [...state.enrollments.filter((e) => e.childProfileId !== childProfileId), ...response.data]
+          : response.data,
+        isLoading: false,
+      }));
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || 'Could not load enrollments', isLoading: false });
     }
-  )
-);
+  },
+
+  enrollChild: async (childProfileId, academyId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.enrollChild({ childProfileId, academyId });
+      set((state) => ({ enrollments: [response.data, ...state.enrollments], isLoading: false }));
+      return response.data;
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not enroll child';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
+
+  withdrawEnrollment: async (studentId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await academyApiService.withdrawEnrollment(studentId);
+      set((state) => ({
+        enrollments: state.enrollments.map((e) => (e.id === studentId ? response.data : e)),
+        isLoading: false,
+      }));
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not withdraw enrollment';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
+
+  getEnrollmentsByChild: (childProfileId) => get().enrollments.filter((e) => e.childProfileId === childProfileId),
+
+  // A withdrawn/rejected ('inactive') enrollment doesn't block re-enrolling —
+  // the server re-requests on the same row rather than rejecting it.
+  isChildEnrolled: (childProfileId, academyId) =>
+    get().enrollments.some(
+      (e) => e.childProfileId === childProfileId && e.academyId === academyId && e.status !== 'inactive'
+    ),
+}));

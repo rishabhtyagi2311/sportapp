@@ -13,10 +13,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import uuid from 'react-native-uuid';
-import { Event } from '@/types/booking';
 import { useEventManagerStore } from '@/store/eventManagerStore';
-import { CURRENT_USER } from './usercontext';
+import VenueLocationPicker, { VenueLocationValue } from '@/components/VenueLocationPicker';
 
 /* -------------------------------------------------------------------------- */
 /* TYPES */
@@ -27,11 +25,10 @@ type FeeType = 'per_team' | 'total';
 interface FormState {
   name: string;
   description: string;
-  venueId: string;
+  location: VenueLocationValue;
   tournamentFormat: TournamentFormat | '';
   teamSize: string;
   maxTeams: string;
-  maxRegistrations: string;
   date: string;
   time: string;
   duration: string;
@@ -44,15 +41,15 @@ interface FormState {
 /* -------------------------------------------------------------------------- */
 export default function CreateFootballTournamentEventScreen() {
   const { createEvent } = useEventManagerStore();
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState<FormState>({
     name: '',
     description: '',
-    venueId: '',
+    location: {},
     tournamentFormat: '',
     teamSize: '11',
     maxTeams: '',
-    maxRegistrations: '',
     date: '',
     time: '',
     duration: '2',
@@ -103,8 +100,8 @@ export default function CreateFootballTournamentEventScreen() {
       Alert.alert('Error', 'Please enter tournament name');
       return false;
     }
-    if (!formData.venueId.trim()) {
-      Alert.alert('Error', 'Please enter venue');
+    if (!formData.location.venueId && !formData.location.locationName?.trim()) {
+      Alert.alert('Error', 'Please choose a venue or enter a custom location');
       return false;
     }
     if (!formData.tournamentFormat) {
@@ -113,10 +110,6 @@ export default function CreateFootballTournamentEventScreen() {
     }
     if (!formData.teamSize) {
       Alert.alert('Error', 'Please enter team size');
-      return false;
-    }
-    if (!formData.maxRegistrations) {
-      Alert.alert('Error', 'Please enter maximum registrations');
       return false;
     }
     if (!formData.maxTeams) {
@@ -161,66 +154,43 @@ export default function CreateFootballTournamentEventScreen() {
   };
 
   /* ----------------------------- SUBMIT ------------------------------------ */
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
 
+    setSubmitting(true);
     try {
       // Parse date and time
       const [year, month, day] = formData.date.split('-').map(Number);
       const [hours, minutes] = formData.time.split(':').map(Number);
       const dateTime = new Date(year, month - 1, day, hours, minutes);
 
-      // Calculate registration deadline (7 days before)
+      // Calculate registration deadline (1 day before)
       const deadline = new Date(dateTime);
       deadline.setDate(deadline.getDate() - 1);
 
-      // Create event object
-      const event: Event = {
-        id: uuid.v4().toString(),
-        creatorId: CURRENT_USER.id,
-        venueId: formData.venueId,
+      await createEvent({
+        eventType: 'footballtournament',
+        tournamentFormat: formData.tournamentFormat,
+        venueId: formData.location.venueId,
+        locationName: formData.location.venueId ? undefined : formData.location.locationName?.trim(),
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
-        eventType: 'footballtournament',
-        tournamentFormat: formData.tournamentFormat as TournamentFormat,
-        sport: {
-          id: 'football',
-          name: 'Football',
-          category: 'outdoor',
-          varieties: [],
-        },
+        sportName: 'Football',
         participationType: 'team',
-        teamSize: parseInt(formData.teamSize),
-        maxParticipants: parseInt(formData.maxTeams),
-        maxRegistrations: parseInt(formData.maxRegistrations),
-        currentParticipants: 0,
+        teamSize: parseInt(formData.teamSize, 10),
+        maxParticipants: parseInt(formData.maxTeams, 10),
         dateTime: dateTime.toISOString(),
-        duration: parseFloat(formData.duration),
-        fees: {
-          amount: parseFloat(formData.feeAmount),
-          currency: 'INR',
-          type: formData.feeType as FeeType,
-        },
-        organizer: {
-          name: CURRENT_USER.name,
-          contact: CURRENT_USER.phone,
-        },
-        status: 'upcoming',
-        isPublic: true,
+        duration: Math.round(parseFloat(formData.duration) * 60),
+        feeAmount: parseFloat(formData.feeAmount),
+        feeType: formData.feeType,
         registrationDeadline: deadline.toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      });
 
-      // Create event (uses Manager store logic which auto-syncs to booking store)
-      createEvent(event);
-      router.push("/(EventManagement)/organizerDashboard");
-    } catch (error) {
-      console.error('Error creating tournament event:', error);
-      Alert.alert(
-        'Error',
-        'Failed to create tournament event. Please check your inputs.'
-      );
+      router.push('/(EventManagement)/organizerDashboard');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to create tournament event. Please check your inputs.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -275,16 +245,10 @@ export default function CreateFootballTournamentEventScreen() {
               <Text className="text-white font-semibold mb-2 text-base">
                 Venue *
               </Text>
-              <View className="bg-sky-100 rounded-xl border border-gray-200 flex-row items-center px-4">
-                <Ionicons name="location-outline" size={20} color="#374151" />
-                <TextInput
-                  className="flex-1 text-black py-4 px-3 text-base"
-                  placeholder="Enter venue"
-                  placeholderTextColor="#6b7280"
-                  value={formData.venueId}
-                  onChangeText={(text) => updateForm('venueId', text)}
-                />
-              </View>
+              <VenueLocationPicker
+                value={formData.location}
+                onChange={(location) => setFormData((prev) => ({ ...prev, location }))}
+              />
             </View>
 
             {/* Tournament Format Selection */}
@@ -355,28 +319,6 @@ export default function CreateFootballTournamentEventScreen() {
                   placeholderTextColor="#6b7280"
                   value={formData.teamSize}
                   onChangeText={(text) => updateForm('teamSize', text)}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-
-            {/* Maximum Registrations */}
-            <View className="mb-6">
-              <Text className="text-white font-semibold mb-2 text-base">
-                Maximum Registrations Allowed *
-              </Text>
-              <View className="bg-sky-100 rounded-xl border border-gray-200 flex-row items-center px-4">
-                <Ionicons
-                  name="people-circle-outline"
-                  size={20}
-                  color="#374151"
-                />
-                <TextInput
-                  className="flex-1 text-black py-4 px-3 text-base"
-                  placeholder="Enter max registrations"
-                  placeholderTextColor="#6b7280"
-                  value={formData.maxRegistrations}
-                  onChangeText={(text) => updateForm('maxRegistrations', text)}
                   keyboardType="numeric"
                 />
               </View>
@@ -499,12 +441,13 @@ export default function CreateFootballTournamentEventScreen() {
             {/* Submit Button */}
             <TouchableOpacity
               onPress={handleSubmit}
+              disabled={submitting}
               className="bg-blue-300 rounded-xl py-4 mb-6 shadow-lg"
               activeOpacity={0.8}
             >
               <View className="flex-row items-center justify-center">
                 <Text className="text-black font-bold text-lg mr-2">
-                  Create Tournament Event
+                  {submitting ? 'Creating…' : 'Create Tournament Event'}
                 </Text>
                 <Ionicons
                   name="checkmark-circle-outline"

@@ -1,82 +1,32 @@
-import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-} from "react-native";
+import React, { useEffect } from "react";
+import { View, Text, TouchableOpacity, ScrollView, StatusBar, ActivityIndicator } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useCertificateStore, Certificate } from "@/store/academyCertifications";
+import { useAcademyStore } from "@/store/academyStore";
+import { Certificate } from "@/types/academy";
 
 export default function CertificationsScreen() {
   const router = useRouter();
-  const { childId } = useLocalSearchParams<{ childId: string }>();
-  
-  // Dummy Data (Filtering by childId to simulate real behavior)
-  const allDummyCertificates: Certificate[] = [
-    {
-      id: '1',
-      childId: 'child_01',
-      academyName: 'Star Cricket Academy',
-      recipientName: 'Rahul Kumar',
-      achievementText: 'Best Bowler of the Month',
-      date: 'Feb 15, 2026',
-      headCoachName: 'Coach Vikram Singh',
-    },
-    {
-      id: '2',
-      childId: 'child_01',
-      academyName: 'Star Cricket Academy',
-      recipientName: 'Rahul Kumar',
-      achievementText: 'Outstanding Discipline Award',
-      date: 'Jan 20, 2026',
-      headCoachName: 'Coach Vikram Singh',
-    },
-    {
-      id: '3',
-      childId: 'child_01',
-      academyName: 'Elite Tennis Club',
-      recipientName: 'Rahul Kumar',
-      achievementText: 'Inter-Academy Runner Up',
-      date: 'Dec 12, 2025',
-      headCoachName: 'Sania Mirza',
-    },
-    {
-      id: '4',
-      childId: 'child_02',
-      academyName: 'Global Football Academy',
-      recipientName: 'Sneha Kapoor',
-      achievementText: 'Most Improved Player',
-      date: 'Feb 05, 2026',
-      headCoachName: 'Coach Ricardo',
-    },
-    {
-      id: '5',
-      childId: 'child_02',
-      academyName: 'Global Football Academy',
-      recipientName: 'Sneha Kapoor',
-      achievementText: 'Top Scorer - Winter League',
-      date: 'Jan 15, 2026',
-      headCoachName: 'Coach Ricardo',
-    }
-  ];
+  const { studentId } = useLocalSearchParams<{ studentId: string }>();
 
-  // Filter based on the child profile being viewed
-  const certificates = allDummyCertificates
+  const { getCertificatesByStudent, fetchChildCertificates, isLoading } = useAcademyStore();
+
+  useEffect(() => {
+    if (studentId) fetchChildCertificates(studentId);
+  }, [studentId]);
+
+  const certificates = studentId ? getCertificatesByStudent(studentId) : [];
 
   const handleViewCertificate = (cert: Certificate) => {
     router.push({
       pathname: "/(academy)/manageProfile/certificates",
-      params: { 
-        id: cert.id,
+      params: {
+        studentName: cert.studentName,
         academyName: cert.academyName,
-        recipientName: cert.recipientName,
-        achievementText: cert.achievementText,
+        achievement: cert.achievement,
         date: cert.date,
-        headCoachName: cert.headCoachName
+        certificateNumber: cert.certificateNumber,
       },
     });
   };
@@ -93,8 +43,8 @@ export default function CertificationsScreen() {
         <Text className="text-xl font-black text-slate-900 ml-2">Certifications</Text>
       </View>
 
-      <ScrollView 
-        className="flex-1" 
+      <ScrollView
+        className="flex-1"
         contentContainerStyle={{ padding: 20 }}
         showsVerticalScrollIndicator={false}
       >
@@ -102,7 +52,11 @@ export default function CertificationsScreen() {
           Achievements ({certificates.length})
         </Text>
 
-        {certificates.length > 0 ? (
+        {isLoading && certificates.length === 0 ? (
+          <View className="items-center justify-center py-20">
+            <ActivityIndicator size="large" color="#0f172a" />
+          </View>
+        ) : certificates.length > 0 ? (
           certificates.map((cert) => (
             <TouchableOpacity
               key={cert.id}
@@ -111,14 +65,13 @@ export default function CertificationsScreen() {
               className="bg-white rounded-3xl p-5 mb-4 border border-slate-100 shadow-sm"
             >
               <View className="flex-row items-center">
-                {/* Achievement Badge Icon */}
                 <View className="h-12 w-12 bg-indigo-50 rounded-2xl items-center justify-center mr-4">
                   <Ionicons name="ribbon" size={24} color="#4f46e5" />
                 </View>
 
                 <View className="flex-1">
                   <Text className="text-slate-900 font-bold text-lg leading-6" numberOfLines={2}>
-                    {cert.achievementText}
+                    {cert.achievement}
                   </Text>
                   <View className="flex-row items-center mt-2">
                     <Ionicons name="calendar-outline" size={14} color="#94a3b8" />

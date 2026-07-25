@@ -1,58 +1,33 @@
-import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StatusBar, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-// STORES
-import { useRegistrationRequestStore } from '@/store/eventRegistrationRequestStore';
-import { useBookingStore } from '@/store/venueStore';
-import { RegistrationRequest } from '@/store/eventRegistrationRequestStore';
-import {useFootballStore} from "@/store/footballTeamStore"
 
+import { useRegistrationRequestStore } from '@/store/eventRegistrationRequestStore';
+import { EventRegistration } from '@/types/event';
 
 export default function UserRegistrationsScreen() {
   const router = useRouter();
 
-  /* ---------------- STORE ACCESS ---------------- */
-  const { getEventById } = useBookingStore();
-  const allRequests = useRegistrationRequestStore((state) => state.requests);
-  const {getCurrentPlayer} = useFootballStore()
-  const CURRENT_USER_ID = getCurrentPlayer()?.id
+  const { myRegistrations, isLoading, fetchMyRegistrations } = useRegistrationRequestStore();
 
-  /* ---------------- FILTER + SORT ---------------- */
-  const sortedRequests = useMemo(() => {
-    const myRequests = allRequests.filter((r) => {
-      // Regular events → owned by userId
-      if (r.domain === 'regular') {
-        return 'userId' in r && r.userId === CURRENT_USER_ID;
-      }
-      // Football tournaments → owned by captain
-      if (r.domain === 'football_tournament') {
-        return r.captainPlayerId === CURRENT_USER_ID;
-      }
-      return false;
-    });
-    return myRequests.sort(
-      (a, b) =>
-        new Date(b.submittedAt).getTime() -
-        new Date(a.submittedAt).getTime()
-    );
-  }, [allRequests]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyRegistrations();
+    }, [])
+  );
 
-  /* ---------------- HELPERS ---------------- */
+  const sortedRequests = [...myRegistrations].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'accepted':
         return {
           bg: 'bg-green-100',
-          textColor: '#15803d', // Use hex color instead of className
+          textColor: '#15803d',
           icon: 'checkmark-circle',
           textClass: 'text-green-700',
         };
@@ -73,28 +48,26 @@ export default function UserRegistrationsScreen() {
     }
   };
 
-  const handlePressRequest = (req: RegistrationRequest) => {
+  const handlePressRequest = (req: EventRegistration) => {
     if (req.notes) {
       Alert.alert('Manager Notes', req.notes, [{ text: 'Close' }]);
     }
   };
 
-  /* ---------------- RENDER CARD ---------------- */
-  const renderRequestCard = ({ item }: { item: RegistrationRequest }) => {
-    const event = getEventById(item.eventId);
+  const renderRequestCard = ({ item }: { item: EventRegistration }) => {
+    const event = item.event;
     if (!event) return null;
 
     const statusStyle = getStatusColor(item.status);
 
     const participationLabel =
-      item.domain === 'football_tournament'
+      event.eventType === 'footballtournament'
         ? 'Football Tournament'
-        : item.participationType === 'team'
+        : item.footballTeamId
           ? 'Team Entry'
           : 'Individual';
 
-    // FIX: Pre-format the date string outside of Text component
-    const appliedDate = new Date(item.submittedAt).toLocaleDateString('en-IN', {
+    const appliedDate = new Date(item.createdAt).toLocaleDateString('en-IN', {
       day: 'numeric',
       month: 'short',
     });
@@ -108,42 +81,32 @@ export default function UserRegistrationsScreen() {
         {/* Header */}
         <View className="flex-row justify-between items-start mb-3">
           <View className="flex-1 mr-2">
-            <Text
-              className="text-lg font-bold text-slate-900"
-              numberOfLines={1}
-            >
+            <Text className="text-lg font-bold text-slate-900" numberOfLines={1}>
               {event.name}
             </Text>
             <Text className="text-xs text-slate-500 uppercase tracking-wider font-semibold mt-1">
-              {event.sport.name} • {participationLabel}
+              {event.sportName} • {participationLabel}
             </Text>
+            {item.teamName && (
+              <Text className="text-xs text-slate-400 mt-0.5">{item.teamName}</Text>
+            )}
           </View>
           <View className="bg-slate-100 px-2 py-1 rounded">
             <Text className="text-slate-700 font-bold text-xs">
-              ₹{event.fees.amount}
+              ₹{event.feeAmount}
             </Text>
           </View>
         </View>
 
         {/* Status */}
         <View className="flex-row items-center justify-between mt-2 pt-3 border-t border-gray-100">
-          <View
-            className={`flex-row items-center px-2.5 py-1 rounded-full ${statusStyle.bg}`}
-          >
-            <Ionicons
-              name={statusStyle.icon as any}
-              size={14}
-              color={statusStyle.textColor}
-            />
-            {/* FIX: Use the textClass for styling instead of concatenating */}
-            <Text
-              className={`text-xs font-bold ml-1.5 capitalize ${statusStyle.textClass}`}
-            >
+          <View className={`flex-row items-center px-2.5 py-1 rounded-full ${statusStyle.bg}`}>
+            <Ionicons name={statusStyle.icon as any} size={14} color={statusStyle.textColor} />
+            <Text className={`text-xs font-bold ml-1.5 capitalize ${statusStyle.textClass}`}>
               {item.status}
             </Text>
           </View>
 
-          {/* FIX: Separate Text elements for clarity */}
           <View className="flex-row">
             <Text className="text-xs text-slate-400">Applied: </Text>
             <Text className="text-xs text-slate-400">{appliedDate}</Text>
@@ -153,16 +116,8 @@ export default function UserRegistrationsScreen() {
         {/* Notes */}
         {item.notes && (
           <View className="mt-3 bg-gray-50 p-2 rounded-lg flex-row items-start">
-            <Ionicons
-              name="chatbox-ellipses-outline"
-              size={14}
-              color="#64748b"
-            />
-            {/* FIX: Use proper template literal */}
-            <Text
-              className="text-xs text-slate-600 ml-2 flex-1"
-              numberOfLines={1}
-            >
+            <Ionicons name="chatbox-ellipses-outline" size={14} color="#64748b" />
+            <Text className="text-xs text-slate-600 ml-2 flex-1" numberOfLines={1}>
               {`Manager note: "${item.notes}"`}
             </Text>
           </View>
@@ -171,7 +126,6 @@ export default function UserRegistrationsScreen() {
     );
   };
 
-  /* ---------------- UI ---------------- */
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -179,46 +133,46 @@ export default function UserRegistrationsScreen() {
       {/* Header */}
       <View className="bg-slate-900 px-6 py-4 border-b border-gray-200 mt-2">
         <View className="flex-row items-center">
-          <TouchableOpacity
-            className="mr-4"
-            onPress={() => router.back()}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity className="mr-4" onPress={() => router.back()} activeOpacity={0.7}>
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
           <View>
-            <Text className="text-xl font-bold text-white">
-              My Requests
-            </Text>
+            <Text className="text-xl font-bold text-white">My Requests</Text>
           </View>
         </View>
       </View>
 
       {/* List */}
-      <FlatList
-        data={sortedRequests}
-        renderItem={renderRequestCard}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View className="items-center justify-center mt-20 opacity-60">
-            <Ionicons name="ticket-outline" size={64} color="#94a3b8" />
-            <Text className="text-slate-500 text-lg font-semibold mt-4">
-              No requests found
-            </Text>
-            <Text className="text-slate-400 text-sm text-center px-10">
-              You haven't registered for any events yet.
-            </Text>
-            <TouchableOpacity
-              onPress={() => router.push('/(homeScreenTabs)')}
-              className="mt-6 bg-blue-600 px-6 py-3 rounded-full"
-            >
-              <Text className="text-white font-bold">Explore Events</Text>
-            </TouchableOpacity>
-          </View>
-        }
-      />
+      {isLoading && myRegistrations.length === 0 ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#0f172a" />
+        </View>
+      ) : (
+        <FlatList
+          data={sortedRequests}
+          renderItem={renderRequestCard}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View className="items-center justify-center mt-20 opacity-60">
+              <Ionicons name="ticket-outline" size={64} color="#94a3b8" />
+              <Text className="text-slate-500 text-lg font-semibold mt-4">
+                No requests found
+              </Text>
+              <Text className="text-slate-400 text-sm text-center px-10">
+                You haven't registered for any events yet.
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.push('/(homeScreenTabs)')}
+                className="mt-6 bg-blue-600 px-6 py-3 rounded-full"
+              >
+                <Text className="text-white font-bold">Explore Events</Text>
+              </TouchableOpacity>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }

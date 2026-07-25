@@ -4,15 +4,12 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  KeyboardAvoidingView,
   Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
   ImageBackground,
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useForm, Controller } from "react-hook-form";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -81,26 +78,23 @@ export default function InfoRegisterScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1"
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View className="flex-1 bg-white">
-          <ImageBackground
-            source={require("../../assets/images/coverImageNew.png")}
-            resizeMode="cover"
-            className="flex-1"
+    <View className="flex-1 bg-white">
+      <ImageBackground
+        source={require("../../assets/images/coverImageNew.png")}
+        resizeMode="cover"
+        className="flex-1"
+      >
+        <View className="flex-1 justify-end">
+          <View
+            className="bg-white border-black border-4"
+            style={{ height: "78%", borderTopRightRadius: 180 }}
           >
-            <View className="flex-1 justify-end">
-              <View
-                className="bg-white border-black border-4"
-                style={{ height: "78%", borderTopRightRadius: 180 }}
-              >
-                <ScrollView
-                  contentContainerStyle={{ paddingBottom: 30 }}
-                  keyboardShouldPersistTaps="handled"
-                >
+            <KeyboardAwareScrollView
+              contentContainerStyle={{ paddingBottom: 30 }}
+              keyboardShouldPersistTaps="handled"
+              enableOnAndroid={true}
+              extraScrollHeight={Platform.OS === "ios" ? 20 : 50}
+            >
                 <View className={isTablet ? 'self-center w-full max-w-md' : 'w-full'}>
                   <Text className="text-black text-2xl font-extrabold mt-8 ml-8 mb-2">
                     You are Almost there.
@@ -274,12 +268,10 @@ export default function InfoRegisterScreen() {
                     </AnimatedPressable>
                   </View>
                 </View>
-                </ScrollView>
-              </View>
-            </View>
-          </ImageBackground>
+            </KeyboardAwareScrollView>
+          </View>
         </View>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+      </ImageBackground>
+    </View>
   );
 }

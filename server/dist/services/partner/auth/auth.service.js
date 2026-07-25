@@ -9,7 +9,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const index_1 = require("../../../index");
 class AuthService {
     static signToken(partnerId) {
-        return jsonwebtoken_1.default.sign({ id: partnerId }, process.env.JWT_SECRET, {
+        return jsonwebtoken_1.default.sign({ id: partnerId, type: "partner" }, process.env.JWT_SECRET, {
             expiresIn: (process.env.JWT_EXPIRES_IN || "7d"),
         });
     }
@@ -22,6 +22,7 @@ class AuthService {
             email: partner.email || undefined,
             city: partner.city || undefined,
             dob: partner.dob || undefined,
+            profileImage: partner.profileImage || undefined,
         };
     }
     static async register(data) {
@@ -66,6 +67,24 @@ class AuthService {
         }
         const token = this.signToken(partner.id);
         return { token, partner: this.toPublicPartner(partner) };
+    }
+    static async updateProfile(partnerId, data) {
+        const existing = await index_1.prisma.partnerIdentity.findUnique({ where: { id: partnerId } });
+        if (!existing) {
+            throw new Error("Partner not found");
+        }
+        const partner = await index_1.prisma.partnerIdentity.update({
+            where: { id: partnerId },
+            data: {
+                firstName: data.firstName,
+                lastName: data.lastName,
+                email: data.email,
+                city: data.city,
+                dob: data.dob,
+                profileImage: data.profileImage,
+            },
+        });
+        return this.toPublicPartner(partner);
     }
 }
 exports.AuthService = AuthService;

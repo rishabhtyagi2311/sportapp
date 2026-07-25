@@ -145,6 +145,11 @@ class VenueService {
                         },
                     }
                     : {}),
+                // Full-array replace, matching how `sports`/`amenities` already work —
+                // the client always sends the complete desired image list.
+                ...(data.images
+                    ? { images: { deleteMany: {}, create: data.images.map((url) => ({ url })) } }
+                    : {}),
             },
             include: { address: true, images: true },
         });
@@ -156,6 +161,25 @@ class VenueService {
             throw new Error('Venue not found or not owned by partner');
         }
         await index_1.prisma.venue.delete({ where: { id: venueId } });
+    }
+    /** Public, unauthenticated browse — no partnerId scoping, active venues only. */
+    static async getPublicVenues(filters = {}) {
+        const venues = await index_1.prisma.venue.findMany({
+            where: {
+                isActive: true,
+                ...(filters.city ? { city: { equals: filters.city, mode: 'insensitive' } } : {}),
+            },
+            include: { address: true, images: true, _count: { select: { timeSlots: true } } },
+            orderBy: { createdAt: 'desc' },
+        });
+        return venues.map((venue) => this.mapVenueForClient(venue));
+    }
+    static async getPublicVenueById(venueId) {
+        const venue = await index_1.prisma.venue.findFirst({
+            where: { id: venueId, isActive: true },
+            include: { address: true, images: true, timeSlots: true },
+        });
+        return venue ? this.mapVenueForClient(venue) : null;
     }
 }
 exports.VenueService = VenueService;

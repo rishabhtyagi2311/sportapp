@@ -55,6 +55,21 @@ class SlotService {
             };
         });
     }
+    /** Public, unauthenticated slot lookup — visible only for active venues. */
+    static async getPublicSlotsForVenue(params) {
+        const venue = await index_1.prisma.venue.findFirst({ where: { id: params.venueId, isActive: true } });
+        if (!venue) {
+            throw new Error('Venue not found');
+        }
+        const where = { venueId: params.venueId };
+        if (params.date) {
+            where.date = new Date(params.date);
+        }
+        return index_1.prisma.timeSlot.findMany({
+            where,
+            orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+        });
+    }
     static async generateSlotsForVenue(params) {
         const venue = await index_1.prisma.venue.findFirst({ where: { id: params.venueId, partnerId: params.partnerId } });
         if (!venue) {

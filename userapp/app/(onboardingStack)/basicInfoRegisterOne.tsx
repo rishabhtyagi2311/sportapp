@@ -68,7 +68,7 @@ export default function InfoRegisterScreen() {
   const onSubmit = async (data: FormData) => {
     setName(data.name);
     setContact(data.phone);
-    router.push("./../(homeScreenTabs)");
+    router.push("./basicInfoRegisterTwo");
   };
 
   return (

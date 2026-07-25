@@ -1,23 +1,26 @@
 // app/(football)/teams/index.tsx
-import { View, Text, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import React, { useCallback } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useFootballStore } from '@/store/footballTeamStore';
-
-const { width } = Dimensions.get('window');
+import { FootballTeam } from '@/types/football';
 
 export default function TeamsScreen() {
- 
-  
-  const { teams } = useFootballStore();
-  
+  const { myTeams, isLoading, fetchMyTeams } = useFootballStore();
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyTeams();
+    }, [])
+  );
+
   const handleCreateTeam = () => {
     router.push("./../../createNewTeam/basicDetail");
   };
 
-  const handleTeamPress = (team: any) => {
-    // Navigate to view members screen with team ID as parameter
+  const handleTeamPress = (team: FootballTeam) => {
     router.push(`/(football)/TeamsNestedFiles/viewMembers?teamId=${team.id}`);
   };
 
@@ -30,7 +33,7 @@ export default function TeamsScreen() {
     });
   };
 
-  const renderTeamCard = (team: any) => (
+  const renderTeamCard = (team: FootballTeam) => (
     <TouchableOpacity
       key={team.id}
       onPress={() => handleTeamPress(team)}
@@ -48,25 +51,12 @@ export default function TeamsScreen() {
       <View className="flex-row items-start justify-between mb-4">
         <View className="flex-1 mr-3">
           <Text className="text-white text-xl font-bold mb-1" numberOfLines={2}>
-            {team.teamName}
+            {team.name}
           </Text>
           <View className="flex-row items-center">
             <Ionicons name="location-outline" size={16} color="#94a3b8" />
-            <Text className="text-slate-400 text-sm ml-1">{team.city}</Text>
+            <Text className="text-slate-400 text-sm ml-1">{team.location}</Text>
           </View>
-        </View>
-        
-        {/* Status Badge */}
-        <View className={`px-3 py-1 rounded-full ${
-          team.status === 'active' 
-            ? 'bg-green-600' 
-            : team.status === 'inactive' 
-              ? 'bg-yellow-600' 
-              : 'bg-red-600'
-        }`}>
-          <Text className="text-white text-xs font-semibold capitalize">
-            {team.status}
-          </Text>
         </View>
       </View>
 
@@ -76,7 +66,7 @@ export default function TeamsScreen() {
         <View className="flex-row items-center bg-sky-100/10 px-3 py-2 rounded-lg flex-1 mr-2">
           <Ionicons name="people-outline" size={18} color="#0ea5e9" />
           <Text className="text-sky-100 text-sm font-semibold ml-2">
-            {team.memberPlayerIds.length}/{team.maxPlayers} Players
+            {team.members.length}/{team.maxPlayers} Players
           </Text>
         </View>
 
@@ -97,17 +87,17 @@ export default function TeamsScreen() {
             Created {formatDate(team.createdAt)}
           </Text>
         </View>
-        
+
         <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
       </View>
 
       {/* Progress Bar for Team Capacity */}
       <View className="mt-4">
         <View className="bg-slate-700 h-2 rounded-full overflow-hidden">
-          <View 
+          <View
             className="bg-sky-400 h-full rounded-full"
             style={{
-              width: `${(team.memberPlayerIds.length / team.maxPlayers) * 100}%`
+              width: `${(team.members.length / team.maxPlayers) * 100}%`
             }}
           />
         </View>
@@ -122,7 +112,7 @@ export default function TeamsScreen() {
         <View className="w-24 h-24 bg-gray-100 rounded-full justify-center items-center mb-6">
           <Ionicons name="people-outline" size={40} color="#6b7280" />
         </View>
-        
+
         <Text className="text-xl font-bold text-gray-900 mb-2 text-center">
           No Teams Yet
         </Text>
@@ -135,7 +125,11 @@ export default function TeamsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      {teams.length === 0 ? (
+      {isLoading && myTeams.length === 0 ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#0f172a" />
+        </View>
+      ) : myTeams.length === 0 ? (
         renderEmptyState()
       ) : (
         <>
@@ -145,30 +139,22 @@ export default function TeamsScreen() {
               <View >
                 <Text className="text-2xl font-bold text-gray-900">My Teams</Text>
                 <Text className="text-gray-600 text-sm">
-                  {teams.length} {teams.length === 1 ? 'team' : 'teams'} created
-                </Text>
-              </View>
-              
-              {/* Stats Summary */}
-              <View className="items-end">
-                <Text className="text-sm text-gray-500">Active Teams</Text>
-                <Text className="text-xl font-bold text-slate-900">
-                  {teams.filter(t => t.status === 'active').length}
+                  {myTeams.length} {myTeams.length === 1 ? 'team' : 'teams'} created
                 </Text>
               </View>
             </View>
           </View>
 
           {/* Teams List */}
-          <ScrollView 
+          <ScrollView
             className="flex-1"
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ 
+            contentContainerStyle={{
               paddingVertical: 16,
               paddingBottom: 100 // Space for floating button
             }}
           >
-            {teams.map(team => renderTeamCard(team))}
+            {myTeams.map(team => renderTeamCard(team))}
           </ScrollView>
         </>
       )}

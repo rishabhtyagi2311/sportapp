@@ -1,80 +1,43 @@
 // app/(football)/tournaments/[tournamentId].tsx
-import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useTournamentStore } from '@/store/footballTournamentStore';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useTournamentStore } from '@/store/tournamentStore';
 
 type TabType = 'fixtures' | 'standings' | 'matches';
 
 export default function TournamentDashboardScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const tournamentId = params.tournamentId as string;
+  const { tournamentId } = useLocalSearchParams<{ tournamentId: string }>();
 
-  const {
-    getTournament,
-    getTournamentFixtures,
-    getTournamentTable,
-    getUpcomingFixtures,
-    getCompletedFixtures,
-    startTournament,
-    initializeTournamentMatch,
-  } = useTournamentStore();
+  const { getTournament, getStandings, fetchTournamentById, startTournament, isLoading } = useTournamentStore();
 
   const [activeTab, setActiveTab] = useState<TabType>('fixtures');
-  const [activeTableId, setActiveTableId] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
 
-  const tournament = useMemo(() => getTournament(tournamentId), [tournamentId, getTournament, refreshKey]);
-  const allFixtures = useMemo(() => getTournamentFixtures(tournamentId), [tournamentId, getTournamentFixtures, refreshKey]);
-  const upcomingFixtures = useMemo(() => getUpcomingFixtures(tournamentId), [tournamentId, getUpcomingFixtures, refreshKey]);
-  const completedFixtures = useMemo(() => getCompletedFixtures(tournamentId), [tournamentId, getCompletedFixtures, refreshKey]);
-  console.log(upcomingFixtures);
+  useFocusEffect(
+    useCallback(() => {
+      if (tournamentId) fetchTournamentById(tournamentId);
+    }, [tournamentId])
+  );
 
-  // Set initial active table when tournament loads
-  useEffect(() => {
-    if (tournament?.tables && tournament.tables.length > 0 && !activeTableId) {
-      setActiveTableId(tournament.tables[0].id);
-    }
-  }, [tournament, activeTableId]);
+  const tournament = getTournament(tournamentId);
+  const standings = useMemo(() => (tournamentId ? getStandings(tournamentId) : []), [tournamentId, tournament]);
 
-  // Get table standings for the active table (raw)
-  const tableStandings = useMemo(() => {
-    if (!tournament || !activeTableId) return [];
-    return getTournamentTable(tournamentId, activeTableId);
-  }, [getTournamentTable, tournamentId, activeTableId, refreshKey]);
+  const upcomingFixtures = useMemo(
+    () => tournament?.fixtures.filter((f) => f.status === 'ready') ?? [],
+    [tournament]
+  );
+  const completedFixtures = useMemo(
+    () => tournament?.fixtures.filter((f) => f.status === 'completed') ?? [],
+    [tournament]
+  );
 
-
-
-  // Sort standings by points desc, then NGR desc (tie-breaker)
-  const standingsSorted = useMemo(() => {
-    return [...tableStandings].sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.goalDifference !== a.goalDifference)
-        return b.goalDifference - a.goalDifference;
-      if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
-      return 0;
-    });
-  }, [tableStandings]);
-
-  // Filter fixtures: league format only shows group stage
-  const filteredUpcomingFixtures = useMemo(() => {
-    if (!tournament) return [];
-    return upcomingFixtures.filter(fixture => fixture.stage === 'group');
-  }, [tournament, upcomingFixtures]);
-
-  const filteredCompletedFixtures = useMemo(() => {
-    if (!tournament) return [];
-    return completedFixtures.filter(fixture => fixture.stage === 'group');
-  }, [tournament, completedFixtures]);
-
-  // Calculate progress percentage
   const progressPercentage = useMemo(() => {
-    if (allFixtures.length === 0) return 0;
-    return Math.round((completedFixtures.length / allFixtures.length) * 100);
-  }, [allFixtures.length, completedFixtures.length]);
+    if (!tournament || tournament.fixtures.length === 0) return 0;
+    return Math.round((completedFixtures.length / tournament.fixtures.length) * 100);
+  }, [tournament, completedFixtures.length]);
 
   const handleStartTournament = () => {
     Alert.alert(
@@ -84,10 +47,12 @@ export default function TournamentDashboardScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Start',
-          style: 'default',
-          onPress: () => {
-            startTournament(tournamentId);
-            setRefreshKey(prev => prev + 1);
+          onPress: async () => {
+            try {
+              await startTournament(tournamentId);
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Could not start tournament');
+            }
           },
         },
       ]
@@ -95,68 +60,18 @@ export default function TournamentDashboardScreen() {
   };
 
   const handlePlayMatch = (fixtureId: string) => {
-    // basic guards
-    if (!tournamentId) {
-      Alert.alert('Error', 'Invalid tournament');
-      return;
-    }
-
-    const fixture = allFixtures.find(f => f.id === fixtureId);
-    if (!fixture) {
-      Alert.alert('Error', 'Fixture not found');
-      return;
-    }
-    if (!fixture.homeTeamId || !fixture.awayTeamId) {
-      Alert.alert('Error', 'Fixture is not ready. Teams are not set.');
-      return;
-    }
-
-    const matchData = initializeTournamentMatch(tournamentId, fixtureId);
-    if (!matchData) {
-      Alert.alert('Error', 'Unable to initialize match');
-      return;
-    }
-
-    router.push(
-      `/(football)/startTournament/${encodeURIComponent(tournamentId)}/selectPlayers?fixtureId=${encodeURIComponent(fixtureId)}`
-    );
+    router.push({
+      pathname: '/(football)/startTournament/[tournamentId]/selectPlayers',
+      params: { tournamentId, fixtureId },
+    });
   };
 
-  const handleGoBack = () => {
-    router.push('/(football)/landingScreen/tournament');
-  };
+  const handleGoBack = () => router.push('/(football)/landingScreen/tournament');
 
-  // Get group name for a team
-  const getTeamGroupName = (teamId?: string | null) => {
-    if (!teamId || !tournament) return '';
-
-    const team = tournament.teams.find(t => t.id === teamId);
-    if (!team || !team.tableId) return '';
-
-    const table = tournament.tables.find(t => t.id === team.tableId);
-    if (!table) return '';
-
-    return table.name;
-  };
-
-  if (!tournamentId) {
+  if (isLoading && !tournament) {
     return (
       <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
-        <View className="items-center px-6">
-          <View className="w-20 h-20 bg-red-100 rounded-full items-center justify-center mb-4">
-            <Ionicons name="alert-circle" size={32} color="#ef4444" />
-          </View>
-          <Text className="text-lg font-bold text-slate-900 mb-2">Invalid Tournament ID</Text>
-          <Text className="text-slate-500 text-center mb-6">
-            No tournament ID was provided.
-          </Text>
-          <TouchableOpacity
-            onPress={() => router.push('/(football)/landingScreen/tournament')}
-            className="bg-blue-600 px-6 py-3 rounded-xl"
-          >
-            <Text className="text-white font-semibold">Go to Tournaments</Text>
-          </TouchableOpacity>
-        </View>
+        <ActivityIndicator size="large" color="#0f172a" />
       </SafeAreaView>
     );
   }
@@ -169,16 +84,10 @@ export default function TournamentDashboardScreen() {
             <Ionicons name="trophy-outline" size={32} color="#64748b" />
           </View>
           <Text className="text-lg font-bold text-slate-900 mb-2">Tournament Not Found</Text>
-          <Text className="text-slate-500 text-center mb-2">
-            ID: {tournamentId}
-          </Text>
           <Text className="text-slate-500 text-center mb-6">
             The tournament doesn't exist or may have been deleted.
           </Text>
-          <TouchableOpacity
-            onPress={() => router.push('/(football)/landingScreen/tournament')}
-            className="bg-blue-600 px-6 py-3 rounded-xl"
-          >
+          <TouchableOpacity onPress={handleGoBack} className="bg-blue-600 px-6 py-3 rounded-xl">
             <Text className="text-white font-semibold">Go to Tournaments</Text>
           </TouchableOpacity>
         </View>
@@ -194,9 +103,6 @@ export default function TournamentDashboardScreen() {
           <TouchableOpacity onPress={handleGoBack} className="p-2">
             <Ionicons name="arrow-back" size={24} color="#1e293b" />
           </TouchableOpacity>
-          <TouchableOpacity className="p-2">
-            <Ionicons name="ellipsis-horizontal" size={24} color="#1e293b" />
-          </TouchableOpacity>
         </View>
 
         {/* Tournament Header */}
@@ -210,14 +116,14 @@ export default function TournamentDashboardScreen() {
                 {tournament.name}
               </Text>
               <View className="flex-row items-center mt-1">
-                <View className={`px-2 py-1 rounded ${tournament.status === 'active' ? 'bg-green-100' :
-                  tournament.status === 'completed' ? 'bg-blue-100' :
-                    'bg-slate-100'
+                <View className={`px-2 py-1 rounded ${
+                  tournament.status === 'ongoing' ? 'bg-green-100' :
+                  tournament.status === 'completed' ? 'bg-blue-100' : 'bg-slate-100'
+                }`}>
+                  <Text className={`text-xs font-semibold ${
+                    tournament.status === 'ongoing' ? 'text-green-700' :
+                    tournament.status === 'completed' ? 'text-blue-700' : 'text-slate-600'
                   }`}>
-                  <Text className={`text-xs font-semibold ${tournament.status === 'active' ? 'text-green-700' :
-                    tournament.status === 'completed' ? 'text-blue-700' :
-                      'text-slate-600'
-                    }`}>
                     {tournament.status.toUpperCase()}
                   </Text>
                 </View>
@@ -233,13 +139,10 @@ export default function TournamentDashboardScreen() {
               <Text className="text-xs text-slate-600 font-bold">{progressPercentage}%</Text>
             </View>
             <View className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <View
-                className="h-full bg-green-500"
-                style={{ width: `${progressPercentage}%` }}
-              />
+              <View className="h-full bg-green-500" style={{ width: `${progressPercentage}%` }} />
             </View>
             <Text className="text-xs text-slate-500 mt-1">
-              {completedFixtures.length} of {allFixtures.length} matches completed
+              {completedFixtures.length} of {tournament.fixtures.length} matches completed
             </Text>
           </View>
         </View>
@@ -249,18 +152,13 @@ export default function TournamentDashboardScreen() {
       <View className="bg-white px-4 py-4 border-b border-slate-100">
         <View className="flex-row justify-around">
           <View className="items-center">
-            <Text className="text-2xl font-bold text-slate-900">{tournament.teams.length}</Text>
+            <Text className="text-2xl font-bold text-slate-900">{tournament.entries.length}</Text>
             <Text className="text-xs text-slate-500 mt-1">Teams</Text>
           </View>
           <View className="w-px bg-slate-200" />
           <View className="items-center">
-            <Text className="text-2xl font-bold text-slate-900">{allFixtures.length}</Text>
+            <Text className="text-2xl font-bold text-slate-900">{tournament.fixtures.length}</Text>
             <Text className="text-xs text-slate-500 mt-1">Matches</Text>
-          </View>
-          <View className="w-px bg-slate-200" />
-          <View className="items-center">
-            <Text className="text-2xl font-bold text-slate-900">{tournament.currentRound}</Text>
-            <Text className="text-xs text-slate-500 mt-1">Round</Text>
           </View>
         </View>
       </View>
@@ -296,7 +194,7 @@ export default function TournamentDashboardScreen() {
         {/* Fixtures Tab */}
         {activeTab === 'fixtures' && (
           <View>
-            {filteredUpcomingFixtures.length === 0 ? (
+            {upcomingFixtures.length === 0 ? (
               <View className="items-center justify-center py-16">
                 <View className="w-20 h-20 bg-slate-100 rounded-full items-center justify-center mb-4">
                   <Ionicons name="calendar-outline" size={32} color="#64748b" />
@@ -310,59 +208,39 @@ export default function TournamentDashboardScreen() {
               </View>
             ) : (
               <View>
-                <Text className="text-sm font-bold text-slate-700 mb-4">
-                  Upcoming Matches
-                </Text>
+                <Text className="text-sm font-bold text-slate-700 mb-4">Upcoming Matches</Text>
 
-                {filteredUpcomingFixtures.map((fixture) => (
-                  <View
-                    key={fixture.id}
-                    className="bg-white rounded-xl p-4 mb-3 border border-slate-100"
-                  >
+                {upcomingFixtures.map((fixture) => (
+                  <View key={fixture.id} className="bg-white rounded-xl p-4 mb-3 border border-slate-100">
                     <View className="flex-row items-center justify-between mb-3">
-                      <Text className="text-xs font-semibold text-slate-500">
-                        {fixture.roundName || `Round ${fixture.round}`} • Match {fixture.matchNumber}
-                      </Text>
+                      <Text className="text-xs font-semibold text-slate-500">Round {fixture.round}</Text>
                       <View className="bg-blue-50 px-2 py-1 rounded">
                         <Text className="text-xs font-semibold text-blue-700">UPCOMING</Text>
                       </View>
                     </View>
 
                     <View className="flex-row items-center justify-between mb-3">
-                      <View className="flex-1">
-                        <View className="flex-row items-center">
-                          <View className="w-8 h-8 bg-emerald-500 rounded-lg items-center justify-center mr-2">
-                            <Ionicons name="shield" size={14} color="white" />
-                          </View>
-                          <View className="flex-1">
-                            <Text className="text-sm font-bold text-slate-900" numberOfLines={1}>
-                              {fixture.homeTeamName}
-                            </Text>
-                            <Text className="text-xs text-slate-500">{getTeamGroupName(fixture.homeTeamId)}</Text>
-                          </View>
+                      <View className="flex-1 flex-row items-center">
+                        <View className="w-8 h-8 bg-emerald-500 rounded-lg items-center justify-center mr-2">
+                          <Ionicons name="shield" size={14} color="white" />
                         </View>
+                        <Text className="text-sm font-bold text-slate-900 flex-1" numberOfLines={1}>
+                          {fixture.homeTeam?.name}
+                        </Text>
                       </View>
                       <Text className="text-lg font-bold text-slate-400 mx-4">vs</Text>
-                      <View className="flex-1 items-end">
-                        <View className="flex-row items-center">
-                          <View className="flex-1 items-end">
-                            <Text className="text-sm font-bold text-slate-900 mr-2" numberOfLines={1}>
-                              {fixture.awayTeamName}
-                            </Text>
-                            <Text className="text-xs text-slate-500 text-right">{getTeamGroupName(fixture.awayTeamId)}</Text>
-                          </View>
-                          <View className="w-8 h-8 bg-red-500 rounded-lg items-center justify-center">
-                            <Ionicons name="flag" size={14} color="white" />
-                          </View>
+                      <View className="flex-1 flex-row items-center justify-end">
+                        <Text className="text-sm font-bold text-slate-900 flex-1 text-right" numberOfLines={1}>
+                          {fixture.awayTeam?.name}
+                        </Text>
+                        <View className="w-8 h-8 bg-red-500 rounded-lg items-center justify-center ml-2">
+                          <Ionicons name="flag" size={14} color="white" />
                         </View>
                       </View>
                     </View>
 
-                    {tournament.status === 'active' && fixture.homeTeamId && fixture.awayTeamId && (
-                      <TouchableOpacity
-                        onPress={() => handlePlayMatch(fixture.id)}
-                        className="bg-blue-600 rounded-lg py-3 items-center"
-                      >
+                    {tournament.status === 'ongoing' && fixture.homeTeamId && fixture.awayTeamId && (
+                      <TouchableOpacity onPress={() => handlePlayMatch(fixture.id)} className="bg-blue-600 rounded-lg py-3 items-center">
                         <Text className="text-white font-semibold text-sm">Play Match</Text>
                       </TouchableOpacity>
                     )}
@@ -376,15 +254,13 @@ export default function TournamentDashboardScreen() {
         {/* Standings Tab */}
         {activeTab === 'standings' && (
           <View>
-            {standingsSorted.length === 0 ? (
+            {standings.length === 0 ? (
               <View className="items-center justify-center py-16">
                 <Text className="text-slate-500">No standings available yet</Text>
               </View>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View className="bg-white rounded-xl border border-slate-100 overflow-hidden mb-6 min-w-[720px]">
-
-                  {/* Header */}
                   <View className="flex-row items-center bg-slate-50 px-4 py-3 border-b border-slate-100">
                     <Text className="w-10 text-xs font-bold text-slate-600">#</Text>
                     <Text className="w-40 text-xs font-bold text-slate-600">Team</Text>
@@ -397,68 +273,28 @@ export default function TournamentDashboardScreen() {
                     <Text className="w-12 text-xs font-bold text-slate-600 text-center">Pts</Text>
                   </View>
 
-                  {/* Rows */}
-                  {standingsSorted.map((team, index) => {
-                    const gf = team.goalsFor ?? 0;
-                    const ga = team.goalsAgainst ?? 0;
-                    const gd = team.goalDifference ?? 0;
-
+                  {standings.map((entry, index) => {
+                    const gd = entry.goalsFor - entry.goalsAgainst;
                     return (
                       <View
-                        key={team.id}
-                        className={`flex-row items-center px-4 py-3 ${index < standingsSorted.length - 1
-                          ? 'border-b border-slate-50'
-                          : ''
-                          }`}
+                        key={entry.id}
+                        className={`flex-row items-center px-4 py-3 ${index < standings.length - 1 ? 'border-b border-slate-50' : ''}`}
                       >
-                        <Text className="w-10 text-sm font-bold text-slate-900">
-                          {index + 1}
-                        </Text>
-
-                        {/* Team name – 2 lines */}
+                        <Text className="w-10 text-sm font-bold text-slate-900">{index + 1}</Text>
                         <View className="w-40 pr-2">
-                          <Text
-                            className="text-sm font-semibold text-slate-900"
-                            numberOfLines={2}
-                          >
-                            {team.teamName}
+                          <Text className="text-sm font-semibold text-slate-900" numberOfLines={2}>
+                            {entry.team?.name}
                           </Text>
                         </View>
-
-                        <Text className="w-10 text-sm text-slate-600 text-center">
-                          {team.played}
-                        </Text>
-                        <Text className="w-10 text-sm text-slate-600 text-center">
-                          {team.won}
-                        </Text>
-                        <Text className="w-10 text-sm text-slate-600 text-center">
-                          {team.drawn}
-                        </Text>
-                        <Text className="w-10 text-sm text-slate-600 text-center">
-                          {team.lost}
-                        </Text>
-
-                        {/* +/- */}
-                        <Text className="w-14 text-sm text-slate-700 text-center">
-                          {gf}/{ga}
-                        </Text>
-
-                        {/* GD */}
-                        <Text
-                          className={`w-12 text-sm font-semibold text-center ${gd > 0
-                            ? 'text-green-600'
-                            : gd < 0
-                              ? 'text-red-600'
-                              : 'text-slate-600'
-                            }`}
-                        >
+                        <Text className="w-10 text-sm text-slate-600 text-center">{entry.played}</Text>
+                        <Text className="w-10 text-sm text-slate-600 text-center">{entry.won}</Text>
+                        <Text className="w-10 text-sm text-slate-600 text-center">{entry.drawn}</Text>
+                        <Text className="w-10 text-sm text-slate-600 text-center">{entry.lost}</Text>
+                        <Text className="w-14 text-sm text-slate-700 text-center">{entry.goalsFor}/{entry.goalsAgainst}</Text>
+                        <Text className={`w-12 text-sm font-semibold text-center ${gd > 0 ? 'text-green-600' : gd < 0 ? 'text-red-600' : 'text-slate-600'}`}>
                           {gd > 0 ? `+${gd}` : gd}
                         </Text>
-
-                        {/* Points */}
-                        <Text className="w-12 text-sm font-bold text-slate-900 text-center">
-                          {team.points}
-                        </Text>
+                        <Text className="w-12 text-sm font-bold text-slate-900 text-center">{entry.points}</Text>
                       </View>
                     );
                   })}
@@ -471,40 +307,30 @@ export default function TournamentDashboardScreen() {
         {/* Completed Matches Tab */}
         {activeTab === 'matches' && (
           <View>
-            {filteredCompletedFixtures.length === 0 ? (
+            {completedFixtures.length === 0 ? (
               <View className="items-center justify-center py-16">
                 <View className="w-20 h-20 bg-slate-100 rounded-full items-center justify-center mb-4">
                   <Ionicons name="checkmark-circle-outline" size={32} color="#64748b" />
                 </View>
                 <Text className="text-lg font-bold text-slate-900 mb-2">No Completed Matches</Text>
-                <Text className="text-slate-500 text-center">
-                  Completed matches will appear here
-                </Text>
+                <Text className="text-slate-500 text-center">Completed matches will appear here</Text>
               </View>
             ) : (
               <View>
-                <Text className="text-sm font-bold text-slate-700 mb-4">
-                  Completed Matches
-                </Text>
+                <Text className="text-sm font-bold text-slate-700 mb-4">Completed Matches</Text>
 
-                {filteredCompletedFixtures.map((fixture) => (
+                {completedFixtures.map((fixture) => (
                   <TouchableOpacity
                     key={fixture.id}
                     className="bg-white rounded-xl p-4 mb-3 border border-slate-100"
                     onPress={() => {
-                      if (fixture.id) {
-                        router.push({
-                          pathname: '/(football)/matchDetails/[matchId]',
-                          params: { matchId: fixture.id },
-                        });
-
+                      if (fixture.matchId) {
+                        router.push({ pathname: '/(football)/matchDetails/[matchId]', params: { matchId: fixture.matchId } });
                       }
                     }}
                   >
                     <View className="flex-row items-center justify-between mb-3">
-                      <Text className="text-xs font-semibold text-slate-500">
-                        {fixture.roundName || `Round ${fixture.round}`} • Match {fixture.matchNumber}
-                      </Text>
+                      <Text className="text-xs font-semibold text-slate-500">Round {fixture.round}</Text>
                       <View className="bg-green-50 px-2 py-1 rounded">
                         <Text className="text-xs font-semibold text-green-700">COMPLETED</Text>
                       </View>
@@ -516,21 +342,13 @@ export default function TournamentDashboardScreen() {
                           <Ionicons name="shield" size={14} color="white" />
                         </View>
                         <Text className="text-sm font-bold flex-1 text-slate-900" numberOfLines={1}>
-                          {fixture.homeTeamName}
+                          {fixture.homeTeam?.name}
                         </Text>
-                      </View>
-
-                      <View className="mx-4 bg-slate-50 rounded-lg px-3 py-2">
-                        <View className="flex-row items-center">
-                          <Text className="text-lg font-bold text-slate-900">{fixture.homeScore}</Text>
-                          <Text className="text-sm font-medium text-slate-400 mx-2">-</Text>
-                          <Text className="text-lg font-bold text-slate-900">{fixture.awayScore}</Text>
-                        </View>
                       </View>
 
                       <View className="flex-1 flex-row items-center justify-end">
                         <Text className="text-sm font-bold flex-1 text-right text-slate-900" numberOfLines={1}>
-                          {fixture.awayTeamName}
+                          {fixture.awayTeam?.name}
                         </Text>
                         <View className="w-8 h-8 bg-red-500 rounded-lg items-center justify-center ml-2">
                           <Ionicons name="flag" size={14} color="white" />
@@ -548,20 +366,16 @@ export default function TournamentDashboardScreen() {
       </ScrollView>
 
       {/* Tournament Control Buttons */}
-      <View className="bg-white px-4 py-4 border-t border-slate-200">
-        {tournament.status === 'draft' ? (
-          // Start Tournament Button
-          <TouchableOpacity
-            onPress={handleStartTournament}
-            className="bg-green-600 rounded-xl py-4 items-center"
-          >
+      {tournament.status === 'draft' && (
+        <View className="bg-white px-4 py-4 border-t border-slate-200">
+          <TouchableOpacity onPress={handleStartTournament} className="bg-green-600 rounded-xl py-4 items-center">
             <View className="flex-row items-center">
               <Ionicons name="play" size={20} color="white" />
               <Text className="text-white font-bold text-base ml-2">Start Tournament</Text>
             </View>
           </TouchableOpacity>
-        ) : null}
-      </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

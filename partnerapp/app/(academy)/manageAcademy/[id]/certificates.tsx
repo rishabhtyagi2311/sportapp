@@ -40,7 +40,7 @@ export default function CertificatesScreen() {
   const createCertificate = useAcademyStore((state) => state.createCertificate);
 
   const students = useMemo(
-    () => allStudents.filter((s) => s.academyId === id),
+    () => allStudents.filter((s) => s.academyId === id && s.status !== 'pending'),
     [allStudents, id]
   );
   const studentIds = useMemo(() => new Set(students.map((s) => s.id)), [students]);

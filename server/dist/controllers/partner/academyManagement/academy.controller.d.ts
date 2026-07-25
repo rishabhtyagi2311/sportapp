@@ -11,6 +11,8 @@ export declare class AcademyController {
     static removeCoach(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
     static addStudent(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
     static getStudents(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
+    static approveEnrollment(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
+    static rejectEnrollment(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
     static updateStudent(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
     static removeStudent(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
     static markAttendance(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
@@ -21,5 +23,12 @@ export declare class AcademyController {
     static removePhoto(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
     static createCertificate(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
     static getAcademyCertificates(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
+    static createAnnouncement(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
+    static getAnnouncements(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
+    static removeAnnouncement(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
+    static getDemoBookings(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
+    static confirmDemoBooking(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
+    static completeDemoBooking(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
+    static cancelDemoBooking(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
 }
 //# sourceMappingURL=academy.controller.d.ts.map

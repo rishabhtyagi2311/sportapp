@@ -1,6 +1,7 @@
 // app/(homeScreenTabs)/sports.tsx
 
-import { View, Text, TouchableOpacity, Image, ImageBackground } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, TouchableOpacity, Image, ImageBackground, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
@@ -8,14 +9,15 @@ import { router } from 'expo-router';
 import { useFootballStore } from '@/store/footballTeamStore';
 
 export default function SportsScreen() {
-  // 🔑 single source of truth
-  const currentPlayer = useFootballStore((state) => state.currentPlayer);
+  const { profile, fetchProfile } = useFootballStore();
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
 
   const navigateToSport = (sport: string) => {
-    console.log(`🎯 Navigating to ${sport}...`);
-
     if (sport === 'football') {
-      if (currentPlayer) {
+      if (profile) {
         // ✅ Player already has football profile
         router.push('/(football)/landingScreen/matches');
       } else {
@@ -25,13 +27,8 @@ export default function SportsScreen() {
       return;
     }
 
-    if (sport === 'cricket') {
-      router.push('/(cricket)/createCricketProfile');
-      return;
-    }
-
-    if (sport === 'tennis') {
-      router.push('/(tennis)/createTennisProfile');
+    if (sport === 'cricket' || sport === 'tennis') {
+      Alert.alert('Coming Soon', `${sport.charAt(0).toUpperCase() + sport.slice(1)} support is on the way.`);
       return;
     }
   };

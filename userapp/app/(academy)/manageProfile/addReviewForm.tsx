@@ -27,11 +27,10 @@ export default function AddAcademyReviewScreen() {
       childName: string;
     }>();
 
-  const addReview = useReviewsStore((state) => state.addReview);
+  const submitReview = useReviewsStore((state) => state.submitReview);
   const childProfiles = usechildStore((state) => state.childProfiles);
 
   const childProfile = childProfiles.find((c) => c.id === childId);
-  const reviewerName = childProfile?.fatherName || "Parent";
   const resolvedChildName = childProfile?.childName || childName || "Child";
 
   const [rating, setRating] = useState<number>(0);
@@ -43,7 +42,7 @@ export default function AddAcademyReviewScreen() {
     router.back();
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!academyId || !childId) {
       Alert.alert("Error", "Something went wrong. Please try again.");
       return;
@@ -57,14 +56,11 @@ export default function AddAcademyReviewScreen() {
       return;
     }
 
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
-      addReview({
+      await submitReview({
         academyId,
-        academyName: academyName || "",
-        childId,
-        childName: resolvedChildName,
-        reviewerName,
+        childProfileId: childId,
         rating,
         title: title.trim() || undefined,
         comment: comment.trim(),
@@ -80,9 +76,8 @@ export default function AddAcademyReviewScreen() {
           },
         ]
       );
-    } catch (err) {
-      console.error(err);
-      Alert.alert("Error", "Could not submit review. Please try again.");
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Could not submit review. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

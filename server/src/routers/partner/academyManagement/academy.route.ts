@@ -17,6 +17,8 @@ router.post('/academies/:academyId/students', authenticatePartner, AcademyContro
 router.get('/academies/:academyId/students', authenticatePartner, AcademyController.getStudents);
 router.put('/academies/:academyId/students/:studentId', authenticatePartner, AcademyController.updateStudent);
 router.delete('/academies/:academyId/students/:studentId', authenticatePartner, AcademyController.removeStudent);
+router.patch('/academies/:academyId/students/:studentId/approve', authenticatePartner, AcademyController.approveEnrollment);
+router.patch('/academies/:academyId/students/:studentId/reject', authenticatePartner, AcademyController.rejectEnrollment);
 
 router.get('/academies/:academyId/attendance', authenticatePartner, AcademyController.getAcademyAttendance);
 router.post('/students/:studentId/attendance', authenticatePartner, AcademyController.markAttendance);
@@ -32,5 +34,10 @@ router.get('/academies/:academyId/certificates', authenticatePartner, AcademyCon
 router.post('/academies/:academyId/announcements', authenticatePartner, AcademyController.createAnnouncement);
 router.get('/academies/:academyId/announcements', authenticatePartner, AcademyController.getAnnouncements);
 router.delete('/academies/:academyId/announcements/:announcementId', authenticatePartner, AcademyController.removeAnnouncement);
+
+router.get('/academies/:academyId/demo-bookings', authenticatePartner, AcademyController.getDemoBookings);
+router.patch('/demo-bookings/:bookingId/confirm', authenticatePartner, AcademyController.confirmDemoBooking);
+router.patch('/demo-bookings/:bookingId/complete', authenticatePartner, AcademyController.completeDemoBooking);
+router.patch('/demo-bookings/:bookingId/cancel', authenticatePartner, AcademyController.cancelDemoBooking);
 
 export default router;

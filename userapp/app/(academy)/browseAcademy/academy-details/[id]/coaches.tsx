@@ -1,46 +1,39 @@
-import React from "react";
-import { View, Text, ScrollView } from "react-native";
+import React, { useEffect } from "react";
+import { View, Text, ScrollView, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { useAcademyStore } from "@/store/academyStore";
 
 export default function CoachesScreen() {
   const { id } = useLocalSearchParams();
-  
-  
-  const { getAcademyById } = useAcademyStore();
-  const academy = getAcademyById(id as string);
+  const academyId = id as string;
 
-  if (!academy) return null;
+  const { getAcademyById, fetchAcademyById, isLoading } = useAcademyStore();
+  const academy = getAcademyById(academyId);
 
-  const mockCoaches = [
-    {
-      name: academy.coachName,
-      specialization: `${academy.sportType} Head Coach`,
-      experience: "5+ years",
-      description: "Certified professional coach with extensive experience in competitive training.",
-    },
-    {
-      name: "Assistant Coach",
-      specialization: `${academy.sportType} Training Specialist`,
-      experience: "3+ years",
-      description: "Focuses on youth development and fundamental skill building.",
-    },
-    {
-      name: "Fitness Trainer",
-      specialization: "Physical Conditioning",
-      experience: "4+ years",
-      description: "Specialized in sports-specific fitness and injury prevention.",
-    },
-  ];
+  useEffect(() => {
+    fetchAcademyById(academyId);
+  }, [academyId]);
+
+  if (!academy) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50">
+        {isLoading && <ActivityIndicator size="large" color="#0f172a" />}
+      </View>
+    );
+  }
+
+  const coaches = academy.coaches?.length
+    ? academy.coaches
+    : [{ id: "head", name: academy.coachName, specialization: `${academy.sportType} Head Coach`, experience: "", contact: academy.contactNumber }];
 
   return (
     <ScrollView className="flex-1 bg-gray-50 p-6">
       <Text className="text-slate-900 text-2xl font-bold mb-6">Our Coaching Team</Text>
-      
-      {mockCoaches.map((coach, index) => (
+
+      {coaches.map((coach) => (
         <View
-          key={index}
+          key={coach.id}
           className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-6"
         >
           <View className="flex-row items-start">
@@ -57,15 +50,20 @@ export default function CoachesScreen() {
                   {coach.specialization}
                 </Text>
               </View>
-              <View className="flex-row items-center mb-3">
-                <Ionicons name="time-outline" size={16} color="#10b981" />
-                <Text className="text-green-600 text-sm ml-2 font-semibold">
-                  {coach.experience} experience
-                </Text>
-              </View>
-              <Text className="text-gray-700 leading-6 text-sm">
-                {coach.description}
-              </Text>
+              {!!coach.experience && (
+                <View className="flex-row items-center mb-3">
+                  <Ionicons name="time-outline" size={16} color="#10b981" />
+                  <Text className="text-green-600 text-sm ml-2 font-semibold">
+                    {coach.experience} experience
+                  </Text>
+                </View>
+              )}
+              {!!coach.contact && (
+                <View className="flex-row items-center">
+                  <Ionicons name="call-outline" size={16} color="#6b7280" />
+                  <Text className="text-gray-700 text-sm ml-2">{coach.contact}</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>

@@ -1,9 +1,10 @@
 import { create } from 'zustand';
+import { matchSessionApiService } from '@/services/matchSession/matchSession';
 
 export interface MatchSession {
   id: string;
   venueId: string;
-  venueName: string;
+  venueName?: string;
   slotId: string;
   date: string;
   startTime: string;
@@ -16,56 +17,107 @@ export interface MatchSession {
   description: string;
   status: 'pending' | 'live' | 'completed' | 'cancelled';
   playersJoined: number;
-  hostName: string; // Added to show who is hosting
 }
 
 interface MatchSessionStore {
   sessions: MatchSession[];
-  setSessions: (sessions: MatchSession[]) => void;
-  createSession: (session: MatchSession) => void;
+  myJoinedSessions: MatchSession[];
+  isLoading: boolean;
+  error: string | null;
+
+  fetchAvailableSessions: (filters?: { venueId?: string; date?: string }) => Promise<void>;
+  fetchMySessions: () => Promise<void>;
+  fetchSessionById: (sessionId: string) => Promise<void>;
+  joinSession: (sessionId: string) => Promise<void>;
+  leaveSession: (sessionId: string) => Promise<void>;
+  isSessionJoined: (sessionId: string) => boolean;
 }
 
-export const useMatchSessionStore = create<MatchSessionStore>((set) => ({
-  sessions: [
-    {
-      id: 'm1',
-      venueId: 'v1',
-      venueName: 'The Arena Turf',
-      slotId: 's1',
-      date: '2026-03-28',
-      startTime: '19:00',
-      endTime: '20:00',
-      sport: 'Football (5v5)',
-      totalPlayers: 10,
-      minPlayersForLive: 8,
-      pricePerPerson: 250,
-      skillLevel: 'Intermediate',
-      description: 'Competitive 5v5 game. Bibs provided. Please bring turf shoes.',
-      status: 'pending',
-      playersJoined: 6,
-      hostName: 'Suryawanshi Promoters'
-    },
-    {
-      id: 'm2',
-      venueId: 'v2',
-      venueName: 'Skyline Box Cricket',
-      slotId: 's2',
-      date: '2026-03-29',
-      startTime: '21:00',
-      endTime: '22:30',
-      sport: 'Box Cricket',
-      totalPlayers: 16,
-      minPlayersForLive: 12,
-      pricePerPerson: 150,
-      skillLevel: 'Open',
-      description: 'Friendly weekend match. All equipment provided.',
-      status: 'live',
-      playersJoined: 14,
-      hostName: 'Webaura Sports'
+export const useMatchSessionStore = create<MatchSessionStore>((set, get) => ({
+  sessions: [],
+  myJoinedSessions: [],
+  isLoading: false,
+  error: null,
+
+  fetchAvailableSessions: async (filters) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await matchSessionApiService.listAvailable(filters);
+      set({ sessions: response.data, isLoading: false });
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not load match sessions';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
     }
-  ],
-  setSessions: (sessions) => set({ sessions }),
-  createSession: (session) => set((state) => ({ 
-    sessions: [...state.sessions, session] 
-  })),
+  },
+
+  fetchMySessions: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await matchSessionApiService.getMine();
+      set({ myJoinedSessions: response.data, isLoading: false });
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not load your match sessions';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
+
+  fetchSessionById: async (sessionId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await matchSessionApiService.getById(sessionId);
+      set((state) => {
+        const exists = state.sessions.some((s) => s.id === sessionId);
+        return {
+          sessions: exists
+            ? state.sessions.map((s) => (s.id === sessionId ? response.data : s))
+            : [...state.sessions, response.data],
+          isLoading: false,
+        };
+      });
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not load this match session';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
+
+  isSessionJoined: (sessionId) => {
+    return get().myJoinedSessions.some((s) => s.id === sessionId);
+  },
+
+  joinSession: async (sessionId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await matchSessionApiService.join(sessionId);
+      set((state) => ({
+        sessions: state.sessions.map((s) => (s.id === sessionId ? response.data : s)),
+        myJoinedSessions: state.myJoinedSessions.some((s) => s.id === sessionId)
+          ? state.myJoinedSessions.map((s) => (s.id === sessionId ? response.data : s))
+          : [...state.myJoinedSessions, response.data],
+        isLoading: false,
+      }));
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not join this match session';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
+
+  leaveSession: async (sessionId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await matchSessionApiService.leave(sessionId);
+      set((state) => ({
+        sessions: state.sessions.map((s) => (s.id === sessionId ? response.data : s)),
+        myJoinedSessions: state.myJoinedSessions.filter((s) => s.id !== sessionId),
+        isLoading: false,
+      }));
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not leave this match session';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
 }));

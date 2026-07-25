@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -42,7 +43,7 @@ export default function TournamentFormatSelectionScreen() {
         {/* KNOCKOUT OPTION */}
         <TouchableOpacity 
           activeOpacity={0.9}
-          onPress={() => router.push('(football)/startKnockOutTournament/step1')}
+          onPress={() => router.push('/(football)/startKnockOutTournament/step1')}
           className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"
         >
           <View className="w-12 h-12 bg-orange-100 rounded-full items-center justify-center mb-4">

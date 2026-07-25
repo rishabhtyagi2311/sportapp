@@ -1,21 +1,16 @@
 // app/slotSelection/[venueId].tsx
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  Modal,
-  Alert,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, Modal, Alert } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Venue, Sport, SportVariety } from '@/types/booking';
-import { dummyVenues } from '@/constants/venueData';
+import { useBookingStore } from '@/store/venueStore';
+import { useVenueSlotsStore } from '@/store/venueSlotsStore';
+import { useUserBookingStore } from '@/store/bookingStore';
 
-// Clean TimeSlot interface
+// Local view-model over the server's VenueSlot, keeping the existing
+// isAvailable-driven rendering logic below unchanged.
 interface TimeSlot {
   id: string;
   sportId?: string;
@@ -174,74 +169,68 @@ const CalendarModal = ({
   );
 };
 
+function formatTimeWithAmPm(time: string) {
+  const [hourStr] = time.split(':');
+  const hour24 = parseInt(hourStr, 10);
+  const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+  const ampm = hour24 >= 12 ? 'PM' : 'AM';
+  return `${hour12}:00 ${ampm}`;
+}
+
 export default function SlotBookingScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const venueId = params.venueId as string;
   const sportId = params.sportId as string;
   const sportVarietyId = params.sportVarietyId as string;
 
-  const [venue, setVenue] = useState<Venue | null>(null);
+  const { getVenueById, fetchVenueById } = useBookingStore();
+  const { fetchSlotsForVenue, getSlots } = useVenueSlotsStore();
+  const createBooking = useUserBookingStore((state) => state.createBooking);
+
+  const venue = getVenueById(venueId);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const [showCalendar, setShowCalendar] = useState(false);
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(true);
+  const [booking, setBooking] = useState(false);
 
   useEffect(() => {
-    const foundVenue = dummyVenues.find(v => v.id === venueId);
-    if (foundVenue) {
-      setVenue(foundVenue);
+    if (!venue) {
+      fetchVenueById(venueId);
     }
   }, [venueId]);
 
-  useEffect(() => {
-    // Generate fresh slots when date changes
-    if (venue) {
-      const selectedSport = venue.sports.find(s => s.id === sportId);
-      const selectedVariety = selectedSport?.varieties?.find(v => v.id === sportVarietyId);
-      setTimeSlots(generateTimeSlots(selectedVariety));
-      setSelectedSlots(new Set()); // Clear selections when date changes
-    }
-  }, [venue, selectedDate, sportId, sportVarietyId]);
+  const dateKey = selectedDate.toISOString().split('T')[0];
 
-  const generateTimeSlots = (variety: SportVariety | undefined): TimeSlot[] => {
-    const slots: TimeSlot[] = [];
-    for (let hour = 6; hour < 23; hour++) {
-      const startTime = `${hour.toString().padStart(2, '0')}:00`;
-      const endTime = `${(hour + 1).toString().padStart(2, '0')}:00`;
-      
-      // Format time with AM/PM
-      const formatTimeWithAmPm = (time: string) => {
-        const [hourStr] = time.split(':');
-        const hour24 = parseInt(hourStr);
-        const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
-        const ampm = hour24 >= 12 ? 'PM' : 'AM';
-        return `${hour12}:00 ${ampm}`;
-      };
-      
-      // Fixed availability - some slots are permanently booked
-      const isAvailable = ![10, 14, 18].includes(hour); // 10 AM, 2 PM, 6 PM are booked
-      const basePrice = variety?.basePrice || 500;
-      const priceMultiplier = hour >= 17 ? 1.5 : hour <= 8 ? 0.8 : 1.0; // Peak/off-peak pricing
-      
-      slots.push({
-        id: `slot_${hour}`,
-        sportId,
-        sportVarietyId,
-        startTime: formatTimeWithAmPm(startTime),
-        endTime: formatTimeWithAmPm(endTime),
-        isAvailable,
-        price: Math.round(basePrice * priceMultiplier),
-      });
-    }
-    return slots;
-  };
+  useEffect(() => {
+    setLoadingSlots(true);
+    fetchSlotsForVenue(venueId, dateKey)
+      .catch((err) => Alert.alert('Could not load slots', err.message))
+      .finally(() => setLoadingSlots(false));
+    setSelectedSlots(new Set()); // Clear selections when date changes
+  }, [venueId, dateKey]);
+
+  const rawSlots = getSlots(venueId, dateKey).filter(
+    (s) => s.varietyId === sportVarietyId || !sportVarietyId
+  );
+
+  const timeSlots: TimeSlot[] = rawSlots.map((slot) => ({
+    id: slot.id,
+    sportId,
+    sportVarietyId: slot.varietyId,
+    startTime: formatTimeWithAmPm(slot.startTime),
+    endTime: formatTimeWithAmPm(slot.endTime),
+    isAvailable: slot.status === 'available',
+    price: slot.price,
+  }));
 
   if (!venue) {
     return (
       <SafeAreaView className="flex-1 bg-gray-100">
         <View className="flex-1 items-center justify-center">
-          <Text className="text-gray-500 text-lg">Venue not found</Text>
+          <Text className="text-gray-500 text-lg">Loading venue…</Text>
         </View>
       </SafeAreaView>
     );
@@ -317,13 +306,28 @@ export default function SlotBookingScreen() {
       `Book ${selectedSlots.size} slot(s) for ${formatDateFull(selectedDate)}?\n\nTotal: ₹${calculateTotal()}`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Confirm', 
-          onPress: () => {
-            Alert.alert('Success!', 'Your slots have been booked.');
-            router.back();
-          }
-        }
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            setBooking(true);
+            try {
+              // The backend books one slot per call — loop through the
+              // selected slots sequentially so a mid-way failure (e.g.
+              // someone else claimed a slot first) is reported precisely.
+              for (const slotId of selectedSlots) {
+                await createBooking({ venueId, slotId });
+              }
+              Alert.alert('Success!', 'Your slots have been booked.');
+              fetchSlotsForVenue(venueId, dateKey);
+              router.back();
+            } catch (err: any) {
+              Alert.alert('Booking Failed', err.message || 'Please try again.');
+              fetchSlotsForVenue(venueId, dateKey);
+            } finally {
+              setBooking(false);
+            }
+          },
+        },
       ]
     );
   };
@@ -455,7 +459,10 @@ export default function SlotBookingScreen() {
 
       {/* Bottom Panel */}
       {selectedSlots.size > 0 && (
-        <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-5 shadow-xl">
+        <View
+          className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 pt-5 shadow-xl"
+          style={{ paddingBottom: insets.bottom + 20 }}
+        >
           <View className="mb-4">
             <Text className="text-gray-900 text-lg font-bold mb-1">
               {getSelectedSlotTimes()}
@@ -468,9 +475,12 @@ export default function SlotBookingScreen() {
           <TouchableOpacity
             className="bg-green-600 rounded-2xl py-4 px-6 shadow-lg"
             onPress={handleConfirmBooking}
+            disabled={booking}
           >
             <Text className="text-white text-lg font-bold text-center">
-              Confirm Booking ({selectedSlots.size} slot{selectedSlots.size > 1 ? 's' : ''})
+              {booking
+                ? 'Booking…'
+                : `Confirm Booking (${selectedSlots.size} slot${selectedSlots.size > 1 ? 's' : ''})`}
             </Text>
           </TouchableOpacity>
         </View>

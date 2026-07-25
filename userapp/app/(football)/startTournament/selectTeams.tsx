@@ -1,119 +1,82 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useTournamentStore } from '@/store/footballTournamentStore';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useTournamentStore } from '@/store/tournamentStore';
 import { useFootballStore } from '@/store/footballTeamStore';
+import { useRegistrationRequestStore } from '@/store/eventRegistrationRequestStore';
+import { useEventManagerStore } from '@/store/eventManagerStore';
 
 export default function SelectTeamsScreen() {
   const router = useRouter();
-  const { teams } = useFootballStore();
-  const {
-    creationDraft,
-    addTeamToDraft,
-    removeTeamFromDraft,
-    assignTeamToTable,
-    updateCreationDraft,
-  } = useTournamentStore();
+  const { eventId } = useLocalSearchParams<{ eventId?: string }>();
+  const { teams, fetchAllTeams, fetchTeamById } = useFootballStore();
+  const { draft, addTeamToDraft, removeTeamFromDraft } = useTournamentStore();
+  const { getRegistrationsByEvent, fetchRegistrationsForEvent } = useRegistrationRequestStore();
+  const { getEventById } = useEventManagerStore();
 
-  const selectedTeamIds = creationDraft?.selectedTeamIds || [];
-  const [activeTableId, setActiveTableId] = useState<string | null>(null);
+  const sourceEvent = eventId ? getEventById(eventId) : undefined;
+  const registrations = eventId ? getRegistrationsByEvent(eventId) : [];
+  const registeredTeamIds = useMemo(
+    () =>
+      eventId
+        ? registrations.filter((r) => r.status === 'accepted' && !!r.footballTeamId).map((r) => r.footballTeamId!)
+        : [],
+    [eventId, registrations]
+  );
 
-  // League-only: single table for league format
-  const tables = useMemo(() => {
-    if (!creationDraft) return [];
-    return [{
-      id: `table_main_${Date.now()}`,
-      name: 'League Table',
-    }];
-  }, [creationDraft]);
-
-  // All teams go to the single league table
-  const teamsPerTable = useMemo(() => {
-    if (!creationDraft) return 0;
-    return creationDraft.teamCount ?? 0;
-  }, [creationDraft]);
-
-  // Set initial active table
   useEffect(() => {
-    if (tables.length > 0 && !activeTableId) {
-      setActiveTableId(tables[0].id);
+    if (eventId) {
+      fetchRegistrationsForEvent(eventId);
+    } else {
+      fetchAllTeams();
     }
-  }, [tables, activeTableId]);
+  }, [eventId]);
 
-  // Ensure teamTableAssignments exists
   useEffect(() => {
-    if (creationDraft && !creationDraft.teamTableAssignments) {
-      updateCreationDraft({
-        teamTableAssignments: {},
-      });
-    }
-  }, [creationDraft, updateCreationDraft]);
+    if (!eventId) return;
+    registeredTeamIds.forEach((id) => {
+      if (!teams.some((t) => t.id === id)) {
+        fetchTeamById(id);
+      }
+    });
+  }, [eventId, registeredTeamIds]);
 
-  // Teams assigned to the league table
-  const teamsInCurrentTable = useMemo(() => {
-    if (!activeTableId || !creationDraft?.teamTableAssignments) return [];
-    return selectedTeamIds.filter(teamId => creationDraft.teamTableAssignments?.[teamId] === activeTableId);
-  }, [selectedTeamIds, activeTableId, creationDraft?.teamTableAssignments]);
+  const availableTeams = eventId ? teams.filter((t) => registeredTeamIds.includes(t.id)) : teams;
 
-  const handleToggleTeam = (teamId: string) => {
-    if (!creationDraft) return;
+  const selectedTeamIds = draft?.teamIds || [];
 
+  const handleToggleTeam = (teamId: number) => {
+    if (!draft) return;
     if (selectedTeamIds.includes(teamId)) {
       removeTeamFromDraft(teamId);
-      return;
-    }
-
-    const maxTeams = creationDraft.teamCount ?? 0;
-    if (selectedTeamIds.length >= maxTeams) {
-      Alert.alert('Team Limit Reached', `You can only select ${maxTeams} teams for this tournament.`);
-      return;
-    }
-
-    addTeamToDraft(teamId);
-
-    // Auto-assign to league table
-    if (activeTableId) {
-      assignTeamToTable(teamId, activeTableId);
+    } else {
+      addTeamToDraft(teamId);
     }
   };
 
   const handleContinue = () => {
-    if (!creationDraft) return;
-
-    if (selectedTeamIds.length < (creationDraft?.teamCount || 0)) {
-      Alert.alert('Error', `Please select all ${creationDraft?.teamCount} teams needed for this tournament.`);
+    if (!draft) return;
+    if (selectedTeamIds.length < 2) {
+      Alert.alert('Error', 'Please select at least 2 teams for this tournament.');
       return;
     }
-
-    const unassignedTeams = selectedTeamIds.filter(teamId => !creationDraft.teamTableAssignments?.[teamId]);
-    if (unassignedTeams.length > 0) {
-      Alert.alert('Error', 'Please assign all selected teams to the league table.');
-      return;
-    }
-
     router.push('/(football)/startTournament/tournamentSpecifics');
   };
 
   const handleBack = () => router.back();
 
-  // Total matches (league-only, single round)
   const totalMatches = useMemo(() => {
-    if (!creationDraft) return 0;
-    const teamCount = creationDraft.teamCount ?? 0;
-    const matchesPerPair = creationDraft.settings?.matchesPerPair ?? 1;
+    const teamCount = selectedTeamIds.length;
+    const matchesPerPair = draft?.matchesPerPair ?? 1;
     if (teamCount > 1) {
       return (teamCount * (teamCount - 1) / 2) * matchesPerPair;
     }
     return 0;
-  }, [creationDraft]);
+  }, [selectedTeamIds.length, draft?.matchesPerPair]);
 
-  const availableTeams = useMemo(() => {
-    return teams.filter(team => team.teamName);
-  }, [teams]);
-
-  if (!creationDraft) {
+  if (!draft) {
     return (
       <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
         <Text className="text-slate-500">No tournament draft found</Text>
@@ -168,9 +131,7 @@ export default function SelectTeamsScreen() {
         <View className="flex-row items-center justify-between mb-3">
           <View>
             <Text className="text-sm text-blue-700 mb-1">Selected Teams</Text>
-            <Text className="text-2xl font-bold text-blue-900">
-              {selectedTeamIds.length} / {creationDraft.teamCount}
-            </Text>
+            <Text className="text-2xl font-bold text-blue-900">{selectedTeamIds.length}</Text>
             <Text className="text-xs text-blue-700 mt-1">
               All teams will play in the league
             </Text>
@@ -199,6 +160,15 @@ export default function SelectTeamsScreen() {
 
       {/* Teams List */}
       <ScrollView className="flex-1 px-4 pt-4" showsVerticalScrollIndicator={false}>
+        {sourceEvent && (
+          <View className="bg-green-50 rounded-xl p-3 mb-4 flex-row items-center">
+            <Ionicons name="link" size={16} color="#16a34a" />
+            <Text className="text-xs text-green-800 ml-2 flex-1">
+              Showing teams accepted into "{sourceEvent.name}"
+            </Text>
+          </View>
+        )}
+
         {availableTeams.length === 0 ? (
           <View className="items-center justify-center py-16">
             <View className="w-20 h-20 bg-slate-100 rounded-full items-center justify-center mb-4">
@@ -206,7 +176,9 @@ export default function SelectTeamsScreen() {
             </View>
             <Text className="text-slate-900 font-bold text-lg mb-2">No Teams Available</Text>
             <Text className="text-slate-500 text-center mb-6">
-              You need to create teams first before creating a tournament
+              {sourceEvent
+                ? 'No teams have been accepted into this event yet.'
+                : 'You need to create teams first before creating a tournament'}
             </Text>
           </View>
         ) : (
@@ -217,7 +189,6 @@ export default function SelectTeamsScreen() {
 
             {availableTeams.map((team) => {
               const isSelected = selectedTeamIds.includes(team.id);
-              const isDisabled = !isSelected && selectedTeamIds.length >= (creationDraft.teamCount ?? 0);
 
               return (
                 <TouchableOpacity
@@ -226,8 +197,6 @@ export default function SelectTeamsScreen() {
                   className={`bg-white rounded-xl p-4 mb-3 border-2 ${
                     isSelected ? 'border-blue-500' : 'border-slate-100'
                   }`}
-                  disabled={isDisabled}
-                
                 >
                   <View className="flex-row items-center justify-between">
                     <View className="flex-row items-center flex-1">
@@ -242,10 +211,10 @@ export default function SelectTeamsScreen() {
                       </View>
                       <View className="flex-1">
                         <Text className="text-base font-bold text-slate-900" numberOfLines={1}>
-                          {team.teamName}
+                          {team.name}
                         </Text>
                         <Text className="text-sm text-slate-500">
-                          {team.memberPlayerIds?.length || 0} Players
+                          {team.members?.length || 0} Players
                         </Text>
                       </View>
                     </View>
@@ -255,9 +224,7 @@ export default function SelectTeamsScreen() {
                         <Ionicons name="checkmark" size={14} color="white" />
                       </View>
                     ) : (
-                      <View className={`w-6 h-6 rounded-full items-center justify-center border-2 ${
-                        isDisabled ? 'border-slate-300' : 'border-slate-300'
-                      }`} />
+                      <View className="w-6 h-6 rounded-full items-center justify-center border-2 border-slate-300" />
                     )}
                   </View>
                 </TouchableOpacity>
@@ -273,12 +240,12 @@ export default function SelectTeamsScreen() {
         <TouchableOpacity
           onPress={handleContinue}
           className={`rounded-xl py-4 items-center ${
-            selectedTeamIds.length === creationDraft.teamCount ? 'bg-blue-600' : 'bg-slate-300'
+            selectedTeamIds.length >= 2 ? 'bg-blue-600' : 'bg-slate-300'
           }`}
-          disabled={selectedTeamIds.length !== creationDraft.teamCount}
+          disabled={selectedTeamIds.length < 2}
         >
           <Text className="text-white font-bold text-base">
-            Continue to Settings ({selectedTeamIds.length}/{creationDraft.teamCount} teams)
+            Continue to Settings ({selectedTeamIds.length} teams)
           </Text>
         </TouchableOpacity>
       </View>

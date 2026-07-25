@@ -1,18 +1,19 @@
 // app/(venue)/eventManager/dashboard.tsx
 
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
+  ActivityIndicator,
 
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { useEventManagerStore } from '@/store/eventManagerStore'
-import { Event } from '@/types/booking'
+import { EventItem } from '@/types/event'
 
 type TabKey = 'upcoming' | 'completed'
 
@@ -22,20 +23,26 @@ const TABS: { key: TabKey; label: string }[] = [
 ]
 
 export default function EventManagerDashboard() {
-  const { managedEvents } = useEventManagerStore()
+  const { myEvents, isLoading, fetchMyEvents } = useEventManagerStore()
   const [activeTab, setActiveTab] = useState<TabKey>('upcoming')
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyEvents()
+    }, [fetchMyEvents])
+  )
 
   /* ---------- FILTER EVENTS ---------- */
   const filteredEvents = useMemo(() => {
-    return managedEvents.filter((event) =>
+    return myEvents.filter((event) =>
       activeTab === 'upcoming'
         ? event.status !== 'completed' && event.status !== 'cancelled'
         : event.status === 'completed' || event.status === 'cancelled'
     )
-  }, [managedEvents, activeTab])
+  }, [myEvents, activeTab])
 
   /* ---------- RENDER CARD ---------- */
-  const renderEventCard = ({ item }: { item: Event }) => (
+  const renderEventCard = ({ item }: { item: EventItem }) => (
     <TouchableOpacity
       activeOpacity={0.85}
       // FIXED: Passing eventId so the next screen knows which event to load
@@ -52,7 +59,7 @@ export default function EventManagerDashboard() {
             {item.name}
           </Text>
           <Text className="text-sm text-slate-600">
-            {item.sport.name}
+            {item.sportName}
           </Text>
         </View>
 
@@ -140,6 +147,11 @@ export default function EventManagerDashboard() {
       </View>
 
       {/* ---------- LIST ---------- */}
+      {isLoading && myEvents.length === 0 ? (
+        <View className="items-center mt-24">
+          <ActivityIndicator size="large" color="#0f172a" />
+        </View>
+      ) : (
       <FlatList
         data={filteredEvents}
         renderItem={renderEventCard}
@@ -162,6 +174,7 @@ export default function EventManagerDashboard() {
           </View>
         }
       />
+      )}
 
       {/* ---------- FAB (Restored to Bottom Right) ---------- */}
       <TouchableOpacity

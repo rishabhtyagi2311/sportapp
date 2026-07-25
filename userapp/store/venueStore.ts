@@ -3,17 +3,15 @@ import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import {
   Venue,
-  Event,
   Booking,
   VenueFilters,
-  EventFilters,
   Sport,
   Amenity,
 } from '@/types/booking';
+import { venueApiService } from '@/services/venue/venue';
 
 export interface BookingStoreState {
   venues: Venue[];
-  events: Event[];
   bookings: Booking[];
   amenities: Amenity[];
   sports: Sport[];
@@ -22,28 +20,51 @@ export interface BookingStoreState {
 
   /* Actions */
   setVenues: (venues: Venue[]) => void;
-  setEvents: (events: Event[]) => void;
   setAmenities: (amenities: Amenity[]) => void;
   setSports: (sports: Sport[]) => void;
 
-  /* Event Sync Actions (Called by Manager Store) */
-  addEvent: (event: Event) => void;
-  updateEvent: (id: string, update: Partial<Event>) => void;
-  deleteEvent: (id: string) => void;
+  /* Server-backed venue fetching */
+  fetchVenues: (filters?: { city?: string }) => Promise<void>;
+  fetchVenueById: (id: string) => Promise<Venue | null>;
 
   /* Read / Search */
   getVenueById: (id: string) => Venue | undefined;
-  getEventById: (id: string) => Event | undefined;
-  getEventsByVenue: (venueId: string) => Event[];
   searchVenues: (query: string, filters?: VenueFilters) => Venue[];
-  searchEvents: (query: string, filters?: EventFilters) => Event[];
+}
+
+/** Derives the filter-modal's master sports/amenities lists from whatever
+ *  venues are actually live, since there's no separate taxonomy endpoint.
+ *  Defensive about shape — a venue's `sports`/`amenities` are raw JSON set by
+ *  whichever partner created it, so entries might be plain strings rather
+ *  than the full `Sport`/`Amenity` object shape. */
+function deriveFilterOptions(venues: Venue[]) {
+  const sportsById = new Map<string, Sport>();
+  const amenitiesById = new Map<string, Amenity>();
+
+  for (const venue of venues) {
+    for (const sport of (venue.sports || []) as any[]) {
+      if (typeof sport === 'string') {
+        sportsById.set(sport, { id: sport, name: sport, category: 'outdoor', varieties: [] });
+      } else if (sport?.id) {
+        sportsById.set(sport.id, sport);
+      }
+    }
+    for (const amenity of (venue.amenities || []) as any[]) {
+      if (typeof amenity === 'string') {
+        amenitiesById.set(amenity, { id: amenity, name: amenity, category: 'basic' });
+      } else if (amenity?.id) {
+        amenitiesById.set(amenity.id, amenity);
+      }
+    }
+  }
+
+  return { sports: Array.from(sportsById.values()), amenities: Array.from(amenitiesById.values()) };
 }
 
 export const useBookingStore = create<BookingStoreState>()(
   devtools(
     immer((set, get) => ({
       venues: [],
-      events: [],
       bookings: [],
       amenities: [],
       sports: [],
@@ -52,42 +73,53 @@ export const useBookingStore = create<BookingStoreState>()(
 
       setVenues: (venues) =>
         set((state) => { state.venues = venues; }),
-      setEvents: (events) =>
-        set((state) => { state.events = events; }),
       setAmenities: (amenities) =>
         set((state) => { state.amenities = amenities; }),
       setSports: (sports) =>
         set((state) => { state.sports = sports; }),
 
-      /* ---------- SYNC ACTIONS ---------- */
-      addEvent: (event) =>
-        set((state) => {
-          // Push to public array
-          state.events.push(event);
-        }),
+      /* ---------- SERVER-BACKED FETCHING ---------- */
+      fetchVenues: async (filters) => {
+        set((state) => { state.isLoading = true; state.error = null; });
+        try {
+          const response = await venueApiService.getVenues(filters);
+          const { sports, amenities } = deriveFilterOptions(response.data);
+          set((state) => {
+            state.venues = response.data;
+            state.sports = sports;
+            state.amenities = amenities;
+            state.isLoading = false;
+          });
+        } catch (err: any) {
+          const message = err.response?.data?.message || 'Could not load venues';
+          set((state) => { state.error = message; state.isLoading = false; });
+          throw new Error(message);
+        }
+      },
 
-      updateEvent: (id, update) =>
-        set((state) => {
-          const index = state.events.findIndex((e) => e.id === id);
-          if (index !== -1) {
-            state.events[index] = {
-              ...state.events[index],
-              ...update,
-              // If updatedAt wasn't passed, we update it, otherwise use passed value
-              updatedAt: update.updatedAt || new Date().toISOString(),
-            };
-          }
-        }),
-
-      deleteEvent: (id) =>
-        set((state) => {
-          state.events = state.events.filter((e) => e.id !== id);
-        }),
+      fetchVenueById: async (id) => {
+        set((state) => { state.isLoading = true; state.error = null; });
+        try {
+          const response = await venueApiService.getVenueById(id);
+          set((state) => {
+            const index = state.venues.findIndex((v) => v.id === id);
+            if (index !== -1) {
+              state.venues[index] = response.data;
+            } else {
+              state.venues.push(response.data);
+            }
+            state.isLoading = false;
+          });
+          return response.data;
+        } catch (err: any) {
+          const message = err.response?.data?.message || 'Could not load venue';
+          set((state) => { state.error = message; state.isLoading = false; });
+          return null;
+        }
+      },
 
       /* ---------- READ & SEARCH ---------- */
       getVenueById: (id) => get().venues.find((v) => v.id === id),
-      getEventById: (id) => get().events.find((e) => e.id === id),
-      getEventsByVenue: (venueId) => get().events.filter((e) => e.venueId === venueId),
 
       searchVenues: (query, filters) => {
         let results = get().venues;
@@ -104,33 +136,6 @@ export const useBookingStore = create<BookingStoreState>()(
         }
         if (filters?.sports?.length) {
           results = results.filter((v) => v.sports.some((s) => filters.sports!.includes(s.id)));
-        }
-        return results;
-      },
-
-      searchEvents: (query, filters) => {
-        let results = get().events;
-        if (query.trim()) {
-          const q = query.toLowerCase();
-          results = results.filter(
-            (e) =>
-              e.name.toLowerCase().includes(q) ||
-              e.sport.name.toLowerCase().includes(q) ||
-              e.description?.toLowerCase().includes(q)
-          );
-        }
-        if (filters?.sports?.length) {
-          results = results.filter((e) => filters.sports!.includes(e.sport.id));
-        }
-        if (filters?.eventType?.length) {
-          results = results.filter((e) => filters.eventType!.includes(e.eventType));
-        }
-        if (filters?.participationType) {
-          results = results.filter((e) => e.participationType === filters.participationType);
-        }
-        if (filters?.feeRange) {
-          const { min, max } = filters.feeRange;
-          results = results.filter((e) => e.fees.amount >= min && e.fees.amount <= max);
         }
         return results;
       },

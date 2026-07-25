@@ -13,33 +13,34 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFootballStore } from '@/store/footballTeamStore';
 import { useMatchCreationStore } from '@/store/footballMatchCreationStore';
-import { FootballPlayer } from '@/types/addingMemberTypes';
+import { FootballProfile } from '@/types/football';
 
 export default function SelectCaptainsScreen() {
   const router = useRouter();
-  const { players } = useFootballStore();
-  const { 
-    matchData, 
-    updateCaptains, 
-    setError 
+  const { teams } = useFootballStore();
+  const {
+    matchData,
+    updateCaptains,
+    setError
   } = useMatchCreationStore();
 
-  const [myTeamCaptain, setMyTeamCaptain] = useState<string>('');
-  const [opponentTeamCaptain, setOpponentTeamCaptain] = useState<string>('');
+  const [myTeamCaptain, setMyTeamCaptain] = useState<number | undefined>(undefined);
+  const [opponentTeamCaptain, setOpponentTeamCaptain] = useState<number | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
+
+  const myTeam = teams.find((t) => t.id === matchData.myTeam.teamId);
+  const opponentTeam = teams.find((t) => t.id === matchData.opponentTeam.teamId);
 
   // Get selected players for both teams
   const myTeamPlayers = useMemo(() => {
-    return matchData.myTeam.selectedPlayers
-      .map(playerId => players.find(player => player.id === playerId))
-      .filter((player): player is FootballPlayer => player !== undefined);
-  }, [matchData.myTeam.selectedPlayers, players]);
+    const roster = myTeam?.members.map((m) => m.footballProfile) ?? [];
+    return roster.filter((p) => matchData.myTeam.selectedPlayers.includes(p.id));
+  }, [myTeam, matchData.myTeam.selectedPlayers]);
 
   const opponentTeamPlayers = useMemo(() => {
-    return matchData.opponentTeam.selectedPlayers
-      .map(playerId => players.find(player => player.id === playerId))
-      .filter((player): player is FootballPlayer => player !== undefined);
-  }, [matchData.opponentTeam.selectedPlayers, players]);
+    const roster = opponentTeam?.members.map((m) => m.footballProfile) ?? [];
+    return roster.filter((p) => matchData.opponentTeam.selectedPlayers.includes(p.id));
+  }, [opponentTeam, matchData.opponentTeam.selectedPlayers]);
 
   // Initialize with previously selected captains if any
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function SelectCaptainsScreen() {
     }
   }, [matchData]);
 
-  const handlePlayerSelection = useCallback((playerId: string, role: 'myTeamCaptain' | 'opponentTeamCaptain') => {
+  const handlePlayerSelection = useCallback((playerId: number, role: 'myTeamCaptain' | 'opponentTeamCaptain') => {
     switch (role) {
       case 'myTeamCaptain':
         setMyTeamCaptain(playerId);
@@ -105,8 +106,8 @@ export default function SelectCaptainsScreen() {
 
   // Render player card for captain selection
   const renderPlayerCard = useCallback((
-    player: FootballPlayer, 
-    isSelected: boolean, 
+    player: FootballProfile,
+    isSelected: boolean,
     teamType: 'my' | 'opponent',
     onSelect: () => void
   ) => {
@@ -138,7 +139,7 @@ export default function SelectCaptainsScreen() {
               <Text className={`text-lg font-bold ${
                 isSelected ? 'text-yellow-800' : 'text-slate-900'
               }`}>
-                {player.name}
+                {player.nickname}
               </Text>
               {player.experience && (
                 <View className={`ml-2 px-2 py-1 rounded-lg ${
@@ -153,15 +154,15 @@ export default function SelectCaptainsScreen() {
               )}
             </View>
             <View className="flex-row items-center mb-1">
-              <Ionicons 
-                name="football" 
-                size={14} 
-                color={isSelected ? '#92400e' : '#64748b'} 
+              <Ionicons
+                name="football"
+                size={14}
+                color={isSelected ? '#92400e' : '#64748b'}
               />
               <Text className={`text-sm ml-1 font-medium ${
                 isSelected ? 'text-yellow-700' : 'text-slate-600'
               }`}>
-                {player.position}
+                {player.role}
               </Text>
             </View>
             {isSelected && (

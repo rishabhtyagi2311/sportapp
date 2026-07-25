@@ -14,6 +14,8 @@ export class AcademyService {
       fee: academy.fee,
       feeStructure: academy.feeStructure,
       isActive: academy.isActive,
+      averageRating: academy.averageRating,
+      reviewCount: academy.reviewCount,
       coaches: (academy.coaches || []).map((coach: any) => ({
         id: coach.id,
         name: coach.name,
@@ -54,7 +56,7 @@ export class AcademyService {
       where: { partnerId },
       include: {
         coaches: true,
-        _count: { select: { students: true } },
+        _count: { select: { students: { where: { status: 'active' } } } },
         photos: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
       orderBy: { createdAt: 'desc' },
@@ -107,6 +109,34 @@ export class AcademyService {
     }
 
     await globalClient.academy.delete({ where: { id: academyId } });
+  }
+
+  /** Public, unauthenticated browse — no partnerId scoping, active academies only. */
+  static async getPublicAcademies(filters: { city?: string; sportType?: string } = {}) {
+    const academies = await globalClient.academy.findMany({
+      where: {
+        isActive: true,
+        ...(filters.city ? { city: { equals: filters.city, mode: 'insensitive' } } : {}),
+        ...(filters.sportType ? { sportType: { equals: filters.sportType, mode: 'insensitive' } } : {}),
+      },
+      include: {
+        coaches: true,
+        _count: { select: { students: { where: { status: 'active' } } } },
+        photos: { orderBy: { createdAt: 'desc' } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return academies.map((academy) => this.mapAcademyForClient(academy));
+  }
+
+  static async getPublicAcademyById(academyId: string) {
+    const academy = await globalClient.academy.findFirst({
+      where: { id: academyId, isActive: true },
+      include: { coaches: true, photos: { orderBy: { createdAt: 'desc' } } },
+    });
+
+    return academy ? this.mapAcademyForClient(academy) : null;
   }
 
   static async addCoach(academyId: string, partnerId: string, data: any) {
@@ -183,6 +213,7 @@ export class AcademyService {
       age: student.age,
       fatherName: student.fatherName,
       fatherContact: student.fatherContact,
+      status: student.status,
       enrollmentDate: student.enrollmentDate.toISOString().split('T')[0],
     };
   }
@@ -207,7 +238,7 @@ export class AcademyService {
     return this.mapStudentForClient(student);
   }
 
-  static async getStudentsByAcademy(academyId: string, partnerId: string) {
+  static async getStudentsByAcademy(academyId: string, partnerId: string, status?: string) {
     const academy = await globalClient.academy.findFirst({ where: { id: academyId, partnerId } });
 
     if (!academy) {
@@ -215,11 +246,61 @@ export class AcademyService {
     }
 
     const students = await globalClient.student.findMany({
-      where: { academyId },
+      where: { academyId, ...(status ? { status } : {}) },
       orderBy: { createdAt: 'desc' },
     });
 
     return students.map((student) => this.mapStudentForClient(student));
+  }
+
+  static async approveEnrollment(academyId: string, partnerId: string, studentId: string) {
+    const academy = await globalClient.academy.findFirst({ where: { id: academyId, partnerId } });
+
+    if (!academy) {
+      throw new Error('Academy not found or not owned by partner');
+    }
+
+    const student = await globalClient.student.findFirst({ where: { id: studentId, academyId } });
+
+    if (!student) {
+      throw new Error('Student not found');
+    }
+
+    if (student.status !== 'pending') {
+      throw new Error(`Cannot approve a '${student.status}' enrollment`);
+    }
+
+    const updated = await globalClient.student.update({
+      where: { id: studentId },
+      data: { status: 'active' },
+    });
+
+    return this.mapStudentForClient(updated);
+  }
+
+  static async rejectEnrollment(academyId: string, partnerId: string, studentId: string) {
+    const academy = await globalClient.academy.findFirst({ where: { id: academyId, partnerId } });
+
+    if (!academy) {
+      throw new Error('Academy not found or not owned by partner');
+    }
+
+    const student = await globalClient.student.findFirst({ where: { id: studentId, academyId } });
+
+    if (!student) {
+      throw new Error('Student not found');
+    }
+
+    if (student.status !== 'pending') {
+      throw new Error(`Cannot reject a '${student.status}' enrollment`);
+    }
+
+    const updated = await globalClient.student.update({
+      where: { id: studentId },
+      data: { status: 'inactive' },
+    });
+
+    return this.mapStudentForClient(updated);
   }
 
   static async updateStudent(academyId: string, partnerId: string, studentId: string, data: any) {
@@ -465,6 +546,22 @@ export class AcademyService {
     return announcements.map((a) => this.mapAnnouncementForClient(a));
   }
 
+  /** Public, unauthenticated read — no sensitive data on Announcement. */
+  static async getPublicAnnouncements(academyId: string) {
+    const academy = await globalClient.academy.findFirst({ where: { id: academyId, isActive: true } });
+
+    if (!academy) {
+      throw new Error('Academy not found');
+    }
+
+    const announcements = await globalClient.announcement.findMany({
+      where: { academyId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return announcements.map((a) => this.mapAnnouncementForClient(a));
+  }
+
   static async removeAnnouncement(academyId: string, partnerId: string, announcementId: string) {
     const academy = await globalClient.academy.findFirst({ where: { id: academyId, partnerId } });
 
@@ -479,5 +576,102 @@ export class AcademyService {
     }
 
     await globalClient.announcement.delete({ where: { id: announcementId } });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* DEMO BOOKINGS                                                       */
+  /* ------------------------------------------------------------------ */
+
+  static mapDemoBookingForClient(booking: any) {
+    const { childProfile, ...rest } = booking;
+    return {
+      ...rest,
+      bookingDate: booking.bookingDate.toISOString().split('T')[0],
+      ...(childProfile
+        ? { childName: childProfile.childName, fatherName: childProfile.fatherName, fatherContact: childProfile.fatherContact }
+        : {}),
+    };
+  }
+
+  static async getDemoBookingsForAcademy(academyId: string, partnerId: string, status?: string) {
+    const academy = await globalClient.academy.findFirst({ where: { id: academyId, partnerId } });
+
+    if (!academy) {
+      throw new Error('Academy not found or not owned by partner');
+    }
+
+    const where: any = { academyId };
+    if (status) {
+      where.status = status;
+    }
+
+    const bookings = await globalClient.demoBooking.findMany({
+      where,
+      include: { childProfile: true },
+      orderBy: { bookingDate: 'asc' },
+    });
+
+    return bookings.map((b) => this.mapDemoBookingForClient(b));
+  }
+
+  private static async assertDemoBookingOwnedByPartner(bookingId: string, partnerId: string) {
+    const booking = await globalClient.demoBooking.findFirst({
+      where: { id: bookingId, academy: { partnerId } },
+      include: { childProfile: true },
+    });
+
+    if (!booking) {
+      throw new Error('Demo booking not found or not owned by partner');
+    }
+
+    return booking;
+  }
+
+  static async confirmDemoBooking(bookingId: string, partnerId: string) {
+    const booking = await this.assertDemoBookingOwnedByPartner(bookingId, partnerId);
+
+    if (booking.status !== 'pending') {
+      throw new Error(`Cannot confirm a '${booking.status}' demo booking`);
+    }
+
+    const updated = await globalClient.demoBooking.update({
+      where: { id: bookingId },
+      data: { status: 'confirmed' },
+      include: { childProfile: true },
+    });
+
+    return this.mapDemoBookingForClient(updated);
+  }
+
+  static async completeDemoBooking(bookingId: string, partnerId: string) {
+    const booking = await this.assertDemoBookingOwnedByPartner(bookingId, partnerId);
+
+    if (booking.status !== 'confirmed') {
+      throw new Error(`Cannot complete a '${booking.status}' demo booking`);
+    }
+
+    const updated = await globalClient.demoBooking.update({
+      where: { id: bookingId },
+      data: { status: 'completed' },
+      include: { childProfile: true },
+    });
+
+    return this.mapDemoBookingForClient(updated);
+  }
+
+  static async cancelDemoBooking(bookingId: string, partnerId: string) {
+    const booking = await this.assertDemoBookingOwnedByPartner(bookingId, partnerId);
+
+    if (booking.status === 'cancelled' || booking.status === 'completed') {
+      throw new Error(`Demo booking is already ${booking.status}`);
+    }
+
+    const updated = await globalClient.demoBooking.update({
+      where: { id: bookingId },
+      data: { status: 'cancelled' },
+      include: { childProfile: true },
+    });
+
+    return this.mapDemoBookingForClient(updated);
   }
 }

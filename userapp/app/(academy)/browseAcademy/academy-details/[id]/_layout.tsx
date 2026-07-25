@@ -1,5 +1,6 @@
-import React from "react";
-import { View, Text, TouchableOpacity, SafeAreaView } from "react-native";
+import React, { useEffect } from "react";
+import { View, Text, TouchableOpacity } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useAcademyStore } from "@/store/academyStore";
@@ -11,10 +12,13 @@ export const Tabs = withLayoutContext(TopTabs.Navigator);
 
 export default function AcademyTabsLayout() {
   const { id } = useLocalSearchParams();
-  console.log("Academy ID in layout:", id);
 
-  const { getAcademyById } = useAcademyStore();
+  const { getAcademyById, fetchAcademyById } = useAcademyStore();
   const academy = getAcademyById(id as string);
+
+  useEffect(() => {
+    if (!academy) fetchAcademyById(id as string);
+  }, [id]);
 
   if (!academy) {
     return (
@@ -52,7 +56,7 @@ export default function AcademyTabsLayout() {
           {academy.address}, {academy.city}
         </Text>
         <Text className="text-white mt-2">
-          ₹{academy.Fee}/month
+          ₹{academy.fee}/{academy.feeStructure?.toLowerCase() || "month"}
         </Text>
       </View>
 

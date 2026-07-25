@@ -1,26 +1,34 @@
-// 1. app/(football)/tournaments/create.tsx
-import React, { useState, useEffect } from 'react';
+// app/(football)/startTournament/createTournament.tsx
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useTournamentStore } from '@/store/footballTournamentStore';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useTournamentStore } from '@/store/tournamentStore';
+import { useEventManagerStore } from '@/store/eventManagerStore';
 
 export default function CreateTournamentScreen() {
   const router = useRouter();
-  const { startTournamentCreation, updateCreationDraft } = useTournamentStore();
-  
+  const { eventId } = useLocalSearchParams<{ eventId?: string }>();
+  const { startDraft, updateDraft } = useTournamentStore();
+  const { getEventById, fetchEventById } = useEventManagerStore();
+
   const [tournamentName, setTournamentName] = useState('');
   const [description, setDescription] = useState('');
-  const [teamCount, setTeamCount] = useState('8');
   const [matchesPerPair, setMatchesPerPair] = useState<'1' | '2'>('1');
-  
+
+  const sourceEvent = eventId ? getEventById(eventId) : undefined;
+
   useEffect(() => {
-    const teams = parseInt(teamCount, 10);
-    if (!isNaN(teams) && teams > 0 && teams < 2) {
-      setTeamCount('2');
+    if (!eventId) return;
+    fetchEventById(eventId);
+  }, [eventId]);
+
+  useEffect(() => {
+    if (sourceEvent && !tournamentName) {
+      setTournamentName(sourceEvent.name);
     }
-  }, [teamCount]);
+  }, [sourceEvent]);
 
   const handleContinue = () => {
     if (!tournamentName.trim()) {
@@ -28,22 +36,17 @@ export default function CreateTournamentScreen() {
       return;
     }
 
-    const teams = parseInt(teamCount, 10);
-    if (isNaN(teams) || teams < 2 || teams % 2 !== 0) {
-      Alert.alert('Error', 'Please enter an even number of teams (minimum 2)');
-      return;
-    }
-
-    startTournamentCreation(tournamentName);
-    updateCreationDraft({
-      description: description.trim() || undefined,
-      format: 'league',
-      teamCount: teams,
-      tableCount: 1,
-      settings: { matchesPerPair: parseInt(matchesPerPair, 10) as 1 | 2 },
+    startDraft('league');
+    updateDraft({
+      name: tournamentName.trim(),
+      description: description.trim(),
+      matchesPerPair: parseInt(matchesPerPair, 10),
     });
 
-    router.push('/(football)/startTournament/selectTeams');
+    router.push({
+      pathname: '/(football)/startTournament/selectTeams',
+      params: eventId ? { eventId } : undefined,
+    });
   };
 
   return (
@@ -86,6 +89,18 @@ export default function CreateTournamentScreen() {
       </View>
 
       <ScrollView className="flex-1 px-4 pt-6">
+        {sourceEvent && (
+          <View className="bg-green-50 rounded-xl p-4 mb-6 flex-row items-start">
+            <Ionicons name="link" size={20} color="#16a34a" />
+            <View className="flex-1 ml-3">
+              <Text className="text-sm font-semibold text-green-900 mb-1">Linked to Event</Text>
+              <Text className="text-sm text-green-700 leading-5">
+                Teams accepted into "{sourceEvent.name}" will be offered as your team pool on the next step.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Tournament Name */}
         <View className="mb-6">
           <Text className="text-sm font-semibold text-slate-700 mb-2">Tournament Name *</Text>
@@ -113,27 +128,10 @@ export default function CreateTournamentScreen() {
           />
         </View>
 
-        {/* Team Count */}
-        <View className="mb-6">
-          <Text className="text-sm font-semibold text-slate-700 mb-2">Number of Teams *</Text>
-          <View className="flex-row items-center">
-            <TextInput
-              value={teamCount}
-              onChangeText={setTeamCount}
-              keyboardType="numeric"
-              className="bg-white border border-slate-200 rounded-xl px-4 py-3 text-base text-slate-900 flex-1"
-              placeholderTextColor="#94a3b8"
-            />
-          </View>
-          <Text className="text-xs text-slate-500 mt-2">
-            Please enter an even number (e.g., 4, 6, 8, 12, 16, etc.)
-          </Text>
-        </View>
-
         {/* League Configuration */}
         <View className="mb-6">
           <Text className="text-sm font-semibold text-slate-700 mb-3">League Configuration</Text>
-          
+
           {/* Matches per pair (once / twice) */}
           <View className="bg-white rounded-xl p-4 mb-3 border border-slate-200">
             <Text className="text-sm font-semibold text-slate-700 mb-2">Round-Robin Type</Text>
@@ -168,7 +166,7 @@ export default function CreateTournamentScreen() {
             <View className="flex-1 ml-3">
               <Text className="text-sm font-semibold text-blue-900 mb-1">Tournament Structure</Text>
               <Text className="text-sm text-blue-700 leading-5">
-                {`${parseInt(teamCount, 10) || 0} teams will play in a single league table. The tournament winner will be determined by the standings.`}
+                Pick your teams next — they'll all play in a single league table, and the tournament winner is determined by the standings.
               </Text>
             </View>
           </View>
