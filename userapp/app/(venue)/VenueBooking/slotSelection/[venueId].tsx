@@ -202,7 +202,11 @@ export default function SlotBookingScreen() {
     }
   }, [venueId]);
 
-  const dateKey = selectedDate.toISOString().split('T')[0];
+  // NOT selectedDate.toISOString() — that converts to UTC first, which silently
+  // shifts to the wrong calendar day for part of the day in timezones ahead of
+  // UTC (e.g. IST, from midnight to 5:30am local). Build the date string from
+  // the device's local calendar fields instead.
+  const dateKey = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
 
   useEffect(() => {
     setLoadingSlots(true);

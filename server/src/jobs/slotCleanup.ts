@@ -25,10 +25,12 @@ export async function cleanupExpiredSlots(prisma: PrismaClient): Promise<number>
   return result.count;
 }
 
-/** Runs the cleanup once at startup, then every 24 hours. */
+/**
+ * Runs the cleanup every 24 hours. Does not run immediately — the initial
+ * run is sequenced explicitly in index.ts (before slot generation, so the
+ * two jobs never race against each other over the same day's rows).
+ */
 export function scheduleSlotCleanup(prisma: PrismaClient): void {
-  cleanupExpiredSlots(prisma).catch((err) => console.error('[slotCleanup] initial run failed:', err));
-
   setInterval(() => {
     cleanupExpiredSlots(prisma).catch((err) => console.error('[slotCleanup] run failed:', err));
   }, DAY_MS);

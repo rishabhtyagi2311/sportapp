@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import app from './app';
-import { scheduleSlotCleanup } from './jobs/slotCleanup';
-import { scheduleSlotGeneration } from './jobs/slotGeneration';
+import { scheduleSlotCleanup, cleanupExpiredSlots } from './jobs/slotCleanup';
+import { scheduleSlotGeneration, generateRollingSlots } from './jobs/slotGeneration';
 
 export const prisma = new PrismaClient();
 
@@ -9,6 +9,15 @@ export const prisma = new PrismaClient();
 // process entry point — not when it's required indirectly (e.g. by tests
 // importing the app, or by any other module reaching for `prisma`).
 if (require.main === module) {
+  // Sequenced (not fire-and-forget in parallel): cleanup must fully finish
+  // before generation runs, otherwise a delete-in-progress for "past" rows
+  // can race a concurrent insert for "today" rows and the two jobs can
+  // clobber each other's view of what "today" currently is.
+  (async () => {
+    await cleanupExpiredSlots(prisma).catch((err) => console.error('[slotCleanup] initial run failed:', err));
+    await generateRollingSlots(prisma).catch((err) => console.error('[slotGeneration] initial run failed:', err));
+  })();
+
   scheduleSlotCleanup(prisma);
   scheduleSlotGeneration(prisma);
 

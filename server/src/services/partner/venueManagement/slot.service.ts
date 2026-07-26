@@ -1,5 +1,5 @@
 import { prisma as globalClient } from '../../../index';
-import { generateSlotsForRange } from './slotGenerator';
+import { generateSlotsForRange, ROLLING_WINDOW_DAYS } from './slotGenerator';
 
 const MANUALLY_SETTABLE_STATUSES = ['available', 'blocked'];
 
@@ -90,10 +90,49 @@ export class SlotService {
       where.date = new Date(params.date);
     }
 
-    return globalClient.timeSlot.findMany({
+    let slots = await globalClient.timeSlot.findMany({
       where,
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
     });
+
+    // Self-heal: the background rolling-window job only runs at process
+    // startup + every 24h in-memory, which on a host that sleeps between
+    // requests (e.g. a free-tier deployment) can leave gaps — a day inside
+    // the window that never got topped up because no cold start happened to
+    // land on it. Rather than showing an empty picker for a date that's
+    // legitimately still within the venue's booking window, generate it here
+    // on demand.
+    if (params.date && slots.length === 0) {
+      const requestedDate = new Date(params.date);
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      const daysFromToday = Math.round((requestedDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+
+      if (daysFromToday >= 0 && daysFromToday < ROLLING_WINDOW_DAYS) {
+        const lastSlot = await globalClient.timeSlot.findFirst({
+          where: { venueId: params.venueId },
+          orderBy: { price: 'desc' },
+          select: { price: true },
+        });
+
+        await generateSlotsForRange(globalClient, {
+          venueId: params.venueId,
+          sports: venue.sports as any[],
+          operatingHours: venue.operatingHours as any,
+          basePrice: lastSlot?.price || 1000,
+          daysCount: 1,
+          startDate: requestedDate,
+          peakPricing: venue.peakPricing as any,
+        });
+
+        slots = await globalClient.timeSlot.findMany({
+          where,
+          orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+        });
+      }
+    }
+
+    return slots;
   }
 
   static async generateSlotsForVenue(params: {

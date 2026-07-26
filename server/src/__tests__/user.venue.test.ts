@@ -98,4 +98,45 @@ describe('GET /api/v1/user/venues/:id/slots', () => {
 
     expect(res.status).toBe(404);
   });
+
+  it('self-heals by generating slots on demand when a date inside the rolling window has none yet', async () => {
+    const venue = fakeVenueRow({
+      sports: [{ id: 's1', varieties: [{ id: 'v1', name: 'Turf' }] }],
+    });
+    prismaMock.venue.findFirst.mockResolvedValue(venue as any);
+
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const dateStr = today.toISOString().split('T')[0];
+
+    prismaMock.timeSlot.findMany
+      .mockResolvedValueOnce([]) // initial query: background job hasn't topped this day up yet
+      .mockResolvedValueOnce([]) // dedup check inside generateSlotsForRange
+      .mockResolvedValueOnce([
+        { id: 'slot-new', venueId: 'venue-1', date: today, status: 'available', price: 1000 },
+      ] as any); // re-query after on-demand generation
+    prismaMock.timeSlot.findFirst.mockResolvedValue({ price: 1000 } as any);
+    prismaMock.timeSlot.createMany.mockResolvedValue({ count: 1 } as any);
+
+    const res = await request(app).get(`/api/v1/user/venues/venue-1/slots?date=${dateStr}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(prismaMock.timeSlot.createMany).toHaveBeenCalled();
+  });
+
+  it('does not self-heal for a date outside the rolling window', async () => {
+    prismaMock.venue.findFirst.mockResolvedValue(fakeVenueRow() as any);
+    prismaMock.timeSlot.findMany.mockResolvedValue([]);
+
+    const farFuture = new Date();
+    farFuture.setUTCDate(farFuture.getUTCDate() + 30);
+    const dateStr = farFuture.toISOString().split('T')[0];
+
+    const res = await request(app).get(`/api/v1/user/venues/venue-1/slots?date=${dateStr}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(0);
+    expect(prismaMock.timeSlot.createMany).not.toHaveBeenCalled();
+  });
 });

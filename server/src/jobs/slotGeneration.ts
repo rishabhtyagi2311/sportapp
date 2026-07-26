@@ -40,10 +40,12 @@ export async function generateRollingSlots(prisma: PrismaClient): Promise<number
   return totalGenerated;
 }
 
-/** Runs the rolling top-up once at startup, then every 24 hours. */
+/**
+ * Runs the rolling top-up every 24 hours. Does not run immediately — the
+ * initial run is sequenced explicitly in index.ts (after slot cleanup, so
+ * the two jobs never race against each other over the same day's rows).
+ */
 export function scheduleSlotGeneration(prisma: PrismaClient): void {
-  generateRollingSlots(prisma).catch((err) => console.error('[slotGeneration] initial run failed:', err));
-
   setInterval(() => {
     generateRollingSlots(prisma).catch((err) => console.error('[slotGeneration] run failed:', err));
   }, DAY_MS);
