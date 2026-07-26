@@ -160,6 +160,22 @@ export default function EditVenue() {
     )
   }
 
+  const updateVarietyPrice = (sportId: string, varietyId: string, priceText: string) => {
+    const price = parseInt(priceText, 10)
+    setSports((prev) =>
+      prev.map((s) =>
+        s.id === sportId
+          ? {
+              ...s,
+              varieties: s.varieties.map((v) =>
+                v.id === varietyId ? { ...v, basePrice: isNaN(price) ? undefined : price } : v
+              ),
+            }
+          : s
+      )
+    )
+  }
+
   const handleSave = async () => {
     if (!name || name.length < 3) {
       setError('Venue name must be at least 3 characters.')
@@ -369,6 +385,30 @@ export default function EditVenue() {
                   <Text className="text-[10px] text-slate-400 font-medium italic ml-1">No court types added yet.</Text>
                 )}
               </View>
+
+              {sport.varieties.length > 0 && (
+                <View className="mb-4 gap-2">
+                  <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
+                    Price per 30-min slot
+                  </Text>
+                  {sport.varieties.map((v) => (
+                    <View key={v.id} className="flex-row items-center bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
+                      <Text className="flex-1 text-xs font-semibold text-slate-700" numberOfLines={1}>
+                        {v.name}
+                      </Text>
+                      <Text className="text-slate-400 font-bold mr-1">₹</Text>
+                      <TextInput
+                        value={v.basePrice ? String(v.basePrice) : ''}
+                        onChangeText={(text) => updateVarietyPrice(sport.id, v.id, text)}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor="#cbd5e1"
+                        className="w-16 text-right font-black text-slate-900"
+                      />
+                    </View>
+                  ))}
+                </View>
+              )}
 
               <View className="flex-row gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-50">
                 <TextInput

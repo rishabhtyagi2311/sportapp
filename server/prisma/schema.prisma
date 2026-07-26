@@ -26,9 +26,57 @@ model userInfo {
   eventRegistrations EventRegistration[]
   createdMatches  Match[]
   createdTournaments Tournament[]
+  workoutLogs     WorkoutLog[]
+  nutritionLogs   NutritionLog[]
+  healthLogs      HealthLog[]
 
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+}
+
+model WorkoutLog {
+  id        String   @id @default(uuid())
+  userId    Int
+  date      DateTime
+  type      String                       // 'Gym' | 'Home'
+  split     String                       // 'Chest' | 'Back' | 'Legs' | ...
+  exercises Json                         // Exercise[] — {name, sets, reps}[]
+  createdAt DateTime @default(now())
+
+  user userInfo @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}
+
+model NutritionLog {
+  id        String   @id @default(uuid())
+  userId    Int
+  date      DateTime
+  meals     Json                         // Meal[] — {category, time, description}[]
+  createdAt DateTime @default(now())
+
+  user userInfo @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}
+
+model HealthLog {
+  id           String   @id @default(uuid())
+  userId       Int
+  date         DateTime
+  weight       String?
+  steps        String?
+  water        String?
+  energy       String?                   // 'Low' | 'Medium' | 'High'
+  sleep        Int?
+  motivation   String?                   // 'Low' | 'Medium' | 'High'
+  measurements Json?                     // {[key]: string}
+  photoUrl     String?
+  createdAt    DateTime @default(now())
+
+  user userInfo @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
 }
 
 model footballProfile {

@@ -61,7 +61,7 @@ const WelcomeScreen: FC = () => {
   const isHydrated = useAuthStore((state) => state.isHydrated);
   const partner = useAuthStore((state) => state.partner);
 
-  const handleSignUp = () => router.push('/(onboardingStack)/basicInfoRegisterOne' as any);
+  const handleSignUp = () => router.push('/(onboardingStack)/signUp' as any);
   const handleSignIn = () => router.push('/(onboardingStack)/login' as any);
 
   // The session check (kicked off back in app/index.tsx, in parallel with

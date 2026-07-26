@@ -98,6 +98,7 @@ export default function Step4Schedule() {
   const { isTablet } = useResponsive();
   const updateDraftVenue = useVenueStore((state) => state.updateDraftVenue);
   const draftHours = useVenueStore((state) => state.draftVenue.operatingHours);
+  const selectedSports = useVenueStore((state) => state.draftVenue.sports);
 
   const [openTime, setOpenTime] = useState('09:00');
   const [closeTime, setCloseTime] = useState('22:00');
@@ -244,14 +245,42 @@ export default function Step4Schedule() {
 
           {/* 3. PRICING */}
           <View className="mb-8">
-            <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 px-1">Standard Pricing</Text>
+            <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 px-1">Variety Pricing</Text>
+
+            {selectedSports.length === 0 || selectedSports.every((s) => s.varieties.length === 0) ? (
+              <View className="bg-white border border-slate-100 rounded-[30px] p-6 mb-4">
+                <Text className="text-slate-400 text-sm italic">No sports/varieties selected yet — go back to add some.</Text>
+              </View>
+            ) : (
+              <View className="bg-white border border-slate-100 rounded-[30px] p-5 shadow-sm mb-4">
+                {selectedSports.flatMap((sport) =>
+                  sport.varieties.map((v, idx) => (
+                    <View
+                      key={v.id}
+                      className={`flex-row items-center justify-between py-3 ${idx > 0 ? 'border-t border-slate-50' : ''}`}
+                    >
+                      <View className="flex-1 mr-3">
+                        <Text className="text-sm font-bold text-slate-900" numberOfLines={1}>{v.name}</Text>
+                        <Text className="text-[10px] text-slate-400">{sport.name}</Text>
+                      </View>
+                      {v.basePrice ? (
+                        <Text className="text-lg font-black text-green-600">₹{v.basePrice}</Text>
+                      ) : (
+                        <Text className="text-xs font-bold text-amber-600">Uses default →</Text>
+                      )}
+                    </View>
+                  ))
+                )}
+              </View>
+            )}
+
             <View className="bg-white border border-slate-100 rounded-[30px] p-6 flex-row items-center shadow-sm">
               <View className="bg-green-500 w-12 h-12 rounded-2xl items-center justify-center mr-4">
                 <MaterialCommunityIcons name="currency-inr" size={24} color="white" />
               </View>
               <View className="flex-1">
-                <Text className="text-[10px] font-bold text-slate-400 uppercase">Rate per 30 min slot</Text>
-                <TextInput 
+                <Text className="text-[10px] font-bold text-slate-400 uppercase">Default rate (for varieties left unpriced)</Text>
+                <TextInput
                   value={basePrice}
                   onChangeText={setBasePrice}
                   keyboardType="numeric"

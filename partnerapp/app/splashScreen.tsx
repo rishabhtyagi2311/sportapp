@@ -1,56 +1,82 @@
+// app/splashScreen.tsx
 import React, { useEffect, useState } from "react";
-import { Image, View, Dimensions } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import { Image, Dimensions } from "react-native";
 import Animated, {
   FadeIn,
   FadeOut,
   Keyframe,
   RotateOutDownLeft,
   RotateOutUpRight,
-  Easing,
 } from "react-native-reanimated";
 
 const { height } = Dimensions.get("window");
 
-/** Chevron entrance: slides in from off-screen and settles into place. */
-const topTranslateKeyframe = new Keyframe({
-  0: { transform: [{ translateY: -height * 0.4 }] },
-  100: { transform: [{ translateY: 0 }] },
+/**
+ * Top image movement
+ */
+export const topTranslateKeyframe = new Keyframe({
+  0: {
+    transform: [{ translateY: -height }],
+  },
+  70: {
+    transform: [{ translateY: -height * 0.2 }],
+  },
+  100: {
+    transform: [{ translateY: 0 }],
+  },
 });
 
-const bottomTranslateKeyframe = new Keyframe({
-  0: { transform: [{ translateY: height * 0.4 }] },
-  100: { transform: [{ translateY: 0 }] },
+/**
+ * Bottom image movement
+ */
+export const bottomTranslateKeyframe = new Keyframe({
+  0: {
+    transform: [{ translateY: height }],
+  },
+  70: {
+    transform: [{ translateY: height * 0.2 }],
+  },
+  100: {
+    transform: [{ translateY: 0 }],
+  },
 });
 
-/** One full spin while sliding in — the flourish this screen is built around. */
-const rotateKeyframe = new Keyframe({
-  0: { transform: [{ rotate: "0deg" }] },
-  100: { transform: [{ rotate: "360deg" }] },
+/**
+ * Rotation animation
+ */
+export const rotateKeyframe = new Keyframe({
+  0: {
+    transform: [{ rotate: "0deg" }],
+  },
+  100: {
+    transform: [{ rotate: "720deg" }],
+  },
 });
 
-interface SplashScreenProps {
-  /** Always fires after a fixed duration — never gated on anything async
-   * (auth checks, network calls, etc). Those happen on the screen we
-   * navigate to next, with their own loading state. A splash screen that
-   * waits on the network can freeze indefinitely if that call is slow. */
+type SplashScreenProps = {
   onFinish: () => void;
-}
+};
 
-const DELAY = 150;
-const SLIDE_ROTATE_DURATION = 900;
-const LOGO_DELAY = 150;
-const LOGO_DURATION = 500;
-const HOLD_MS = 700;
-const EXIT_DURATION = 400;
-const SHOW_DURATION_MS = Math.max(DELAY + SLIDE_ROTATE_DURATION, LOGO_DELAY + LOGO_DURATION) + HOLD_MS;
+export default function SplashScreen({ onFinish }: SplashScreenProps) {
+  const DURATION = 2600;
+  const DELAY = 1300;
 
-export default function SplashScreen({ onFinish }: SplashScreenProps): React.ReactNode {
+  // how long total until we start exit
+  const MAIN_ANIM_END = 4500; // ms
+  const EXIT_DURATION = 500;  // ms
+
   const [showContent, setShowContent] = useState(true);
 
   useEffect(() => {
-    const exitTimer = setTimeout(() => setShowContent(false), SHOW_DURATION_MS);
-    const navTimer = setTimeout(() => onFinish(), SHOW_DURATION_MS + EXIT_DURATION);
+    // 1) after main animation, trigger exit
+    const exitTimer = setTimeout(() => {
+      setShowContent(false); // this causes exiting animations to run
+    }, MAIN_ANIM_END);
+
+    // 2) after exit duration, tell parent to navigate
+    const navTimer = setTimeout(() => {
+      onFinish();
+    }, MAIN_ANIM_END + EXIT_DURATION);
 
     return () => {
       clearTimeout(exitTimer);
@@ -59,69 +85,65 @@ export default function SplashScreen({ onFinish }: SplashScreenProps): React.Rea
   }, [onFinish]);
 
   return (
-    <View className="flex-1">
-      <LinearGradient
-        colors={['#F8FAFC', '#EFF6FF', '#F8FAFC']}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-      />
+    <Animated.View
+      className="flex-1 bg-white"
 
+    >
       {showContent && (
-        <View className="flex-1 items-center justify-center">
-          {/* Soft glow behind the mark */}
-          <View
-            className="absolute bg-blue-100 rounded-full"
-            style={{ width: 260, height: 260, opacity: 0.5 }}
-          />
-
-          {/* Top chevron */}
+        <>
+          {/* Top Section */}
           <Animated.View
-            entering={topTranslateKeyframe.duration(SLIDE_ROTATE_DURATION).delay(DELAY)}
-            className="absolute"
-            style={{ top: '50%', marginTop: -170 }}
+            entering={topTranslateKeyframe.duration(DURATION).delay(DELAY)}
+            className="flex-1 justify-end"
           >
             <Animated.View
-              entering={rotateKeyframe.duration(SLIDE_ROTATE_DURATION).delay(DELAY)}
+              entering={rotateKeyframe.duration(DURATION).delay(DELAY)}
               exiting={RotateOutDownLeft.duration(EXIT_DURATION)}
             >
               <Image
-                style={{ width: 56, height: 40 }}
+                style={{ width: 72, height: 72 }}
+                className="self-center aspect-square"
                 resizeMode="contain"
                 source={require("@/assets/images/logo3.png")}
               />
             </Animated.View>
           </Animated.View>
 
-          {/* Brand mark */}
-          <Animated.View
-            entering={FadeIn.duration(LOGO_DURATION).delay(LOGO_DELAY).easing(Easing.out(Easing.cubic))}
-            exiting={FadeOut.duration(EXIT_DURATION)}
-          >
-            <Image
-              style={{ width: 190, height: 190 }}
-              resizeMode="contain"
-              source={require("@/assets/images/logo2.png")}
-            />
+          {/* Center Section */}
+          <Animated.View className="h-64 bg-white flex justify-center items-center">
+            <Animated.View
+              entering={FadeIn.delay(4000)}
+              exiting={FadeOut.duration(EXIT_DURATION)}
+              className="bg-white rounded-xl"
+            >
+              <Image
+                style={{ width: 224, height: 224 }}
+                className="aspect-square"
+                resizeMode="contain"
+                source={require("@/assets/images/logo2.png")}
+              />
+            </Animated.View>
           </Animated.View>
 
-          {/* Bottom chevron */}
+          {/* Bottom Section */}
           <Animated.View
-            entering={bottomTranslateKeyframe.duration(SLIDE_ROTATE_DURATION).delay(DELAY)}
-            className="absolute"
-            style={{ bottom: '50%', marginBottom: -170 }}
+            entering={bottomTranslateKeyframe.duration(DURATION).delay(DELAY)}
+            className="flex-1 justify-start"
           >
             <Animated.View
-              entering={rotateKeyframe.duration(SLIDE_ROTATE_DURATION).delay(DELAY)}
+              entering={rotateKeyframe.duration(DURATION).delay(DELAY)}
               exiting={RotateOutUpRight.duration(EXIT_DURATION)}
             >
               <Image
-                style={{ width: 56, height: 40 }}
+                style={{ width: 72, height: 72 }}
+                className="self-center aspect-square"
                 resizeMode="contain"
                 source={require("@/assets/images/logo1.png")}
               />
             </Animated.View>
           </Animated.View>
-        </View>
+        </>
       )}
-    </View>
+    </Animated.View>
   );
 }

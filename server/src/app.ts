@@ -12,6 +12,8 @@ import userMatchSessionRouter from './routers/user/matchSession/matchSession.rou
 import userAcademyRouter from './routers/user/academyManagement/academy.route';
 import userEventRouter from './routers/user/eventManagement/event.route';
 import userFootballRouter from './routers/user/footballManagement/football.route';
+import userLogRouter from './routers/user/logManagement/log.route';
+import userStorageRouter from './routers/user/storage/storage.route';
 
 // Express app definition, kept separate from process startup (listen +
 // cron scheduling in index.ts) so it can be imported by tests via
@@ -38,5 +40,7 @@ app.use('/api/v1/user', userMatchSessionRouter);
 app.use('/api/v1/user', userAcademyRouter);
 app.use('/api/v1/user', userEventRouter);
 app.use('/api/v1/user', userFootballRouter);
+app.use('/api/v1/user', userLogRouter);
+app.use('/api/v1/user', userStorageRouter);
 
 export default app;

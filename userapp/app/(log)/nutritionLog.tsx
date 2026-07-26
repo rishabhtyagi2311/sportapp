@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { 
-  View, Text, ScrollView, TextInput, TouchableOpacity, 
-  KeyboardAvoidingView, Platform 
+import {
+  View, Text, ScrollView, TextInput, TouchableOpacity,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Alert
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -26,6 +26,7 @@ export default function NutritionScreen() {
   const [meals, setMeals] = useState(
     MEAL_CATEGORIES.map(cat => ({ category: cat.label, icon: cat.icon, time: '', description: '' }))
   );
+  const [saving, setSaving] = useState(false);
 
   const updateMeal = (index: number, field: string, value: string) => {
     const updatedMeals = [...meals];
@@ -33,13 +34,28 @@ export default function NutritionScreen() {
     setMeals(updatedMeals);
   };
 
-  const handleSave = () => {
-    const filteredMeals = meals.filter(m => m.description.trim() !== '');
-    addNutrition({
-      date: new Date().toISOString(),
-      meals: filteredMeals,
-    });
-    router.back();
+  const handleSave = async () => {
+    const filteredMeals = meals
+      .filter(m => m.description.trim() !== '')
+      .map(({ category, time, description }) => ({ category, time, description }));
+
+    if (filteredMeals.length === 0) {
+      Alert.alert('Nothing to save', 'Add at least one meal before saving.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await addNutrition({
+        date: new Date().toISOString(),
+        meals: filteredMeals,
+      });
+      router.back();
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Could not save your nutrition log.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -54,8 +70,8 @@ export default function NutritionScreen() {
             <Ionicons name="chevron-back" size={20} color="white" />
           </TouchableOpacity>
           <Text className="text-black font-bold text-lg">Fuel Log</Text>
-          <TouchableOpacity 
-            onPress={() => router.push('/nutrition-history')}
+          <TouchableOpacity
+            onPress={() => router.push('/(log)/nutrition-history')}
             className="p-2 bg-emerald-500/10 rounded-full"
           >
             <Ionicons name="time-outline" size={22} color="#10b981" />
@@ -129,14 +145,19 @@ export default function NutritionScreen() {
 
         {/* SAVE ACTION */}
         <View className="px-6 py-6 bg-[#0f172a] border-t border-slate-800/50">
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={handleSave}
+            disabled={saving}
             activeOpacity={0.8}
             className="bg-emerald-500 py-5 rounded-[22px] items-center shadow-xl shadow-emerald-500/20"
           >
-            <Text className="text-emerald-950 text-lg font-black uppercase tracking-widest">
-              Update Journal
-            </Text>
+            {saving ? (
+              <ActivityIndicator color="#064e3b" />
+            ) : (
+              <Text className="text-emerald-950 text-lg font-black uppercase tracking-widest">
+                Update Journal
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

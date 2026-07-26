@@ -57,6 +57,11 @@ export function buildCandidateSlots(params: {
 
   for (const sport of sports || []) {
     for (const variety of sport.varieties || []) {
+      // A variety with its own base price is priced independently (e.g. a
+      // badminton court vs. a cricket box at the same venue); varieties left
+      // unpriced fall back to the venue's single default rate.
+      const varietyBasePrice = variety.basePrice ?? basePrice;
+
       for (let i = 0; i < daysCount; i++) {
         const targetDate = new Date(Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i));
 
@@ -75,7 +80,7 @@ export function buildCandidateSlots(params: {
               date: targetDate,
               startTime: minsToTime(currentMins),
               endTime: minsToTime(currentMins + 30),
-              price: priceForSlot(currentMins, basePrice, peakPricing),
+              price: priceForSlot(currentMins, varietyBasePrice, peakPricing),
               status: 'available',
             });
             currentMins += 30;

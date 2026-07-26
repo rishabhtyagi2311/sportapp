@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  View, Text, ScrollView, TextInput, TouchableOpacity, 
-  KeyboardAvoidingView, Platform, Pressable 
+import {
+  View, Text, ScrollView, TextInput, TouchableOpacity,
+  KeyboardAvoidingView, Platform, Pressable, ActivityIndicator, Alert
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useHealthStore, Exercise, WorkoutEntry } from '@/store/HealthLogStore';
+import { useHealthStore, Exercise } from '@/store/HealthLogStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const SPLITS = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Cardio', 'Full Body'];
@@ -18,6 +18,7 @@ export default function WorkoutLogScreen() {
   const [type, setType] = useState<'Gym' | 'Home'>('Gym');
   const [selectedSplit, setSelectedSplit] = useState('Chest');
   const [exercises, setExercises] = useState<Exercise[]>([{ name: '', sets: '', reps: '' }]);
+  const [saving, setSaving] = useState(false);
 
   const updateExercise = (index: number, field: keyof Exercise, value: string) => {
     const newExercises = [...exercises];
@@ -35,17 +36,27 @@ export default function WorkoutLogScreen() {
     setExercises(exercises.filter((_, i) => i !== index));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const activeExercises = exercises.filter(ex => ex.name.trim() !== '');
-    const entry: WorkoutEntry = {
-      id: Date.now().toString(),
-      date: new Date().toISOString(),
-      type,
-      split: selectedSplit,
-      exercises: activeExercises,
-    };
-    addWorkout(entry);
-    router.back();
+    if (activeExercises.length === 0) {
+      Alert.alert('Nothing to save', 'Add at least one exercise before saving.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await addWorkout({
+        date: new Date().toISOString(),
+        type,
+        split: selectedSplit,
+        exercises: activeExercises,
+      });
+      router.back();
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Could not save your workout log.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -60,7 +71,7 @@ export default function WorkoutLogScreen() {
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
           <Text className="text-white font-bold text-lg">Log Session</Text>
-          <TouchableOpacity onPress={() => router.push('/workout-history')}>
+          <TouchableOpacity onPress={() => router.push('/(log)/workout-history')}>
             <Ionicons name="stats-chart" size={22} color="#38bdf8" />
           </TouchableOpacity>
         </View>
@@ -168,12 +179,17 @@ export default function WorkoutLogScreen() {
 
         {/* BOTTOM FIXED BUTTON */}
         <View className="px-6 py-6 bg-[#0f172a]">
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={handleSave}
+            disabled={saving}
             activeOpacity={0.9}
             className="bg-cyan-500 w-full py-5 rounded-[20px] items-center shadow-xl shadow-cyan-500/20"
           >
-            <Text className="text-slate-900 text-lg font-black uppercase tracking-widest">Complete Workout</Text>
+            {saving ? (
+              <ActivityIndicator color="#0f172a" />
+            ) : (
+              <Text className="text-slate-900 text-lg font-black uppercase tracking-widest">Complete Workout</Text>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

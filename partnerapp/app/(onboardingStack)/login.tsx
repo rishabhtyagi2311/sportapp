@@ -153,7 +153,7 @@ export default function PartnerLoginScreen() {
 
                   <TouchableOpacity
                     className="mt-6 items-center"
-                    onPress={() => router.push("./basicInfoRegisterOne")}
+                    onPress={() => router.push("./signUp")}
                   >
                     <Text className="text-black font-medium underline">
                       New partner? Create an account

@@ -130,6 +130,20 @@ export default function Step3Sports() {
     ])
   }
 
+  const updateVarietyPrice = (sportId: string, varietyId: string, priceText: string) => {
+    const price = parseInt(priceText, 10)
+    const newSports = selectedSports.map((s) => {
+      if (s.id !== sportId) return s
+      return {
+        ...s,
+        varieties: s.varieties.map((v) =>
+          v.id === varietyId ? { ...v, basePrice: isNaN(price) ? undefined : price } : v
+        ),
+      }
+    })
+    updateDraftVenue({ sports: newSports })
+  }
+
   const toggleSportVariety = (masterSport: Sport, varietyId: string) => {
     const existingSportIndex = selectedSports.findIndex(s => s.id === masterSport.id)
     let newSports = [...selectedSports]
@@ -288,6 +302,31 @@ export default function Step3Sports() {
                         <Text className="text-[10px] text-slate-400 font-medium italic ml-1">No types added yet. Add one below ↓</Text>
                       )}
                     </View>
+
+                    {/* Per-Variety Pricing — only for varieties selected into this venue */}
+                    {isSportActive && draftSport!.varieties.length > 0 && (
+                      <View className="mb-5 gap-2">
+                        <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
+                          Price per 30-min slot
+                        </Text>
+                        {draftSport!.varieties.map((v) => (
+                          <View key={v.id} className="flex-row items-center bg-white border border-slate-100 rounded-xl px-3 py-2.5">
+                            <Text className="flex-1 text-xs font-semibold text-slate-700" numberOfLines={1}>
+                              {v.name}
+                            </Text>
+                            <Text className="text-slate-400 font-bold mr-1">₹</Text>
+                            <TextInput
+                              value={v.basePrice ? String(v.basePrice) : ''}
+                              onChangeText={(text) => updateVarietyPrice(sport.id, v.id, text)}
+                              keyboardType="numeric"
+                              placeholder="0"
+                              placeholderTextColor="#cbd5e1"
+                              className="w-16 text-right font-black text-slate-900"
+                            />
+                          </View>
+                        ))}
+                      </View>
+                    )}
 
                     {/* Add Custom Variety Input */}
                     <View className="flex-row gap-2 bg-white/50 p-2 rounded-2xl border border-slate-50">
