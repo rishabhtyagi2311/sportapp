@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions, StatusBar, Alert, FlatList } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, StatusBar, Alert, FlatList, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -81,12 +81,7 @@ const VenueDetailsScreen: React.FC = () => {
   };
 
   const renderImageCarousel = () => {
-    const placeholderImages = [
-      { id: '1', title: 'Main View' },
-      { id: '2', title: 'Sports Area' },
-      { id: '3', title: 'Facilities' },
-      { id: '4', title: 'Amenities' },
-    ];
+    const images = venue.images || [];
 
     const handleScroll = (event : any) => {
       const scrollPosition = event.nativeEvent.contentOffset.x;
@@ -94,33 +89,37 @@ const VenueDetailsScreen: React.FC = () => {
       setCurrentImageIndex(index);
     };
 
+    if (images.length === 0) {
+      return (
+        <View style={{ height: 288 }} className="bg-slate-200 items-center justify-center">
+          <Ionicons name="image-outline" size={72} color="#64748b" />
+          <Text className="text-slate-500 text-lg mt-3 font-medium">
+            No photos uploaded yet
+          </Text>
+        </View>
+      );
+    }
+
     return (
       <View style={{ height: 288 }}>
         <FlatList
-          data={placeholderImages}
+          data={images}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           onScroll={handleScroll}
           scrollEventThrottle={16}
           renderItem={({ item }) => (
-            <View 
-              className="bg-slate-200 items-center justify-center" 
-              style={{ width }}
-            >
-              <Ionicons name="image-outline" size={72} color="#64748b" />
-              <Text className="text-slate-500 text-lg mt-3 font-medium">
-                No photos uploaded yet
-              </Text>
-              <Text className="text-slate-400 text-sm mt-1">{item.title}</Text>
+            <View style={{ width }}>
+              <Image source={{ uri: item }} style={{ width, height: 288 }} resizeMode="cover" />
             </View>
           )}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => `${item}-${index}`}
         />
-        
+
         <View className="absolute bottom-4 right-4 bg-black/70 rounded-lg px-3 py-2">
           <Text className="text-white text-sm font-medium">
-            {currentImageIndex + 1} / {placeholderImages.length}
+            {currentImageIndex + 1} / {images.length}
           </Text>
         </View>
       </View>

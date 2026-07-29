@@ -19,13 +19,61 @@ export interface PeakPricingRule {
   price: number;
 }
 
-function priceForSlot(startMins: number, basePrice: number, peakPricing?: PeakPricingRule | null): number {
+export function priceForSlot(startMins: number, basePrice: number, peakPricing?: PeakPricingRule | null): number {
   if (!peakPricing?.enabled) return basePrice;
 
   const peakStart = timeToMins(peakPricing.startTime);
   const peakEnd = timeToMins(peakPricing.endTime);
 
   return startMins >= peakStart && startMins < peakEnd ? peakPricing.price : basePrice;
+}
+
+/**
+ * Re-prices every still-'available' (unbooked) current/future slot to match
+ * the venue's current per-variety base price + peak-pricing rule. Needed
+ * because editing a venue only ever touches its `sports`/`peakPricing` JSON —
+ * without this, a partner changing a variety's price would never see it
+ * reflected on slots generated before the edit (they'd keep whatever price
+ * was baked in at generation time, forever). Booked/blocked slots are left
+ * untouched so past pricing on an existing booking is never rewritten.
+ */
+export async function repriceAvailableSlots(
+  client: any,
+  params: {
+    venueId: string;
+    sports: any[];
+    peakPricing?: PeakPricingRule | null;
+    fallbackBasePrice: number;
+  }
+): Promise<number> {
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  const varietyBasePriceById = new Map<string, number>();
+  for (const sport of params.sports || []) {
+    for (const variety of sport.varieties || []) {
+      varietyBasePriceById.set(variety.id, variety.basePrice ?? params.fallbackBasePrice);
+    }
+  }
+
+  const slots = await client.timeSlot.findMany({
+    where: { venueId: params.venueId, status: "available", date: { gte: today } },
+    select: { id: true, varietyId: true, startTime: true, price: true },
+  });
+
+  let updatedCount = 0;
+  for (const slot of slots) {
+    const basePrice = varietyBasePriceById.get(slot.varietyId);
+    if (basePrice === undefined) continue; // variety no longer exists on the venue — leave its old slots alone
+
+    const newPrice = priceForSlot(timeToMins(slot.startTime), basePrice, params.peakPricing);
+    if (newPrice !== slot.price) {
+      await client.timeSlot.update({ where: { id: slot.id }, data: { price: newPrice } });
+      updatedCount += 1;
+    }
+  }
+
+  return updatedCount;
 }
 
 /**

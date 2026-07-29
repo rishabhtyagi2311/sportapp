@@ -107,7 +107,11 @@ export default function AcademyAnnouncementsScreen() {
         {isLoading && <ActivityIndicator size="small" color="#2563eb" />}
       </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
+        className="flex-1"
+      >
         <ImageBackground
           source={require("@/assets/images/bgEnhancedCoverImage.png")}
           className="flex-1"

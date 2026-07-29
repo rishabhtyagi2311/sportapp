@@ -1,5 +1,5 @@
 import { prisma as globalClient } from "../../../index";
-import { generateSlotsForRange, ROLLING_WINDOW_DAYS } from "./slotGenerator";
+import { generateSlotsForRange, repriceAvailableSlots, ROLLING_WINDOW_DAYS } from "./slotGenerator";
 
 /**
  * Professional Venue Service
@@ -164,6 +164,35 @@ export class VenueService {
       },
       include: { address: true, images: true },
     });
+
+    // Sports/pricing changed — reprice existing available slots to match
+    // (peak pricing composes correctly per-slot) and backfill any newly
+    // added varieties or rolling-window days.
+    if (data.sports) {
+      const lastSlot = await globalClient.timeSlot.findFirst({
+        where: { venueId },
+        orderBy: { price: "desc" },
+        select: { price: true },
+      });
+      const fallbackBasePrice = lastSlot?.price || 1000;
+      const effectivePeakPricing = (data.peakPricing ?? venue.peakPricing) as any;
+
+      await repriceAvailableSlots(globalClient, {
+        venueId,
+        sports: data.sports,
+        peakPricing: effectivePeakPricing,
+        fallbackBasePrice,
+      });
+
+      await generateSlotsForRange(globalClient, {
+        venueId,
+        sports: data.sports,
+        operatingHours: (data.operatingHours ?? venue.operatingHours) as any,
+        basePrice: fallbackBasePrice,
+        daysCount: ROLLING_WINDOW_DAYS,
+        peakPricing: effectivePeakPricing,
+      });
+    }
 
     return this.mapVenueForClient(venue);
   }

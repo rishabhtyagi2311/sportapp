@@ -343,6 +343,7 @@ model TimeSlot {
   status      String   @default("available")
   venue       Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
 
+  @@unique([venueId, varietyId, date, startTime, endTime])
   @@index([venueId, date, varietyId])
   @@index([status])
 }

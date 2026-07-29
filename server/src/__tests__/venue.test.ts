@@ -164,6 +164,36 @@ describe('PUT /api/v1/partner/venues/:venueId', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.name).toBe('New Name Ltd');
   });
+
+  it('reprices existing available slots and backfills new varieties when sports/pricing change', async () => {
+    const updatedSports = [
+      { id: 'sport-1', name: 'Football', varieties: [{ id: 'variety-1', name: '5-a-side', basePrice: 750 }] },
+    ];
+
+    prismaMock.venue.findFirst.mockResolvedValue(fakeVenueRow() as any);
+    prismaMock.venue.update.mockResolvedValue(fakeVenueRow({ sports: updatedSports }) as any);
+    prismaMock.timeSlot.findFirst.mockResolvedValue({ price: 1000 } as any);
+
+    prismaMock.timeSlot.findMany
+      .mockResolvedValueOnce([
+        { id: 'slot-1', varietyId: 'variety-1', startTime: '09:00', price: 1000 },
+      ] as any) // repriceAvailableSlots' existing-available query
+      .mockResolvedValueOnce([] as any); // generateSlotsForRange's dedup-check query
+
+    prismaMock.timeSlot.update.mockResolvedValue({} as any);
+    prismaMock.timeSlot.createMany.mockResolvedValue({ count: 0 } as any);
+
+    const res = await request(app)
+      .put('/api/v1/partner/venues/venue-1')
+      .set(authHeader(PARTNER_ID))
+      .send({ sports: updatedSports });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.timeSlot.update).toHaveBeenCalledWith({
+      where: { id: 'slot-1' },
+      data: { price: 750 },
+    });
+  });
 });
 
 describe('DELETE /api/v1/partner/venues/:venueId', () => {
