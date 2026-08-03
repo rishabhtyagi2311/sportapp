@@ -132,6 +132,17 @@ export const academyApiService = {
     return response.data;
   },
 
+  setCoverPhoto: async (academyId: string, url: string) => {
+    const response = await apiClient.patch(`/partner/academies/${academyId}/cover-photo`, { url });
+    return response.data;
+  },
+
+  // --- Reviews ---
+  getReviews: async (academyId: string) => {
+    const response = await apiClient.get(`/partner/academies/${academyId}/reviews`);
+    return response.data;
+  },
+
   // --- Certificates ---
   createCertificate: async (studentId: string, template: string, achievement: string) => {
     const response = await apiClient.post(`/partner/students/${studentId}/certificates`, { template, achievement });
@@ -179,6 +190,11 @@ export const academyApiService = {
 
   cancelDemoBooking: async (bookingId: string) => {
     const response = await apiClient.patch(`/partner/demo-bookings/${bookingId}/cancel`);
+    return response.data;
+  },
+
+  rescheduleDemoBooking: async (bookingId: string, bookingDate: string) => {
+    const response = await apiClient.patch(`/partner/demo-bookings/${bookingId}/reschedule`, { bookingDate });
     return response.data;
   },
 };

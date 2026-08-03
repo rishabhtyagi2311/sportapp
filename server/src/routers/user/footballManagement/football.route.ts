@@ -14,6 +14,8 @@ router.get("/football/teams", authenticateUser, FootballTeamController.all);
 router.get("/football/teams/mine", authenticateUser, FootballTeamController.mine);
 router.get("/football/teams/:teamId", FootballTeamController.getById);
 router.post("/football/teams/:teamId/members", authenticateUser, FootballTeamController.addMember);
+router.patch("/football/teams/:teamId/captain", authenticateUser, FootballTeamController.updateCaptain);
+router.delete("/football/teams/:teamId/members/:playerId", authenticateUser, FootballTeamController.removeMember);
 router.get("/football/players", FootballTeamController.players);
 router.get("/football/players/:profileId/stats", MatchController.playerStats);
 

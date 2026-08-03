@@ -59,6 +59,7 @@ function fakeVenueRow(overrides: Partial<any> = {}) {
     partnerId: PARTNER_ID,
     address: { street: '123 Main St', lat: null, lng: null },
     images: [],
+    coverImageUrl: null,
     timeSlots: [],
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -193,6 +194,51 @@ describe('PUT /api/v1/partner/venues/:venueId', () => {
       where: { id: 'slot-1' },
       data: { price: 750 },
     });
+  });
+
+  it('falls back to the first image as cover when none has been explicitly set', async () => {
+    prismaMock.venue.findFirst.mockResolvedValue(
+      fakeVenueRow({ images: [{ url: 'https://cdn.example.com/a.jpg' }, { url: 'https://cdn.example.com/b.jpg' }] }) as any
+    );
+
+    const res = await request(app).get('/api/v1/partner/venues/venue-1').set(authHeader(PARTNER_ID));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.coverImage).toBe('https://cdn.example.com/a.jpg');
+  });
+
+  it('rejects setting a cover photo not among the venue images', async () => {
+    prismaMock.venue.findFirst.mockResolvedValue(
+      fakeVenueRow({ images: [{ url: 'https://cdn.example.com/a.jpg' }] }) as any
+    );
+
+    const res = await request(app)
+      .put('/api/v1/partner/venues/venue-1')
+      .set(authHeader(PARTNER_ID))
+      .send({ coverImageUrl: 'https://cdn.example.com/not-mine.jpg' });
+
+    expect(res.status).toBe(500);
+    expect(prismaMock.venue.update).not.toHaveBeenCalled();
+  });
+
+  it('sets the cover photo to one of the venue images', async () => {
+    prismaMock.venue.findFirst.mockResolvedValue(
+      fakeVenueRow({ images: [{ url: 'https://cdn.example.com/a.jpg' }] }) as any
+    );
+    prismaMock.venue.update.mockResolvedValue(
+      fakeVenueRow({ coverImageUrl: 'https://cdn.example.com/a.jpg', images: [{ url: 'https://cdn.example.com/a.jpg' }] }) as any
+    );
+
+    const res = await request(app)
+      .put('/api/v1/partner/venues/venue-1')
+      .set(authHeader(PARTNER_ID))
+      .send({ coverImageUrl: 'https://cdn.example.com/a.jpg' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.coverImage).toBe('https://cdn.example.com/a.jpg');
+    expect(prismaMock.venue.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ coverImageUrl: 'https://cdn.example.com/a.jpg' }) })
+    );
   });
 });
 

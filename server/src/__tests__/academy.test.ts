@@ -232,6 +232,107 @@ describe('Photos', () => {
     expect(res.status).toBe(200);
     expect(prismaMock.academyPhoto.delete).toHaveBeenCalledWith({ where: { id: 'photo-1' } });
   });
+
+  it('rejects setting a cover photo not owned by the academy', async () => {
+    prismaMock.academy.findFirst.mockResolvedValue(fakeAcademy() as any);
+    prismaMock.academyPhoto.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .patch(`/api/v1/partner/academies/${ACADEMY_ID}/cover-photo`)
+      .set(authHeader(PARTNER_ID))
+      .send({ url: 'https://cdn.example.com/not-mine.jpg' });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.academy.update).not.toHaveBeenCalled();
+  });
+
+  it("sets the academy's cover photo to one of its existing photos", async () => {
+    prismaMock.academy.findFirst.mockResolvedValue(fakeAcademy() as any);
+    prismaMock.academyPhoto.findFirst.mockResolvedValue({
+      id: 'photo-1',
+      academyId: ACADEMY_ID,
+      url: 'https://cdn.example.com/photo.jpg',
+    } as any);
+    prismaMock.academy.update.mockResolvedValue(
+      fakeAcademy({
+        coverPhotoUrl: 'https://cdn.example.com/photo.jpg',
+        photos: [{ url: 'https://cdn.example.com/photo.jpg' }],
+      }) as any
+    );
+
+    const res = await request(app)
+      .patch(`/api/v1/partner/academies/${ACADEMY_ID}/cover-photo`)
+      .set(authHeader(PARTNER_ID))
+      .send({ url: 'https://cdn.example.com/photo.jpg' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.coverImage).toBe('https://cdn.example.com/photo.jpg');
+    expect(prismaMock.academy.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: ACADEMY_ID },
+        data: { coverPhotoUrl: 'https://cdn.example.com/photo.jpg' },
+      })
+    );
+  });
+
+  it('falls back to the first photo as cover when none has been explicitly set', async () => {
+    prismaMock.academy.findFirst.mockResolvedValue(
+      fakeAcademy({ photos: [{ url: 'https://cdn.example.com/a.jpg' }, { url: 'https://cdn.example.com/b.jpg' }] }) as any
+    );
+
+    const res = await request(app)
+      .get(`/api/v1/partner/academies/${ACADEMY_ID}`)
+      .set(authHeader(PARTNER_ID));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.coverImage).toBe('https://cdn.example.com/a.jpg');
+  });
+});
+
+describe('GET /api/v1/partner/academies/:academyId/reviews', () => {
+  it('requires authentication', async () => {
+    const res = await request(app).get(`/api/v1/partner/academies/${ACADEMY_ID}/reviews`);
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects listing reviews for an academy not owned by the partner', async () => {
+    prismaMock.academy.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .get(`/api/v1/partner/academies/${ACADEMY_ID}/reviews`)
+      .set(authHeader(PARTNER_ID));
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.review.findMany).not.toHaveBeenCalled();
+  });
+
+  it('lists reviews for an owned academy', async () => {
+    prismaMock.academy.findFirst.mockResolvedValue(fakeAcademy() as any);
+    prismaMock.review.findMany.mockResolvedValue([
+      {
+        id: 'review-1',
+        academyId: ACADEMY_ID,
+        childProfileId: 'child-1',
+        parentId: 1,
+        rating: 5,
+        title: 'Great academy',
+        comment: 'Loved it',
+        createdAt: new Date(),
+        childProfile: { id: 'child-1', childName: 'Timmy' },
+      },
+    ] as any);
+
+    const res = await request(app)
+      .get(`/api/v1/partner/academies/${ACADEMY_ID}/reviews`)
+      .set(authHeader(PARTNER_ID));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].childName).toBe('Timmy');
+    expect(prismaMock.review.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { academyId: ACADEMY_ID } })
+    );
+  });
 });
 
 describe('Certificates', () => {

@@ -33,6 +33,8 @@ interface FormState {
   maxParticipants: string;
   date: string;
   time: string;
+  deadlineDate: string;
+  deadlineTime: string;
   duration: string;
   feeAmount: string;
   feeType: FeeType | '';
@@ -56,6 +58,8 @@ export default function CreateEventScreen() {
     maxParticipants: '',
     date: '',
     time: '',
+    deadlineDate: '',
+    deadlineTime: '',
     duration: '',
     feeAmount: '',
     feeType: '',
@@ -71,7 +75,7 @@ export default function CreateEventScreen() {
   };
 
   // Handle date input with format control
-  const handleDateChange = (text: string) => {
+  const handleDateChange = (field: 'date' | 'deadlineDate') => (text: string) => {
     const sanitized = text.replace(/[^\d-]/g, '');
     let formatted = sanitized;
     if (sanitized.length > 4 && !sanitized.includes('-')) {
@@ -83,19 +87,19 @@ export default function CreateEventScreen() {
         parts[0] + '-' + parts[1].slice(0, 2) + '-' + parts[1].slice(2);
     }
     if (formatted.length <= 10) {
-      updateForm('date', formatted);
+      updateForm(field, formatted);
     }
   };
 
   // Handle time input with format control
-  const handleTimeChange = (text: string) => {
+  const handleTimeChange = (field: 'time' | 'deadlineTime') => (text: string) => {
     const sanitized = text.replace(/[^\d:]/g, '');
     let formatted = sanitized;
     if (sanitized.length > 2 && !sanitized.includes(':')) {
       formatted = sanitized.slice(0, 2) + ':' + sanitized.slice(2);
     }
     if (formatted.length <= 5) {
-      updateForm('time', formatted);
+      updateForm(field, formatted);
     }
   };
 
@@ -149,6 +153,28 @@ export default function CreateEventScreen() {
       Alert.alert('Error', 'Please enter time in HH:MM format');
       return false;
     }
+    if (!formData.deadlineDate) {
+      Alert.alert('Error', 'Please enter a registration deadline date');
+      return false;
+    }
+    if (
+      formData.deadlineDate.length !== 10 ||
+      !formData.deadlineDate.match(/^\d{4}-\d{2}-\d{2}$/)
+    ) {
+      Alert.alert('Error', 'Please enter the deadline date in YYYY-MM-DD format');
+      return false;
+    }
+    if (!formData.deadlineTime) {
+      Alert.alert('Error', 'Please enter a registration deadline time');
+      return false;
+    }
+    if (
+      formData.deadlineTime.length !== 5 ||
+      !formData.deadlineTime.match(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    ) {
+      Alert.alert('Error', 'Please enter the deadline time in HH:MM format');
+      return false;
+    }
     if (!formData.duration) {
       Alert.alert('Error', 'Please enter event duration');
       return false;
@@ -169,17 +195,27 @@ export default function CreateEventScreen() {
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
+    // Parse date and time
+    const [year, month, day] = formData.date.split('-').map(Number);
+    const [hours, minutes] = formData.time.split(':').map(Number);
+    const dateTime = new Date(year, month - 1, day, hours, minutes);
+
+    // Parse organizer-chosen registration deadline
+    const [deadlineYear, deadlineMonth, deadlineDay] = formData.deadlineDate.split('-').map(Number);
+    const [deadlineHours, deadlineMinutes] = formData.deadlineTime.split(':').map(Number);
+    const deadline = new Date(deadlineYear, deadlineMonth - 1, deadlineDay, deadlineHours, deadlineMinutes);
+
+    if (deadline.getTime() <= Date.now()) {
+      Alert.alert('Error', 'Registration deadline must be in the future');
+      return;
+    }
+    if (deadline.getTime() > dateTime.getTime()) {
+      Alert.alert('Error', 'Registration deadline must be at or before the event start time');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      // Parse date and time
-      const [year, month, day] = formData.date.split('-').map(Number);
-      const [hours, minutes] = formData.time.split(':').map(Number);
-      const dateTime = new Date(year, month - 1, day, hours, minutes);
-
-      // Calculate registration deadline
-      const deadline = new Date(dateTime);
-      deadline.setDate(deadline.getDate() - 1);
-
       await createEvent({
         eventType: 'regular',
         venueId: formData.location.venueId,
@@ -402,7 +438,7 @@ export default function CreateEventScreen() {
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor="#6b7280"
                     value={formData.date}
-                    onChangeText={handleDateChange}
+                    onChangeText={handleDateChange('date')}
                     keyboardType="numeric"
                     maxLength={10}
                   />
@@ -414,7 +450,47 @@ export default function CreateEventScreen() {
                     placeholder="HH:MM"
                     placeholderTextColor="#6b7280"
                     value={formData.time}
-                    onChangeText={handleTimeChange}
+                    onChangeText={handleTimeChange('time')}
+                    keyboardType="numeric"
+                    maxLength={5}
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Registration Deadline */}
+            <View className="mb-6">
+              <Text className="text-white font-semibold mb-2 text-base">
+                Registration Deadline *
+              </Text>
+              <Text className="text-gray-300 text-xs mb-2">
+                Registrations close automatically at this date and time.
+              </Text>
+              <View className="flex-row">
+                <View className="flex-1 bg-sky-100 rounded-xl border border-gray-200 flex-row items-center px-4 mr-2">
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color="#374151"
+                  />
+                  <TextInput
+                    className="flex-1 text-black py-4 px-3 text-base"
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#6b7280"
+                    value={formData.deadlineDate}
+                    onChangeText={handleDateChange('deadlineDate')}
+                    keyboardType="numeric"
+                    maxLength={10}
+                  />
+                </View>
+                <View className="flex-1 bg-sky-100 rounded-xl border border-gray-200 flex-row items-center px-4">
+                  <Ionicons name="time-outline" size={20} color="#374151" />
+                  <TextInput
+                    className="flex-1 text-black py-4 px-3 text-base"
+                    placeholder="HH:MM"
+                    placeholderTextColor="#6b7280"
+                    value={formData.deadlineTime}
+                    onChangeText={handleTimeChange('deadlineTime')}
                     keyboardType="numeric"
                     maxLength={5}
                   />

@@ -51,6 +51,7 @@ export default function EditVenue() {
   const [whatsapp, setWhatsapp] = useState(venue?.contactInfo.whatsapp || '')
 
   const [images, setImages] = useState<string[]>(venue?.images || [])
+  const [coverImageUrl, setCoverImageUrl] = useState<string | undefined>(venue?.coverImage ?? undefined)
   const [amenities, setAmenities] = useState<Amenity[]>(venue?.amenities || [])
   const [sports, setSports] = useState<Sport[]>(venue?.sports || [])
 
@@ -110,7 +111,11 @@ export default function EditVenue() {
   }
 
   const removeImage = (index: number) => {
+    const removedUrl = images[index]
     setImages((prev) => prev.filter((_, i) => i !== index))
+    if (coverImageUrl === removedUrl) {
+      setCoverImageUrl(undefined)
+    }
   }
 
   /* --- AMENITY HANDLERS --- */
@@ -196,6 +201,7 @@ export default function EditVenue() {
         address: { street, city, state, pincode },
         contactInfo: { phone, email, whatsapp },
         images,
+        coverImageUrl: coverImageUrl ?? null,
         amenities,
         sports,
       })
@@ -229,17 +235,28 @@ export default function EditVenue() {
           {/* PHOTOS */}
           <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Photos (Max 5)</Text>
           <View className="flex-row flex-wrap gap-3 mb-8">
-            {images.map((url, index) => (
-              <View key={index} className="w-[100px] h-[100px] rounded-2xl overflow-hidden bg-slate-200 relative">
-                <Image source={{ uri: url }} className="w-full h-full" />
-                <TouchableOpacity
-                  onPress={() => removeImage(index)}
-                  className="absolute top-1 right-1 bg-white/90 rounded-full p-1"
-                >
-                  <Ionicons name="close-circle" size={18} color="#ef4444" />
-                </TouchableOpacity>
-              </View>
-            ))}
+            {images.map((url, index) => {
+              const isCover = coverImageUrl ? coverImageUrl === url : index === 0
+              return (
+                <View key={index} className="w-[100px] h-[100px] rounded-2xl overflow-hidden bg-slate-200 relative">
+                  <Image source={{ uri: url }} className="w-full h-full" />
+                  <TouchableOpacity
+                    onPress={() => removeImage(index)}
+                    className="absolute top-1 right-1 bg-white/90 rounded-full p-1"
+                  >
+                    <Ionicons name="close-circle" size={18} color="#ef4444" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setCoverImageUrl(url)}
+                    disabled={isCover}
+                    className="absolute bottom-1 left-1 right-1 bg-black/60 rounded-full py-1 flex-row items-center justify-center"
+                  >
+                    <Ionicons name={isCover ? 'star' : 'star-outline'} size={11} color="#facc15" />
+                    <Text className="text-white text-[8px] font-bold ml-1">{isCover ? 'Cover' : 'Set Cover'}</Text>
+                  </TouchableOpacity>
+                </View>
+              )
+            })}
             {images.length < 5 && (
               <TouchableOpacity
                 onPress={pickImage}

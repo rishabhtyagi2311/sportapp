@@ -88,6 +88,7 @@ model footballProfile {
 
   user         userInfo    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdTeams footballTeam[] @relation("CreatedTeams")
+  captainOfTeams footballTeam[] @relation("TeamCaptain")
   memberTeams  footballTeamMember[]
   matchStats   MatchPlayerStat[]
 
@@ -101,12 +102,14 @@ model footballTeam {
   location      String
   maxPlayers    Int
   createdById   Int
+  captainId     Int?
   matchesPlayed Int                   @default(0)
   matchesWon    Int                   @default(0)
   matchesLost   Int                   @default(0)
   matchesDrawn  Int                   @default(0)
 
   createdBy     footballProfile       @relation("CreatedTeams", fields: [createdById], references: [id])
+  captain       footballProfile?      @relation("TeamCaptain", fields: [captainId], references: [id])
   members       footballTeamMember[]
   eventRegistrations EventRegistration[]
   homeMatches   Match[]               @relation("HomeMatches")
@@ -163,6 +166,7 @@ model Academy {
   isActive      Boolean  @default(true)
   averageRating Float    @default(0)
   reviewCount   Int      @default(0)
+  coverPhotoUrl String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -308,6 +312,7 @@ model Venue {
   pincode        String
 
   images         Image[]
+  coverImageUrl  String?
   address        Address?
   timeSlots      TimeSlot[]
   bookings       Booking[]

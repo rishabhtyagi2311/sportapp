@@ -32,6 +32,8 @@ interface FormState {
   maxParticipants: string;
   date: string;
   time: string;
+  deadlineDate: string;
+  deadlineTime: string;
   duration: string;
   feeAmount: string;
   feeType: FeeType;
@@ -57,6 +59,7 @@ export default function EditEventScreen() {
   useEffect(() => {
     if (!event) return;
     const dt = new Date(event.dateTime);
+    const deadlineDt = new Date(event.registrationDeadline);
     setForm({
       name: event.name,
       description: event.description ?? '',
@@ -69,6 +72,8 @@ export default function EditEventScreen() {
       maxParticipants: event.maxParticipants.toString(),
       date: dt.toISOString().slice(0, 10),
       time: dt.toISOString().slice(11, 16),
+      deadlineDate: deadlineDt.toISOString().slice(0, 10),
+      deadlineTime: deadlineDt.toISOString().slice(11, 16),
       duration: (event.duration / 60).toString(),
       feeAmount: event.feeAmount.toString(),
       feeType: event.feeType,
@@ -89,7 +94,7 @@ export default function EditEventScreen() {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
 
   // Handle date input
-  const handleDateChange = (text: string) => {
+  const handleDateChange = (field: 'date' | 'deadlineDate') => (text: string) => {
     const sanitized = text.replace(/[^\d-]/g, '');
     let formatted = sanitized;
     if (sanitized.length > 4 && !sanitized.includes('-')) {
@@ -101,19 +106,19 @@ export default function EditEventScreen() {
         parts[0] + '-' + parts[1].slice(0, 2) + '-' + parts[1].slice(2);
     }
     if (formatted.length <= 10) {
-      update('date', formatted);
+      update(field, formatted);
     }
   };
 
   // Handle time input
-  const handleTimeChange = (text: string) => {
+  const handleTimeChange = (field: 'time' | 'deadlineTime') => (text: string) => {
     const sanitized = text.replace(/[^\d:]/g, '');
     let formatted = sanitized;
     if (sanitized.length > 2 && !sanitized.includes(':')) {
       formatted = sanitized.slice(0, 2) + ':' + sanitized.slice(2);
     }
     if (formatted.length <= 5) {
-      update('time', formatted);
+      update(field, formatted);
     }
   };
 
@@ -129,6 +134,10 @@ export default function EditEventScreen() {
     if (form.date.length !== 10 || !form.date.match(/^\d{4}-\d{2}-\d{2}$/)) { Alert.alert('Error', 'Please enter date in YYYY-MM-DD format'); return false; }
     if (!form.time) { Alert.alert('Error', 'Please enter event time'); return false; }
     if (form.time.length !== 5 || !form.time.match(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)) { Alert.alert('Error', 'Please enter time in HH:MM format'); return false; }
+    if (!form.deadlineDate) { Alert.alert('Error', 'Please enter a registration deadline date'); return false; }
+    if (form.deadlineDate.length !== 10 || !form.deadlineDate.match(/^\d{4}-\d{2}-\d{2}$/)) { Alert.alert('Error', 'Please enter the deadline date in YYYY-MM-DD format'); return false; }
+    if (!form.deadlineTime) { Alert.alert('Error', 'Please enter a registration deadline time'); return false; }
+    if (form.deadlineTime.length !== 5 || !form.deadlineTime.match(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)) { Alert.alert('Error', 'Please enter the deadline time in HH:MM format'); return false; }
     if (!form.duration) { Alert.alert('Error', 'Please enter event duration'); return false; }
     if (!form.feeAmount) { Alert.alert('Error', 'Please enter fee amount'); return false; }
     if (!form.feeType) { Alert.alert('Error', 'Please select fee type'); return false; }
@@ -140,15 +149,21 @@ export default function EditEventScreen() {
     if (!id) return;
     if (!validateForm()) return;
 
+    const [y, m, d] = form.date.split('-').map(Number);
+    const [hh, mm] = form.time.split(':').map(Number);
+    const dateTime = new Date(y, m - 1, d, hh, mm);
+
+    const [dy, dm, dd] = form.deadlineDate.split('-').map(Number);
+    const [dhh, dmm] = form.deadlineTime.split(':').map(Number);
+    const deadline = new Date(dy, dm - 1, dd, dhh, dmm);
+
+    if (deadline.getTime() > dateTime.getTime()) {
+      Alert.alert('Error', 'Registration deadline must be at or before the event start time');
+      return;
+    }
+
     setSaving(true);
     try {
-      const [y, m, d] = form.date.split('-').map(Number);
-      const [hh, mm] = form.time.split(':').map(Number);
-      const dateTime = new Date(y, m - 1, d, hh, mm);
-
-      const deadline = new Date(dateTime);
-      deadline.setDate(deadline.getDate() - 1);
-
       await updateEvent(id, {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
@@ -347,7 +362,7 @@ export default function EditEventScreen() {
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor="#6b7280"
                   value={form.date}
-                  onChangeText={handleDateChange}
+                  onChangeText={handleDateChange('date')}
                   keyboardType="numeric"
                   maxLength={10}
                 />
@@ -359,7 +374,43 @@ export default function EditEventScreen() {
                   placeholder="HH:MM"
                   placeholderTextColor="#6b7280"
                   value={form.time}
-                  onChangeText={handleTimeChange}
+                  onChangeText={handleTimeChange('time')}
+                  keyboardType="numeric"
+                  maxLength={5}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Registration Deadline */}
+          <View className="mb-6">
+            <Text className="text-white font-semibold mb-2 text-base">
+              Registration Deadline *
+            </Text>
+            <Text className="text-gray-400 text-sm mb-3">
+              Registrations close automatically at this date and time.
+            </Text>
+            <View className="flex-row">
+              <View className="flex-1 bg-sky-100 rounded-xl border border-gray-200 flex-row items-center px-4 mr-2">
+                <Ionicons name="calendar-outline" size={20} color="#374151" />
+                <TextInput
+                  className="flex-1 text-black py-4 px-3 text-base"
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#6b7280"
+                  value={form.deadlineDate}
+                  onChangeText={handleDateChange('deadlineDate')}
+                  keyboardType="numeric"
+                  maxLength={10}
+                />
+              </View>
+              <View className="flex-1 bg-sky-100 rounded-xl border border-gray-200 flex-row items-center px-4">
+                <Ionicons name="time-outline" size={20} color="#374151" />
+                <TextInput
+                  className="flex-1 text-black py-4 px-3 text-base"
+                  placeholder="HH:MM"
+                  placeholderTextColor="#6b7280"
+                  value={form.deadlineTime}
+                  onChangeText={handleTimeChange('deadlineTime')}
                   keyboardType="numeric"
                   maxLength={5}
                 />

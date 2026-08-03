@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Academy, Student, Attendance, Certificate, Coach, AcademyPhoto } from '../types';
+import { Academy, Student, Attendance, Certificate, Coach, AcademyPhoto, Review } from '../types';
 import { academyApiService, CreateAcademyInput } from '@/services/academyManagement/academy';
 
 interface AcademyStore {
@@ -9,6 +9,7 @@ interface AcademyStore {
   attendance: Attendance[];
   certificates: Certificate[];
   photos: AcademyPhoto[];
+  reviews: Review[];
   isLoading: boolean;
   error: string | null;
 
@@ -51,7 +52,12 @@ interface AcademyStore {
   fetchPhotos: (academyId: string) => Promise<void>;
   addPhoto: (academyId: string, url: string) => Promise<void>;
   removePhoto: (academyId: string, photoId: string) => Promise<void>;
+  setCoverPhoto: (academyId: string, url: string) => Promise<void>;
   getPhotosByAcademy: (academyId: string) => AcademyPhoto[];
+
+  // Review actions (API-backed)
+  fetchReviews: (academyId: string) => Promise<void>;
+  getReviewsByAcademy: (academyId: string) => Review[];
 }
 
 export const useAcademyStore = create<AcademyStore>((set, get) => ({
@@ -61,6 +67,7 @@ export const useAcademyStore = create<AcademyStore>((set, get) => ({
   attendance: [],
   certificates: [],
   photos: [],
+  reviews: [],
   isLoading: false,
   error: null,
 
@@ -324,7 +331,30 @@ export const useAcademyStore = create<AcademyStore>((set, get) => ({
     set((state) => ({ photos: state.photos.filter((p) => p.id !== photoId) }));
   },
 
+  setCoverPhoto: async (academyId, url) => {
+    const response = await academyApiService.setCoverPhoto(academyId, url);
+    if (response.success) {
+      set((state) => ({
+        academies: state.academies.map((a) => (a.id === academyId ? response.data : a)),
+      }));
+    }
+  },
+
   getPhotosByAcademy: (academyId) => {
     return get().photos.filter((p) => p.academyId === academyId);
+  },
+
+  // --- Review Implementation ---
+  fetchReviews: async (academyId) => {
+    const response = await academyApiService.getReviews(academyId);
+    if (response.success) {
+      set((state) => ({
+        reviews: [...state.reviews.filter((r) => r.academyId !== academyId), ...response.data],
+      }));
+    }
+  },
+
+  getReviewsByAcademy: (academyId) => {
+    return get().reviews.filter((r) => r.academyId === academyId);
   },
 }));

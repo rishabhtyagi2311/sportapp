@@ -52,6 +52,7 @@ export const createVenueSchema = z.object({
   sports: z.array(z.any()),
   amenities: z.array(z.any()),
   images: z.array(z.string()),
+  coverImageUrl: z.string().optional(),
   timeSlots: z.array(z.any()),
   isActive: z.boolean().optional(),
 });
@@ -67,4 +68,5 @@ export const updateVenueSchema = z.object({
   sports: z.array(z.any()).optional(),
   amenities: z.array(z.any()).optional(),
   images: z.array(z.string()).optional(),
+  coverImageUrl: z.string().nullable().optional(),
 });

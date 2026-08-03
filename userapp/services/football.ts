@@ -108,6 +108,26 @@ class FootballService {
     }
   }
 
+  async updateCaptain(teamId: number, captainId: number): Promise<FootballTeam | null> {
+    try {
+      const response = await apiClient.patch(`/user/football/teams/${teamId}/captain`, { captainId });
+      return response?.data?.data ?? null;
+    } catch (e) {
+      console.error("Error in updateCaptain:", e);
+      return null;
+    }
+  }
+
+  async removeTeamMember(teamId: number, playerId: number): Promise<FootballTeam | null> {
+    try {
+      const response = await apiClient.delete(`/user/football/teams/${teamId}/members/${playerId}`);
+      return response?.data?.data ?? null;
+    } catch (e) {
+      console.error("Error in removeTeamMember:", e);
+      return null;
+    }
+  }
+
   async fetchTeamMatches(teamId: number): Promise<FootballMatch[]> {
     try {
       const response = await apiClient.get(`/user/football/teams/${teamId}/matches`);

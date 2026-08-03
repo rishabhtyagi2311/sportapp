@@ -14,6 +14,14 @@ export class VenueService {
    * Address row; the client always wants one nested `address` object.
    */
   static mapVenueForClient(venue: any) {
+    const images = (venue.images || []).map((img: any) => img.url);
+    // Partner-selected cover wins; if unset (or it no longer points at an
+    // existing photo — e.g. that image was since removed) fall back to
+    // whichever photo happens to be first, rather than showing blank.
+    const coverImage = venue.coverImageUrl && images.includes(venue.coverImageUrl)
+      ? venue.coverImageUrl
+      : images[0] || null;
+
     return {
       id: venue.id,
       name: venue.name,
@@ -30,7 +38,8 @@ export class VenueService {
       contactInfo: venue.contactInfo,
       sports: venue.sports,
       amenities: venue.amenities,
-      images: (venue.images || []).map((img: any) => img.url),
+      images,
+      coverImage,
       rating: venue.rating,
       reviewCount: 0,
       operatingHours: venue.operatingHours,
@@ -49,6 +58,13 @@ export class VenueService {
   }
 
   static async createVenue(data: any, partnerId: string) {
+    // Only honor a client-supplied cover if it's actually among the photos
+    // being uploaded — otherwise mapVenueForClient's fallback (first image)
+    // takes over.
+    const coverImageUrl = data.coverImageUrl && (data.images || []).includes(data.coverImageUrl)
+      ? data.coverImageUrl
+      : undefined;
+
     const venue = await globalClient.$transaction(async (tx) => {
       const created = await tx.venue.create({
         data: {
@@ -62,6 +78,7 @@ export class VenueService {
           peakPricing: data.peakPricing || undefined,
           sports: data.sports,
           amenities: data.amenities,
+          coverImageUrl,
           partner: { connect: { id: partnerId } },
           address: {
             create: {
@@ -114,10 +131,20 @@ export class VenueService {
   }
 
   static async updateVenue(venueId: string, partnerId: string, data: any) {
-    const existingVenue = await globalClient.venue.findFirst({ where: { id: venueId, partnerId } });
+    const existingVenue = await globalClient.venue.findFirst({
+      where: { id: venueId, partnerId },
+      include: { images: true },
+    });
 
     if (!existingVenue) {
       throw new Error('Venue not found or not owned by partner');
+    }
+
+    if (data.coverImageUrl !== undefined) {
+      const candidateImages = data.images ?? existingVenue.images.map((img) => img.url);
+      if (data.coverImageUrl !== null && !candidateImages.includes(data.coverImageUrl)) {
+        throw new Error("Selected cover photo is not one of this venue's photos");
+      }
     }
 
     const venue = await globalClient.venue.update({
@@ -134,6 +161,7 @@ export class VenueService {
         peakPricing: data.peakPricing,
         sports: data.sports,
         amenities: data.amenities,
+        coverImageUrl: data.coverImageUrl,
         ...(data.address
           ? {
               address: {

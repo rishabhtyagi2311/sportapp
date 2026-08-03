@@ -14,6 +14,15 @@ import { useAcademyStore } from "@/store/academyStore";
 import { usechildStore } from "@/store/academyChildProfile";
 import { useEnrollmentStore } from "@/store/academyEnrollmentStore";
 import { useDemoBookingStore } from "@/store/demobookingstore";
+import CalendarModal from "@/components/CalendarModal";
+
+function defaultDemoDate() {
+  // Sensible starting point for the picker — tomorrow — the parent can
+  // change it to any other non-past date via the calendar.
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow;
+}
 
 export default function DetailsScreen() {
   const { id } = useLocalSearchParams();
@@ -25,10 +34,9 @@ export default function DetailsScreen() {
 
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
+  const [showDemoCalendar, setShowDemoCalendar] = useState(false);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
-  const [nextDemoDate, setNextDemoDate] = useState<string>("");
-  const [nextDemoDay, setNextDemoDay] = useState<string>("");
-  const [nextDemoIso, setNextDemoIso] = useState<string>("");
+  const [selectedDemoDate, setSelectedDemoDate] = useState<Date>(defaultDemoDate());
   const [submitting, setSubmitting] = useState(false);
 
   const academy = getAcademyById(academyId);
@@ -47,33 +55,6 @@ export default function DetailsScreen() {
       </View>
     );
   }
-
-  // Function to calculate next working day (excluding weekends)
-  const calculateNextWorkingDay = () => {
-    const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const today = new Date();
-    const nextDay = new Date(today);
-    
-    // Add 1 day to get tomorrow
-    nextDay.setDate(today.getDate() + 1);
-    
-    // If tomorrow is a weekend (Saturday = 6, Sunday = 0), adjust to Monday
-    if (nextDay.getDay() === 0) { // Sunday
-      nextDay.setDate(nextDay.getDate() + 1); // Move to Monday
-    } else if (nextDay.getDay() === 6) { // Saturday
-      nextDay.setDate(nextDay.getDate() + 2); // Move to Monday
-    }
-    
-    // Format the date and day
-    const formattedDate = nextDay.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-    const dayName = daysOfWeek[nextDay.getDay()];
-    
-    return { date: formattedDate, day: dayName, isoDate: nextDay.toISOString() };
-  };
 
   const handleEnrollPress = () => {
     if (childProfiles.length === 0) {
@@ -97,12 +78,7 @@ export default function DetailsScreen() {
       return;
     }
     
-    // Calculate next working day
-    const { date, day, isoDate } = calculateNextWorkingDay();
-    setNextDemoDate(date);
-    setNextDemoDay(day);
-    setNextDemoIso(isoDate);
-
+    setSelectedDemoDate(defaultDemoDate());
     setShowDemoModal(true);
   };
 
@@ -160,13 +136,13 @@ export default function DetailsScreen() {
       await createDemoBooking({
         childProfileId: selectedChild.id,
         academyId: academy.id,
-        bookingDate: nextDemoIso || calculateNextWorkingDay().isoDate,
+        bookingDate: selectedDemoDate.toISOString(),
       });
       setShowDemoModal(false);
       setSelectedChildId(null);
       Alert.alert(
         "Demo Requested!",
-        `${selectedChild.childName}'s demo class with ${academy.academyName} has been requested for ${nextDemoDate} (${nextDemoDay}). The academy will confirm shortly.`,
+        `${selectedChild.childName}'s demo class with ${academy.academyName} has been requested for ${selectedDemoDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}. The academy will confirm shortly.`,
         [{ text: "OK" }]
       );
     } catch (err: any) {
@@ -451,17 +427,29 @@ export default function DetailsScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Demo Date Info */}
-            <View className="bg-slate-100 rounded-xl p-4 mb-6">
-              <Text className="text-slate-900 text-base font-medium mb-1">
-                Your demo class with {academy.academyName} will be scheduled for:
+            {/* Demo Date Picker */}
+            <View className="mb-6">
+              <Text className="text-slate-900 text-base font-medium mb-2">
+                Choose a date for your demo class with {academy.academyName}:
               </Text>
-              <View className="flex-row items-center mt-2">
-                <Ionicons name="calendar" size={20} color="#10b981" />
-                <Text className="text-green-600 font-bold text-lg ml-2">
-                  {nextDemoDate} ({nextDemoDay})
-                </Text>
-              </View>
+              <TouchableOpacity
+                onPress={() => setShowDemoCalendar(true)}
+                className="bg-slate-100 rounded-xl p-4 flex-row items-center justify-between"
+                activeOpacity={0.8}
+              >
+                <View className="flex-row items-center">
+                  <Ionicons name="calendar" size={20} color="#10b981" />
+                  <Text className="text-green-600 font-bold text-lg ml-2">
+                    {selectedDemoDate.toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#64748b" />
+              </TouchableOpacity>
             </View>
 
             {/* Child Profiles List */}
@@ -563,6 +551,17 @@ export default function DetailsScreen() {
           </View>
         </View>
       </Modal>
+
+      <CalendarModal
+        visible={showDemoCalendar}
+        onClose={() => setShowDemoCalendar(false)}
+        selectedDate={selectedDemoDate}
+        onDateSelect={(date) => {
+          setSelectedDemoDate(date);
+          setShowDemoCalendar(false);
+        }}
+        title="Select Demo Date"
+      />
     </>
   );
 }

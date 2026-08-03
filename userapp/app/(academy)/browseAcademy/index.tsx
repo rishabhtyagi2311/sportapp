@@ -99,12 +99,16 @@ export default function BrowseAcademies() {
         activeOpacity={0.9}
       >
         <View className="relative">
-          <View className="h-48 bg-gray-200 items-center justify-center">
-            <View className="bg-gray-300 rounded-full p-4 mb-2">
-              <Ionicons name="image-outline" size={40} color="#9ca3af" />
+          {academy.coverImage ? (
+            <Image source={{ uri: academy.coverImage }} className="h-48 w-full" resizeMode="cover" />
+          ) : (
+            <View className="h-48 bg-gray-200 items-center justify-center">
+              <View className="bg-gray-300 rounded-full p-4 mb-2">
+                <Ionicons name="image-outline" size={40} color="#9ca3af" />
+              </View>
+              <Text className="text-gray-500 text-sm font-medium">No Cover Photo</Text>
             </View>
-            <Text className="text-gray-500 text-sm font-medium">No Cover Photo</Text>
-          </View>
+          )}
 
           <View className="absolute top-3 left-3 bg-slate-900 px-3 py-1 rounded-full">
             <Text className="text-white text-xs font-semibold">{academy.sportType}</Text>

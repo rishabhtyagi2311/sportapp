@@ -6,25 +6,30 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useFootballStore } from '@/store/footballTeamStore';
+import { useAuthStore } from '@/store/authStore';
 import { footballService } from '@/services/football';
 import { FootballMatch, FootballProfile } from '@/types/football';
 
 export default function ViewMembersScreen() {
   const { teamId: teamIdParam } = useLocalSearchParams();
   const teamId = parseInt(teamIdParam as string, 10);
-  const { getTeamById, fetchTeamById, getTeamPlayers } = useFootballStore();
+  const { getTeamById, fetchTeamById, getTeamPlayers, updateCaptain, removeTeamMember } = useFootballStore();
+  const currentUser = useAuthStore((state) => state.user);
 
   const [isLoading, setIsLoading] = useState(true);
   const [recentMatches, setRecentMatches] = useState<FootballMatch[]>([]);
+  const [actionPlayerId, setActionPlayerId] = useState<number | null>(null);
 
   const team = getTeamById(teamId);
   const teamPlayers = team ? getTeamPlayers(team.id) : [];
-  const captain = team?.createdBy;
+  const captain = team?.captain;
+  const isOwner = !!currentUser && currentUser.id === team?.createdBy?.userId;
 
   useFocusEffect(
     useCallback(() => {
@@ -38,6 +43,49 @@ export default function ViewMembersScreen() {
 
   const handleGoBack = () => {
     router.back();
+  };
+
+  const handleMakeCaptain = (player: FootballProfile) => {
+    if (!team) return;
+    const displayName = player.user ? `${player.user.firstname} ${player.user.lastname}` : player.nickname;
+    Alert.alert('Make Captain', `Make ${displayName} the team captain?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Confirm',
+        onPress: async () => {
+          try {
+            setActionPlayerId(player.id);
+            await updateCaptain(team.id, player.id);
+          } catch (e: any) {
+            Alert.alert('Error', e.message || 'Could not update captain');
+          } finally {
+            setActionPlayerId(null);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleRemovePlayer = (player: FootballProfile) => {
+    if (!team) return;
+    const displayName = player.user ? `${player.user.firstname} ${player.user.lastname}` : player.nickname;
+    Alert.alert('Remove Player', `Remove ${displayName} from the team?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setActionPlayerId(player.id);
+            await removeTeamMember(team.id, player.id);
+          } catch (e: any) {
+            Alert.alert('Error', e.message || 'Could not remove player');
+          } finally {
+            setActionPlayerId(null);
+          }
+        },
+      },
+    ]);
   };
 
   // Get position color for better visual organization
@@ -60,7 +108,11 @@ export default function ViewMembersScreen() {
 
   const renderPlayerCard = (player: FootballProfile, index: number) => {
     const isCaptain = captain?.id === player.id;
+    const isCreator = team?.createdById === player.id;
     const displayName = player.user ? `${player.user.firstname} ${player.user.lastname}` : player.nickname;
+    const isBusy = actionPlayerId === player.id;
+    const canRemove = isOwner && !isCreator && !isCaptain;
+    const canMakeCaptain = isOwner && !isCaptain;
 
     return (
       <View
@@ -128,6 +180,39 @@ export default function ViewMembersScreen() {
             </View>
           </View>
         </View>
+
+        {(canMakeCaptain || canRemove) && (
+          <View className="flex-row border-t border-gray-100 px-4 py-2">
+            {isBusy ? (
+              <View className="flex-1 items-center py-1">
+                <ActivityIndicator size="small" color="#64748b" />
+              </View>
+            ) : (
+              <>
+                {canMakeCaptain && (
+                  <TouchableOpacity
+                    onPress={() => handleMakeCaptain(player)}
+                    className="flex-row items-center mr-5"
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="shield-outline" size={16} color="#b45309" />
+                    <Text className="text-amber-700 text-sm font-medium ml-1">Make Captain</Text>
+                  </TouchableOpacity>
+                )}
+                {canRemove && (
+                  <TouchableOpacity
+                    onPress={() => handleRemovePlayer(player)}
+                    className="flex-row items-center"
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="person-remove-outline" size={16} color="#dc2626" />
+                    <Text className="text-red-600 text-sm font-medium ml-1">Remove</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </View>
+        )}
       </View>
     );
   };

@@ -69,6 +69,7 @@ export interface Venue {
   sports: Sport[]; // Multiple sports supported with varieties
   amenities: Amenity[]; // Dynamic list of amenities
   images: string[]; // Array of image URLs
+  coverImage?: string | null; // Partner-selected cover, or server fallback (first image)
   rating: number;
   reviewCount: number;
   operatingHours: {

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { UserAuthRequest } from "../../../middlewares/auth.middleware";
 import { FootballTeamService } from "../../../services/user/footballManagement/team";
-import { footballTeamCreateSchema } from "../../../types/user/football";
+import { footballTeamCaptainUpdateSchema, footballTeamCreateSchema } from "../../../types/user/football";
 
 export class FootballTeamController {
   static async create(req: UserAuthRequest, res: Response) {
@@ -97,6 +97,54 @@ export class FootballTeamController {
       return res.status(200).json({ success: true, message: "Member added", data: team });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message || "Error adding member" });
+    }
+  }
+
+  static async updateCaptain(req: UserAuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      const teamId = parseInt(req.params.teamId, 10);
+
+      if (!userId) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      if (isNaN(teamId)) {
+        return res.status(400).json({ success: false, message: "Invalid team id" });
+      }
+
+      const parsed = footballTeamCaptainUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ success: false, message: "Invalid captain data", error: parsed.error.issues });
+      }
+
+      const team = await FootballTeamService.updateCaptain(userId, teamId, parsed.data.captainId);
+
+      return res.status(200).json({ success: true, message: "Captain updated", data: team });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message || "Error updating captain" });
+    }
+  }
+
+  static async removeMember(req: UserAuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      const teamId = parseInt(req.params.teamId, 10);
+      const playerId = parseInt(req.params.playerId, 10);
+
+      if (!userId) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      if (isNaN(teamId) || isNaN(playerId)) {
+        return res.status(400).json({ success: false, message: "Invalid team id or player id" });
+      }
+
+      const team = await FootballTeamService.removeMember(userId, teamId, playerId);
+
+      return res.status(200).json({ success: true, message: "Member removed", data: team });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message || "Error removing member" });
     }
   }
 }

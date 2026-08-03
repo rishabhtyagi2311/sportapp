@@ -106,6 +106,7 @@ export interface Venue {
   
   // Content
   images: string[];
+  coverImage?: string | null;
   rating: number;
   reviewCount: number;
   
@@ -139,4 +140,8 @@ export interface VenueFilters {
   isActive?: boolean;
 }
 
-export type CreateVenueInput = Omit<Venue, 'id' | 'createdAt' | 'updatedAt' | 'rating' | 'reviewCount'>;
+export type CreateVenueInput = Omit<Venue, 'id' | 'createdAt' | 'updatedAt' | 'rating' | 'reviewCount' | 'coverImage'> & {
+  // Write-side field name — matches the server's create/update payload.
+  // Reads come back as `coverImage` on `Venue` instead (see above).
+  coverImageUrl?: string | null;
+};

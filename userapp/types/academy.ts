@@ -25,6 +25,7 @@ export interface Academy {
   coaches: Coach[];
   studentCount?: number;
   photos: string[];
+  coverImage?: string | null; // Partner-selected cover, or server fallback (first photo)
   createdAt: string;
   updatedAt: string;
 }

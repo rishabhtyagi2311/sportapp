@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, Image } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
@@ -35,10 +35,14 @@ export default function AcademyTabsLayout() {
     <SafeAreaView className="flex-1 bg-white">
       {/* Cover Section */}
       <View className="relative">
-        <View className="w-full h-64 bg-gray-200 items-center justify-center">
-          <Ionicons name="image-outline" size={48} color="black" />
-          <Text className="text-black">No Cover Photo</Text>
-        </View>
+        {academy.coverImage ? (
+          <Image source={{ uri: academy.coverImage }} className="w-full h-64" resizeMode="cover" />
+        ) : (
+          <View className="w-full h-64 bg-gray-200 items-center justify-center">
+            <Ionicons name="image-outline" size={48} color="black" />
+            <Text className="text-black">No Cover Photo</Text>
+          </View>
+        )}
         <TouchableOpacity
           onPress={() => router.back()}
           className="absolute top-12 left-4 bg-black/50 rounded-full p-2"

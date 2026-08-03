@@ -63,6 +63,14 @@ export const addPhotoSchema = z.object({
   url: z.string().min(1),
 });
 
+export const setCoverPhotoSchema = z.object({
+  url: z.string().min(1),
+});
+
+export const rescheduleDemoBookingSchema = z.object({
+  bookingDate: z.string().min(1),
+});
+
 export const createCertificateSchema = z.object({
   template: z.string().min(1),
   achievement: z.string().min(1),

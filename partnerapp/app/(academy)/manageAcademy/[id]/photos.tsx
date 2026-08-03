@@ -38,8 +38,10 @@ export default function AcademyPhotosScreen() {
   const fetchPhotos = useAcademyStore((state) => state.fetchPhotos);
   const addPhoto = useAcademyStore((state) => state.addPhoto);
   const removePhoto = useAcademyStore((state) => state.removePhoto);
+  const setCoverPhoto = useAcademyStore((state) => state.setCoverPhoto);
 
   const [uploading, setUploading] = useState(false);
+  const [settingCoverId, setSettingCoverId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -116,21 +118,49 @@ export default function AcademyPhotosScreen() {
     );
   };
 
-  const renderPhotoItem = ({ item, index }: { item: AcademyPhoto; index: number }) => (
-    <FadeInView delay={Math.min(index, 12) * 30} className="m-1 relative shadow-sm">
-      <Image
-        source={{ uri: item.url }}
-        style={{ width: itemSize, height: itemSize, borderRadius: 12 }}
-        resizeMode="cover"
-      />
-      <TouchableOpacity
-        onPress={() => handleDelete(item)}
-        className="absolute top-1 right-1 bg-black/50 p-1.5 rounded-full"
-      >
-        <Ionicons name="trash-outline" size={16} color="white" />
-      </TouchableOpacity>
-    </FadeInView>
-  );
+  const handleSetCover = async (photo: AcademyPhoto) => {
+    setSettingCoverId(photo.id);
+    try {
+      await setCoverPhoto(academy.id, photo.url);
+    } catch {
+      Alert.alert("Error", "Could not set cover photo");
+    } finally {
+      setSettingCoverId(null);
+    }
+  };
+
+  const renderPhotoItem = ({ item, index }: { item: AcademyPhoto; index: number }) => {
+    const isCover = academy.coverImage ? academy.coverImage === item.url : index === 0;
+    return (
+      <FadeInView delay={Math.min(index, 12) * 30} className="m-1 relative shadow-sm">
+        <Image
+          source={{ uri: item.url }}
+          style={{ width: itemSize, height: itemSize, borderRadius: 12 }}
+          resizeMode="cover"
+        />
+        <TouchableOpacity
+          onPress={() => handleDelete(item)}
+          className="absolute top-1 right-1 bg-black/50 p-1.5 rounded-full"
+        >
+          <Ionicons name="trash-outline" size={16} color="white" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => handleSetCover(item)}
+          disabled={isCover || settingCoverId === item.id}
+          className="absolute bottom-1 left-1 right-1 bg-black/60 rounded-full py-1 flex-row items-center justify-center"
+        >
+          {settingCoverId === item.id ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <>
+              <Ionicons name={isCover ? 'star' : 'star-outline'} size={12} color="#facc15" />
+              <Text className="text-white text-[9px] font-bold ml-1">{isCover ? 'Cover' : 'Set Cover'}</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </FadeInView>
+    );
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white">

@@ -21,6 +21,7 @@ interface DemoBookingStore {
   confirmDemoBooking: (bookingId: string) => Promise<void>;
   completeDemoBooking: (bookingId: string) => Promise<void>;
   cancelDemoBooking: (bookingId: string) => Promise<void>;
+  rescheduleDemoBooking: (bookingId: string, bookingDate: string) => Promise<void>;
 }
 
 export const useDemoBookingStore = create<DemoBookingStore>((set) => ({
@@ -64,6 +65,16 @@ export const useDemoBookingStore = create<DemoBookingStore>((set) => ({
     const response = await academyApiService.cancelDemoBooking(bookingId);
     if (!response.success) {
       throw new Error(response.message || 'Could not cancel demo booking');
+    }
+    set((state) => ({
+      bookings: state.bookings.map((b) => (b.id === bookingId ? response.data : b)),
+    }));
+  },
+
+  rescheduleDemoBooking: async (bookingId, bookingDate) => {
+    const response = await academyApiService.rescheduleDemoBooking(bookingId, bookingDate);
+    if (!response.success) {
+      throw new Error(response.message || 'Could not reschedule demo booking');
     }
     set((state) => ({
       bookings: state.bookings.map((b) => (b.id === bookingId ? response.data : b)),

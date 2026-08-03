@@ -175,6 +175,11 @@ export default function AcademyDetailScreen() {
               onPress={() => router.push(`/manageAcademy/${id}/announcements`)}
             />
             <NavigationCard
+              icon="star"
+              title="Reviews"
+              onPress={() => router.push(`/manageAcademy/${id}/reviews`)}
+            />
+            <NavigationCard
               icon="calendar-outline"
               title="Demo Requests"
               onPress={() => router.push(`/manageAcademy/${id}/demoRequests`)}

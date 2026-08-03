@@ -27,6 +27,9 @@ router.get('/students/:studentId/attendance', authenticatePartner, AcademyContro
 router.post('/academies/:academyId/photos', authenticatePartner, AcademyController.addPhoto);
 router.get('/academies/:academyId/photos', authenticatePartner, AcademyController.getPhotos);
 router.delete('/academies/:academyId/photos/:photoId', authenticatePartner, AcademyController.removePhoto);
+router.patch('/academies/:academyId/cover-photo', authenticatePartner, AcademyController.setCoverPhoto);
+
+router.get('/academies/:academyId/reviews', authenticatePartner, AcademyController.getReviews);
 
 router.post('/students/:studentId/certificates', authenticatePartner, AcademyController.createCertificate);
 router.get('/academies/:academyId/certificates', authenticatePartner, AcademyController.getAcademyCertificates);
@@ -39,5 +42,6 @@ router.get('/academies/:academyId/demo-bookings', authenticatePartner, AcademyCo
 router.patch('/demo-bookings/:bookingId/confirm', authenticatePartner, AcademyController.confirmDemoBooking);
 router.patch('/demo-bookings/:bookingId/complete', authenticatePartner, AcademyController.completeDemoBooking);
 router.patch('/demo-bookings/:bookingId/cancel', authenticatePartner, AcademyController.cancelDemoBooking);
+router.patch('/demo-bookings/:bookingId/reschedule', authenticatePartner, AcademyController.rescheduleDemoBooking);
 
 export default router;

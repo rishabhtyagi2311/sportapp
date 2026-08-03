@@ -109,10 +109,10 @@ describe('POST /api/v1/user/football/teams', () => {
     expect(prismaMock.footballTeam.create).not.toHaveBeenCalled();
   });
 
-  it('creates a team owned by the requester\'s football profile', async () => {
+  it('creates a team owned by the requester\'s football profile, with the creator as captain and a member', async () => {
     prismaMock.footballProfile.findUnique.mockResolvedValue(fakeProfile() as any);
     prismaMock.footballTeam.create.mockResolvedValue(fakeTeam() as any);
-    prismaMock.footballTeamMember.createMany.mockResolvedValue({ count: 2 } as any);
+    prismaMock.footballTeamMember.createMany.mockResolvedValue({ count: 3 } as any);
     prismaMock.footballTeam.findUnique.mockResolvedValue(fakeTeam() as any);
 
     const res = await request(app)
@@ -122,13 +122,146 @@ describe('POST /api/v1/user/football/teams', () => {
 
     expect(res.status).toBe(201);
     expect(prismaMock.footballTeam.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ createdById: 10 }) })
+      expect.objectContaining({ data: expect.objectContaining({ createdById: 10, captainId: 10 }) })
     );
     expect(prismaMock.footballTeamMember.createMany).toHaveBeenCalledWith({
       data: [
+        { footballProfileId: 10, footballTeamId: 100 },
         { footballProfileId: 11, footballTeamId: 100 },
         { footballProfileId: 12, footballTeamId: 100 },
       ],
+    });
+  });
+
+  it('does not double-add the creator if they also passed their own id in playerIds', async () => {
+    prismaMock.footballProfile.findUnique.mockResolvedValue(fakeProfile() as any);
+    prismaMock.footballTeam.create.mockResolvedValue(fakeTeam() as any);
+    prismaMock.footballTeamMember.createMany.mockResolvedValue({ count: 2 } as any);
+    prismaMock.footballTeam.findUnique.mockResolvedValue(fakeTeam() as any);
+
+    const res = await request(app)
+      .post('/api/v1/user/football/teams')
+      .set(userAuthHeader(1))
+      .send({ name: 'Thunder FC', location: 'Pune', maxPlayers: 11, playerIds: [10, 11] });
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.footballTeamMember.createMany).toHaveBeenCalledWith({
+      data: [
+        { footballProfileId: 10, footballTeamId: 100 },
+        { footballProfileId: 11, footballTeamId: 100 },
+      ],
+    });
+  });
+});
+
+describe('PATCH /api/v1/user/football/teams/:teamId/captain', () => {
+  it('requires authentication', async () => {
+    const res = await request(app).patch('/api/v1/user/football/teams/100/captain').send({ captainId: 11 });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects reassigning captain on a team the requester does not own', async () => {
+    prismaMock.footballProfile.findUnique.mockResolvedValue(fakeProfile() as any);
+    prismaMock.footballTeam.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/teams/100/captain')
+      .set(userAuthHeader(1))
+      .send({ captainId: 11 });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.footballTeam.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects assigning a captain who is not a team member', async () => {
+    prismaMock.footballProfile.findUnique.mockResolvedValue(fakeProfile() as any);
+    prismaMock.footballTeam.findFirst.mockResolvedValue(fakeTeam() as any);
+    prismaMock.footballTeamMember.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/teams/100/captain')
+      .set(userAuthHeader(1))
+      .send({ captainId: 99 });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/must be a member/i);
+    expect(prismaMock.footballTeam.update).not.toHaveBeenCalled();
+  });
+
+  it('reassigns the captain to an existing member', async () => {
+    prismaMock.footballProfile.findUnique.mockResolvedValue(fakeProfile() as any);
+    prismaMock.footballTeam.findFirst.mockResolvedValue(fakeTeam() as any);
+    prismaMock.footballTeamMember.findUnique.mockResolvedValue({ id: 1, footballProfileId: 11, footballTeamId: 100 } as any);
+    prismaMock.footballTeam.update.mockResolvedValue(fakeTeam({ captainId: 11 }) as any);
+    prismaMock.footballTeam.findUnique.mockResolvedValue(fakeTeam({ captainId: 11 }) as any);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/teams/100/captain')
+      .set(userAuthHeader(1))
+      .send({ captainId: 11 });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.footballTeam.update).toHaveBeenCalledWith({ where: { id: 100 }, data: { captainId: 11 } });
+  });
+});
+
+describe('DELETE /api/v1/user/football/teams/:teamId/members/:playerId', () => {
+  it('requires authentication', async () => {
+    const res = await request(app).delete('/api/v1/user/football/teams/100/members/11');
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects removing a member from a team the requester does not own', async () => {
+    prismaMock.footballProfile.findUnique.mockResolvedValue(fakeProfile() as any);
+    prismaMock.footballTeam.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .delete('/api/v1/user/football/teams/100/members/11')
+      .set(userAuthHeader(1));
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.footballTeamMember.delete).not.toHaveBeenCalled();
+  });
+
+  it('rejects removing the team creator', async () => {
+    prismaMock.footballProfile.findUnique.mockResolvedValue(fakeProfile() as any);
+    prismaMock.footballTeam.findFirst.mockResolvedValue(fakeTeam({ captainId: 10 }) as any);
+
+    const res = await request(app)
+      .delete('/api/v1/user/football/teams/100/members/10')
+      .set(userAuthHeader(1));
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/creator cannot be removed/i);
+    expect(prismaMock.footballTeamMember.delete).not.toHaveBeenCalled();
+  });
+
+  it('rejects removing the current captain without reassigning first', async () => {
+    prismaMock.footballProfile.findUnique.mockResolvedValue(fakeProfile() as any);
+    prismaMock.footballTeam.findFirst.mockResolvedValue(fakeTeam({ captainId: 11 }) as any);
+
+    const res = await request(app)
+      .delete('/api/v1/user/football/teams/100/members/11')
+      .set(userAuthHeader(1));
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/reassign the captain/i);
+    expect(prismaMock.footballTeamMember.delete).not.toHaveBeenCalled();
+  });
+
+  it('removes a non-captain member from the team', async () => {
+    prismaMock.footballProfile.findUnique.mockResolvedValue(fakeProfile() as any);
+    prismaMock.footballTeam.findFirst.mockResolvedValue(fakeTeam({ captainId: 10 }) as any);
+    prismaMock.footballTeamMember.delete.mockResolvedValue({ id: 1, footballProfileId: 12, footballTeamId: 100 } as any);
+    prismaMock.footballTeam.findUnique.mockResolvedValue(fakeTeam({ captainId: 10 }) as any);
+
+    const res = await request(app)
+      .delete('/api/v1/user/football/teams/100/members/12')
+      .set(userAuthHeader(1));
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.footballTeamMember.delete).toHaveBeenCalledWith({
+      where: { footballProfileId_footballTeamId: { footballProfileId: 12, footballTeamId: 100 } },
     });
   });
 });

@@ -1,6 +1,6 @@
 // components/booking/VenueCard.tsx
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Venue } from '../types/booking';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,12 +32,19 @@ const VenueCard: React.FC<VenueCardProps> = ({ venue, onPress }) => {
     >
       {/* Image Section */}
       <View className="relative">
-        <View className="w-full h-48 bg-gray-300 rounded-t-xl items-center justify-center">
-       
-          <Ionicons name="image-outline" size={48} color="#6b7280" />
-          <Text className="text-gray-600 text-sm mt-2">No photos uploaded yet</Text>
-        </View>
-        
+        {venue.coverImage ? (
+          <Image
+            source={{ uri: venue.coverImage }}
+            className="w-full h-48 rounded-t-xl"
+            resizeMode="cover"
+          />
+        ) : (
+          <View className="w-full h-48 bg-gray-300 rounded-t-xl items-center justify-center">
+            <Ionicons name="image-outline" size={48} color="#6b7280" />
+            <Text className="text-gray-600 text-sm mt-2">No photos uploaded yet</Text>
+          </View>
+        )}
+
         {/* Rating Badge */}
         <View className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1 flex-row items-center">
           <Ionicons name="star" size={14} color="#f59e0b" />

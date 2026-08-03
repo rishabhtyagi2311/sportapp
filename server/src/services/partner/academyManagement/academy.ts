@@ -2,6 +2,14 @@ import { prisma as globalClient } from "../../../index";
 
 export class AcademyService {
   static mapAcademyForClient(academy: any) {
+    const photos = (academy.photos || []).map((photo: any) => photo.url);
+    // Partner-selected cover wins; if unset (or stale — e.g. that photo was
+    // since removed) fall back to whichever photo happens to be first,
+    // rather than showing blank.
+    const coverImage = academy.coverPhotoUrl && photos.includes(academy.coverPhotoUrl)
+      ? academy.coverPhotoUrl
+      : photos[0] || null;
+
     return {
       id: academy.id,
       academyName: academy.academyName,
@@ -24,7 +32,8 @@ export class AcademyService {
         contact: coach.contact || '',
       })),
       studentCount: academy._count?.students ?? undefined,
-      photos: (academy.photos || []).map((photo: any) => photo.url),
+      photos,
+      coverImage,
       createdAt: academy.createdAt?.toISOString?.() ?? academy.createdAt,
       updatedAt: academy.updatedAt?.toISOString?.() ?? academy.updatedAt,
     };
@@ -57,7 +66,7 @@ export class AcademyService {
       include: {
         coaches: true,
         _count: { select: { students: { where: { status: 'active' } } } },
-        photos: { orderBy: { createdAt: 'desc' }, take: 1 },
+        photos: { orderBy: { createdAt: 'desc' } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -68,7 +77,7 @@ export class AcademyService {
   static async getAcademyById(academyId: string, partnerId: string) {
     const academy = await globalClient.academy.findFirst({
       where: { id: academyId, partnerId },
-      include: { coaches: true, photos: { orderBy: { createdAt: 'desc' }, take: 1 } },
+      include: { coaches: true, photos: { orderBy: { createdAt: 'desc' } } },
     });
 
     return academy ? this.mapAcademyForClient(academy) : null;
@@ -95,7 +104,7 @@ export class AcademyService {
         feeStructure: data.feeStructure,
         isActive: data.isActive,
       },
-      include: { coaches: true, photos: { orderBy: { createdAt: 'desc' }, take: 1 } },
+      include: { coaches: true, photos: { orderBy: { createdAt: 'desc' } } },
     });
 
     return this.mapAcademyForClient(academy);
@@ -448,6 +457,55 @@ export class AcademyService {
     await globalClient.academyPhoto.delete({ where: { id: photoId } });
   }
 
+  static async setCoverPhoto(academyId: string, partnerId: string, url: string) {
+    const academy = await globalClient.academy.findFirst({ where: { id: academyId, partnerId } });
+
+    if (!academy) {
+      throw new Error('Academy not found or not owned by partner');
+    }
+
+    const photo = await globalClient.academyPhoto.findFirst({ where: { academyId, url } });
+
+    if (!photo) {
+      throw new Error("Selected photo is not one of this academy's photos");
+    }
+
+    const updated = await globalClient.academy.update({
+      where: { id: academyId },
+      data: { coverPhotoUrl: url },
+      include: { coaches: true, photos: { orderBy: { createdAt: 'desc' } } },
+    });
+
+    return this.mapAcademyForClient(updated);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* REVIEWS                                                             */
+  /* ------------------------------------------------------------------ */
+
+  static async getReviewsForAcademy(academyId: string, partnerId: string) {
+    const academy = await globalClient.academy.findFirst({ where: { id: academyId, partnerId } });
+
+    if (!academy) {
+      throw new Error('Academy not found or not owned by partner');
+    }
+
+    const reviews = await globalClient.review.findMany({
+      where: { academyId },
+      include: { childProfile: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return reviews.map((review) => {
+      const { childProfile, ...rest } = review;
+      return {
+        ...rest,
+        createdAt: review.createdAt?.toISOString?.() ?? review.createdAt,
+        ...(childProfile ? { childName: childProfile.childName } : {}),
+      };
+    });
+  }
+
   /* ------------------------------------------------------------------ */
   /* CERTIFICATES                                                        */
   /* ------------------------------------------------------------------ */
@@ -669,6 +727,22 @@ export class AcademyService {
     const updated = await globalClient.demoBooking.update({
       where: { id: bookingId },
       data: { status: 'cancelled' },
+      include: { childProfile: true },
+    });
+
+    return this.mapDemoBookingForClient(updated);
+  }
+
+  static async rescheduleDemoBooking(bookingId: string, partnerId: string, bookingDate: string) {
+    const booking = await this.assertDemoBookingOwnedByPartner(bookingId, partnerId);
+
+    if (booking.status === 'cancelled' || booking.status === 'completed') {
+      throw new Error(`Cannot reschedule a '${booking.status}' demo booking`);
+    }
+
+    const updated = await globalClient.demoBooking.update({
+      where: { id: bookingId },
+      data: { bookingDate: new Date(bookingDate) },
       include: { childProfile: true },
     });
 

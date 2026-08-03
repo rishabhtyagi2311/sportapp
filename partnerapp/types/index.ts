@@ -16,9 +16,13 @@ export type Academy = {
   coaches?: Coach[];
   headCoach?: string;
   studentCount?: number;
-  // Cover photo only (most recent upload) — for list/card display.
-  // The full gallery (with photo ids, for delete) is fetched separately via AcademyPhoto.
+  averageRating?: number;
+  reviewCount?: number;
+  // Full photo URL list — the full gallery (with photo ids, for delete) is
+  // fetched separately via AcademyPhoto.
   photos?: string[];
+  // Partner-selected cover photo, or the server's fallback (first photo) if unset.
+  coverImage?: string | null;
 };
 
 export type Coach = {
@@ -61,4 +65,16 @@ export type Certificate = {
   achievement: string;
   date: string;
   certificateNumber: string;
+};
+
+export type Review = {
+  id: string;
+  academyId: string;
+  childProfileId: string;
+  parentId: number;
+  rating: number;
+  title?: string;
+  comment: string;
+  childName?: string;
+  createdAt: string;
 };

@@ -87,8 +87,16 @@ export default function Step5Review() {
   };
 
   const removeImage = (index: number) => {
+    const removedUrl = draftVenue.images[index];
     const newImages = draftVenue.images.filter((_, i) => i !== index);
-    updateDraftVenue({ images: newImages });
+    updateDraftVenue({
+      images: newImages,
+      ...(draftVenue.coverImageUrl === removedUrl ? { coverImageUrl: undefined } : {}),
+    });
+  };
+
+  const setCoverImage = (url: string) => {
+    updateDraftVenue({ coverImageUrl: url });
   };
 
   /* -------------------------------------------------------------------------- */
@@ -175,17 +183,30 @@ export default function Step5Review() {
               )}
 
               {/* Uploaded Images */}
-              {draftVenue.images.map((url, index) => (
-                <View key={index} className="w-[105px] h-[105px] rounded-[30px] overflow-hidden bg-slate-200 relative shadow-sm">
-                  <Image source={{ uri: url }} className="w-full h-full" />
-                  <TouchableOpacity 
-                    onPress={() => removeImage(index)}
-                    className="absolute top-1 right-1 bg-white/90 rounded-full p-1"
-                  >
-                    <Ionicons name="close-circle" size={20} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
-              ))}
+              {draftVenue.images.map((url, index) => {
+                const isCover = draftVenue.coverImageUrl
+                  ? draftVenue.coverImageUrl === url
+                  : index === 0;
+                return (
+                  <View key={index} className="w-[105px] h-[105px] rounded-[30px] overflow-hidden bg-slate-200 relative shadow-sm">
+                    <Image source={{ uri: url }} className="w-full h-full" />
+                    <TouchableOpacity
+                      onPress={() => removeImage(index)}
+                      className="absolute top-1 right-1 bg-white/90 rounded-full p-1"
+                    >
+                      <Ionicons name="close-circle" size={20} color="#ef4444" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setCoverImage(url)}
+                      disabled={isCover}
+                      className="absolute bottom-1 left-1 right-1 bg-black/60 rounded-full py-1 flex-row items-center justify-center"
+                    >
+                      <Ionicons name={isCover ? 'star' : 'star-outline'} size={12} color="#facc15" />
+                      <Text className="text-white text-[9px] font-bold ml-1">{isCover ? 'Cover' : 'Set Cover'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
             </View>
           </View>
 

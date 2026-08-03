@@ -19,6 +19,8 @@ interface FootballTeamState {
   fetchTeamById: (id: number) => Promise<FootballTeam | null>;
   createTeam: (data: { name: string; location: string; maxPlayers: number; playerIds: number[] }) => Promise<FootballTeam>;
   addTeamMember: (teamId: number, playerId: number) => Promise<void>;
+  updateCaptain: (teamId: number, captainId: number) => Promise<void>;
+  removeTeamMember: (teamId: number, playerId: number) => Promise<void>;
 
   getTeamById: (id: number) => FootballTeam | undefined;
   getPlayerById: (id: number) => FootballProfile | undefined;
@@ -107,6 +109,36 @@ export const useFootballStore = create<FootballTeamState>((set, get) => ({
     const team = await footballService.addTeamMember(teamId, playerId);
     if (!team) {
       const message = 'Could not add member to team';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+    set((state) => ({
+      teams: upsertTeam(state.teams, team),
+      myTeams: upsertTeam(state.myTeams, team),
+      isLoading: false,
+    }));
+  },
+
+  updateCaptain: async (teamId, captainId) => {
+    set({ isLoading: true, error: null });
+    const team = await footballService.updateCaptain(teamId, captainId);
+    if (!team) {
+      const message = 'Could not update captain';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+    set((state) => ({
+      teams: upsertTeam(state.teams, team),
+      myTeams: upsertTeam(state.myTeams, team),
+      isLoading: false,
+    }));
+  },
+
+  removeTeamMember: async (teamId, playerId) => {
+    set({ isLoading: true, error: null });
+    const team = await footballService.removeTeamMember(teamId, playerId);
+    if (!team) {
+      const message = 'Could not remove member from team';
       set({ error: message, isLoading: false });
       throw new Error(message);
     }

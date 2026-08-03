@@ -10,6 +10,8 @@ import {
   updateStudentSchema,
   markAttendanceSchema,
   addPhotoSchema,
+  setCoverPhotoSchema,
+  rescheduleDemoBookingSchema,
   createCertificateSchema,
   createAnnouncementSchema,
 } from '../../../types/partner/academy';
@@ -411,6 +413,49 @@ export class AcademyController {
     }
   }
 
+  static async setCoverPhoto(req: AuthRequest, res: Response) {
+    try {
+      const partnerId = req.partner?.id;
+      const { academyId } = req.params;
+
+      if (!partnerId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const parsed = setCoverPhotoSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ success: false, message: 'Invalid cover photo data', error: parsed.error.issues });
+      }
+
+      const academy = await AcademyService.setCoverPhoto(academyId, partnerId, parsed.data.url);
+
+      return res.status(200).json({ success: true, message: 'Cover photo updated', data: academy });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message || 'Error setting cover photo' });
+    }
+  }
+
+  /* -------------------------------------------------------------- */
+  /* REVIEWS                                                         */
+  /* -------------------------------------------------------------- */
+
+  static async getReviews(req: AuthRequest, res: Response) {
+    try {
+      const partnerId = req.partner?.id;
+      const { academyId } = req.params;
+
+      if (!partnerId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const reviews = await AcademyService.getReviewsForAcademy(academyId, partnerId);
+
+      return res.status(200).json({ success: true, data: reviews });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message || 'Error fetching reviews' });
+    }
+  }
+
   /* -------------------------------------------------------------- */
   /* CERTIFICATES                                                    */
   /* -------------------------------------------------------------- */
@@ -580,6 +625,28 @@ export class AcademyController {
       return res.status(200).json({ success: true, message: 'Demo booking cancelled', data: booking });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message || 'Error cancelling demo booking' });
+    }
+  }
+
+  static async rescheduleDemoBooking(req: AuthRequest, res: Response) {
+    try {
+      const partnerId = req.partner?.id;
+      const { bookingId } = req.params;
+
+      if (!partnerId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const parsed = rescheduleDemoBookingSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ success: false, message: 'Invalid reschedule data', error: parsed.error.issues });
+      }
+
+      const booking = await AcademyService.rescheduleDemoBooking(bookingId, partnerId, parsed.data.bookingDate);
+
+      return res.status(200).json({ success: true, message: 'Demo booking rescheduled', data: booking });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message || 'Error rescheduling demo booking' });
     }
   }
 }

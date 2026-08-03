@@ -16,6 +16,8 @@ export interface FootballTeam {
   maxPlayers: number;
   createdById: number;
   createdBy?: FootballProfile;
+  captainId: number;
+  captain?: FootballProfile;
   members: { footballProfile: FootballProfile }[];
   matchesPlayed: number;
   matchesWon: number;

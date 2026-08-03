@@ -12,3 +12,7 @@ export const footballTeamCreateSchema = z.object({
   maxPlayers: z.number().int().positive(),
   playerIds: z.array(z.number().int().positive()).default([]),
 });
+
+export const footballTeamCaptainUpdateSchema = z.object({
+  captainId: z.number().int().positive(),
+});

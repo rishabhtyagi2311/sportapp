@@ -158,4 +158,52 @@ describe('Partner demo booking management', () => {
 
     expect(res.status).toBe(400);
   });
+
+  it('reschedules a pending demo booking to a new date', async () => {
+    prismaMock.demoBooking.findFirst.mockResolvedValue(fakeDemoBooking() as any);
+    prismaMock.demoBooking.update.mockResolvedValue(
+      fakeDemoBooking({ bookingDate: new Date('2026-08-10') }) as any
+    );
+
+    const { authHeader } = require('./helpers/auth');
+    const res = await request(app)
+      .patch('/api/v1/partner/demo-bookings/demo-1/reschedule')
+      .set(authHeader('partner-1'))
+      .send({ bookingDate: '2026-08-10' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.bookingDate).toBe('2026-08-10');
+    expect(prismaMock.demoBooking.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'demo-1' },
+        data: { bookingDate: new Date('2026-08-10') },
+      })
+    );
+  });
+
+  it('rejects rescheduling a completed demo booking', async () => {
+    prismaMock.demoBooking.findFirst.mockResolvedValue(fakeDemoBooking({ status: 'completed' }) as any);
+
+    const { authHeader } = require('./helpers/auth');
+    const res = await request(app)
+      .patch('/api/v1/partner/demo-bookings/demo-1/reschedule')
+      .set(authHeader('partner-1'))
+      .send({ bookingDate: '2026-08-10' });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.demoBooking.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects rescheduling a demo booking owned by another partner', async () => {
+    prismaMock.demoBooking.findFirst.mockResolvedValue(null);
+
+    const { authHeader } = require('./helpers/auth');
+    const res = await request(app)
+      .patch('/api/v1/partner/demo-bookings/demo-1/reschedule')
+      .set(authHeader('partner-2'))
+      .send({ bookingDate: '2026-08-10' });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.demoBooking.update).not.toHaveBeenCalled();
+  });
 });
