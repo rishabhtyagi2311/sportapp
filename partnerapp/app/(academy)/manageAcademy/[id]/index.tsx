@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useState } from "react";
 import {
   ScrollView,
   View,
@@ -15,13 +15,14 @@ import {
   ActivityIndicator,
 } from "react-native";
 // ✅ 1. Import useRouter hook instead of global router
-import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAcademyStore } from "@/store/academyStore";
 import NavigationCard from "@/components/NavigationCard";
 import { Coach } from "@/types";
 import { useResponsive } from "@/hooks/useResponsive";
 import FadeInView from "@/components/animated/FadeInView";
+import { useDebouncedFocusFetch } from "@/hooks/useDebouncedFocusFetch";
 
 export default function AcademyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -43,11 +44,7 @@ export default function AcademyDetailScreen() {
   const [error, setError] = useState("");
   const [savingCoach, setSavingCoach] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchMyAcademies();
-    }, [fetchMyAcademies])
-  );
+  useDebouncedFocusFetch(fetchMyAcademies, 15_000, id);
 
   if (!academy) {
     return (

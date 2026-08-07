@@ -37,7 +37,7 @@ function fakeMatch(overrides: Partial<any> = {}) {
     penaltyAwayScore: null,
     currentMinute: 0,
     currentPossessionTeamId: null,
-    lastPossessionChangeSeconds: 0,
+    possessionStartedAt: null,
     homePossessionSeconds: 0,
     awayPossessionSeconds: 0,
     startedAt: null,
@@ -118,6 +118,65 @@ describe('POST /api/v1/user/football/matches', () => {
   });
 });
 
+describe('POST /api/v1/user/football/matches/schedule', () => {
+  it('requires authentication', async () => {
+    const res = await request(app)
+      .post('/api/v1/user/football/matches/schedule')
+      .send({ homeTeamId: 10, awayTeamId: 20, scheduledAt: '2026-09-01T10:00:00.000Z' });
+    expect(res.status).toBe(401);
+  });
+
+  it('creates a scheduled match with no lineup/settings yet', async () => {
+    prismaMock.footballTeam.findUnique.mockResolvedValueOnce(fakeTeam({ id: 10 }) as any);
+    prismaMock.footballTeam.findUnique.mockResolvedValueOnce(fakeTeam({ id: 20, name: 'Lightning FC' }) as any);
+    prismaMock.match.create.mockResolvedValue(
+      fakeMatch({
+        playersPerTeam: null,
+        allowedSubs: null,
+        duration: null,
+        homeRoster: null,
+        awayRoster: null,
+        referees: [],
+        scheduledAt: new Date('2026-09-01T10:00:00.000Z'),
+        venueName: 'Community Ground',
+      }) as any
+    );
+
+    const res = await request(app)
+      .post('/api/v1/user/football/matches/schedule')
+      .set(userAuthHeader(1))
+      .send({ homeTeamId: 10, awayTeamId: 20, scheduledAt: '2026-09-01T10:00:00.000Z', venueName: 'Community Ground' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.status).toBe('scheduled');
+    expect(prismaMock.match.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          creatorId: 1,
+          homeTeamId: 10,
+          awayTeamId: 20,
+          venueName: 'Community Ground',
+          scheduledAt: new Date('2026-09-01T10:00:00.000Z'),
+          referees: [],
+        }),
+      })
+    );
+  });
+
+  it('rejects when a team does not exist', async () => {
+    prismaMock.footballTeam.findUnique.mockResolvedValueOnce(null);
+    prismaMock.footballTeam.findUnique.mockResolvedValueOnce(fakeTeam({ id: 20 }) as any);
+
+    const res = await request(app)
+      .post('/api/v1/user/football/matches/schedule')
+      .set(userAuthHeader(1))
+      .send({ homeTeamId: 10, awayTeamId: 20, scheduledAt: '2026-09-01T10:00:00.000Z' });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.match.create).not.toHaveBeenCalled();
+  });
+});
+
 describe('POST /api/v1/user/football/matches/:id/start', () => {
   it('rejects starting a match not owned by the requester', async () => {
     prismaMock.match.findFirst.mockResolvedValue(null);
@@ -127,7 +186,7 @@ describe('POST /api/v1/user/football/matches/:id/start', () => {
     expect(res.status).toBe(400);
   });
 
-  it('transitions a scheduled match to live', async () => {
+  it('transitions an already-fully-configured (quick-start) match to live with no body needed', async () => {
     prismaMock.match.findFirst.mockResolvedValue(fakeMatch() as any);
     prismaMock.match.update.mockResolvedValue(fakeMatch({ status: 'live', startedAt: new Date() }) as any);
 
@@ -135,6 +194,9 @@ describe('POST /api/v1/user/football/matches/:id/start', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('live');
+    expect(prismaMock.match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'live', startedAt: expect.any(Date) } })
+    );
   });
 
   it('rejects starting a match that is already live', async () => {
@@ -144,6 +206,50 @@ describe('POST /api/v1/user/football/matches/:id/start', () => {
 
     expect(res.status).toBe(400);
     expect(prismaMock.match.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects starting a previously-scheduled match with no lineup/settings supplied', async () => {
+    prismaMock.match.findFirst.mockResolvedValue(
+      fakeMatch({ playersPerTeam: null, allowedSubs: null, duration: null, homeRoster: null, awayRoster: null }) as any
+    );
+
+    const res = await request(app).post('/api/v1/user/football/matches/match-1/start').set(userAuthHeader(1)).send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/lineup and settings/i);
+    expect(prismaMock.match.update).not.toHaveBeenCalled();
+  });
+
+  it('finalizes a previously-scheduled match with the supplied lineup/settings and starts it', async () => {
+    prismaMock.match.findFirst.mockResolvedValue(
+      fakeMatch({ playersPerTeam: null, allowedSubs: null, duration: null, homeRoster: null, awayRoster: null }) as any
+    );
+    prismaMock.match.update.mockResolvedValue(fakeMatch({ status: 'live' }) as any);
+
+    const res = await request(app)
+      .post('/api/v1/user/football/matches/match-1/start')
+      .set(userAuthHeader(1))
+      .send({
+        playersPerTeam: 7,
+        allowedSubs: 3,
+        duration: 60,
+        homeRoster: fakeRoster(),
+        awayRoster: fakeRoster({ startingXI: [4, 5], bench: [6], captainId: 4 }),
+        referees: ['Jane Ref'],
+      });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.match.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'live',
+          playersPerTeam: 7,
+          allowedSubs: 3,
+          duration: 60,
+          referees: ['Jane Ref'],
+        }),
+      })
+    );
   });
 });
 
@@ -168,6 +274,24 @@ describe('POST /api/v1/user/football/matches/:id/abandon', () => {
 
     expect(res.status).toBe(400);
     expect(prismaMock.match.update).not.toHaveBeenCalled();
+  });
+
+  it('finalizes the trailing possession segment before abandoning', async () => {
+    prismaMock.match.findFirst.mockResolvedValue(
+      fakeMatch({
+        status: 'live',
+        currentPossessionTeamId: 10,
+        possessionStartedAt: new Date(Date.now() - 4000),
+        homePossessionSeconds: 20,
+      }) as any
+    );
+    prismaMock.match.update.mockResolvedValue(fakeMatch({ status: 'abandoned' }) as any);
+
+    await request(app).post('/api/v1/user/football/matches/match-1/abandon').set(userAuthHeader(1)).send({});
+
+    const call = prismaMock.match.update.mock.calls[0][0] as any;
+    expect(call.data.homePossessionSeconds).toBeGreaterThanOrEqual(24);
+    expect(call.data.possessionStartedAt).toBeNull();
   });
 });
 
@@ -233,28 +357,146 @@ describe('POST /api/v1/user/football/matches/:id/events', () => {
 });
 
 describe('PATCH /api/v1/user/football/matches/:id/possession', () => {
-  it('accrues elapsed seconds to the previous possession holder before flipping', async () => {
+  it('accrues real elapsed seconds to the previous possession holder before flipping', async () => {
     prismaMock.match.findFirst.mockResolvedValue(
-      fakeMatch({ status: 'live', currentPossessionTeamId: 10, lastPossessionChangeSeconds: 100, homePossessionSeconds: 50 }) as any
+      fakeMatch({
+        status: 'live',
+        currentPossessionTeamId: 10,
+        possessionStartedAt: new Date(Date.now() - 5000),
+        homePossessionSeconds: 50,
+      }) as any
     );
-    prismaMock.$transaction.mockImplementation((cb: any) => cb(prismaMock));
-    prismaMock.match.update.mockResolvedValue(fakeMatch({ homePossessionSeconds: 80, currentPossessionTeamId: 20 }) as any);
+    prismaMock.match.update.mockResolvedValue(fakeMatch({ homePossessionSeconds: 55, currentPossessionTeamId: 20 }) as any);
 
     const res = await request(app)
       .patch('/api/v1/user/football/matches/match-1/possession')
       .set(userAuthHeader(1))
-      .send({ teamId: 20, currentSeconds: 130 });
+      .send({ teamId: 20 });
+
+    expect(res.status).toBe(200);
+    const call = prismaMock.match.update.mock.calls[0][0] as any;
+    expect(call.data.homePossessionSeconds).toBeGreaterThanOrEqual(55);
+    expect(call.data.homePossessionSeconds).toBeLessThan(60);
+    expect(call.data.currentPossessionTeamId).toBe(20);
+    expect(call.data.possessionStartedAt).toBeInstanceOf(Date);
+  });
+
+  it('sets possession with no accrual on the first-ever toggle', async () => {
+    prismaMock.match.findFirst.mockResolvedValue(fakeMatch({ status: 'live' }) as any);
+    prismaMock.match.update.mockResolvedValue(fakeMatch({ currentPossessionTeamId: 10 }) as any);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/matches/match-1/possession')
+      .set(userAuthHeader(1))
+      .send({ teamId: 10 });
 
     expect(res.status).toBe(200);
     expect(prismaMock.match.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          homePossessionSeconds: 80,
-          currentPossessionTeamId: 20,
-          lastPossessionChangeSeconds: 130,
-        }),
+        data: expect.objectContaining({ homePossessionSeconds: 0, awayPossessionSeconds: 0, currentPossessionTeamId: 10 }),
       })
     );
+  });
+
+  it('rejects a teamId that is not one of the match\'s two teams', async () => {
+    prismaMock.match.findFirst.mockResolvedValue(fakeMatch({ status: 'live' }) as any);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/matches/match-1/possession')
+      .set(userAuthHeader(1))
+      .send({ teamId: 999 });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.match.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects updating possession on a non-live match', async () => {
+    prismaMock.match.findFirst.mockResolvedValue(fakeMatch({ status: 'scheduled' }) as any);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/matches/match-1/possession')
+      .set(userAuthHeader(1))
+      .send({ teamId: 10 });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.match.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects updating possession on a match not owned by the requester', async () => {
+    prismaMock.match.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/matches/match-1/possession')
+      .set(userAuthHeader(2))
+      .send({ teamId: 10 });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.match.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('PATCH /api/v1/user/football/matches/:id/possession/pause', () => {
+  it('flushes the active segment into the bank and clears the baseline', async () => {
+    prismaMock.match.findFirst.mockResolvedValue(
+      fakeMatch({
+        status: 'live',
+        currentPossessionTeamId: 20,
+        possessionStartedAt: new Date(Date.now() - 3000),
+        awayPossessionSeconds: 10,
+      }) as any
+    );
+    prismaMock.match.update.mockResolvedValue(fakeMatch({ awayPossessionSeconds: 13, possessionStartedAt: null }) as any);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/matches/match-1/possession/pause')
+      .set(userAuthHeader(1));
+
+    expect(res.status).toBe(200);
+    const call = prismaMock.match.update.mock.calls[0][0] as any;
+    expect(call.data.awayPossessionSeconds).toBeGreaterThanOrEqual(13);
+    expect(call.data.possessionStartedAt).toBeNull();
+  });
+
+  it('is a no-op when nothing is currently accruing', async () => {
+    prismaMock.match.findFirst.mockResolvedValue(fakeMatch({ status: 'live', currentPossessionTeamId: null }) as any);
+    prismaMock.match.findUnique.mockResolvedValue(fakeMatch({ status: 'live' }) as any);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/matches/match-1/possession/pause')
+      .set(userAuthHeader(1));
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.match.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('PATCH /api/v1/user/football/matches/:id/possession/resume', () => {
+  it('restamps the baseline for the current holder without changing who holds it', async () => {
+    prismaMock.match.findFirst.mockResolvedValue(
+      fakeMatch({ status: 'live', currentPossessionTeamId: 10, possessionStartedAt: null }) as any
+    );
+    prismaMock.match.update.mockResolvedValue(fakeMatch({ currentPossessionTeamId: 10, possessionStartedAt: new Date() }) as any);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/matches/match-1/possession/resume')
+      .set(userAuthHeader(1));
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { possessionStartedAt: expect.any(Date) } })
+    );
+  });
+
+  it('is a no-op when no team has ever held possession', async () => {
+    prismaMock.match.findFirst.mockResolvedValue(fakeMatch({ status: 'live', currentPossessionTeamId: null }) as any);
+    prismaMock.match.findUnique.mockResolvedValue(fakeMatch({ status: 'live' }) as any);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/matches/match-1/possession/resume')
+      .set(userAuthHeader(1));
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.match.update).not.toHaveBeenCalled();
   });
 });
 
@@ -315,6 +557,27 @@ describe('POST /api/v1/user/football/matches/:id/end', () => {
     expect(prismaMock.footballTeam.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 10 }, data: expect.objectContaining({ matchesDrawn: { increment: 1 } }) })
     );
+  });
+
+  it('finalizes the trailing possession segment when the match ends', async () => {
+    prismaMock.match.findFirst.mockResolvedValue(
+      fakeMatch({
+        status: 'live',
+        currentPossessionTeamId: 20,
+        possessionStartedAt: new Date(Date.now() - 6000),
+        awayPossessionSeconds: 30,
+      }) as any
+    );
+    prismaMock.$transaction.mockImplementation((cb: any) => cb(prismaMock));
+    prismaMock.matchEvent.findMany.mockResolvedValue([] as any);
+    prismaMock.footballTeam.update.mockResolvedValue(fakeTeam() as any);
+    prismaMock.match.update.mockResolvedValue(fakeMatch({ status: 'completed' }) as any);
+
+    await request(app).post('/api/v1/user/football/matches/match-1/end').set(userAuthHeader(1)).send({});
+
+    const call = prismaMock.match.update.mock.calls[0][0] as any;
+    expect(call.data.awayPossessionSeconds).toBeGreaterThanOrEqual(36);
+    expect(call.data.possessionStartedAt).toBeNull();
   });
 
   it('accounts for a substitution when computing minutes played', async () => {

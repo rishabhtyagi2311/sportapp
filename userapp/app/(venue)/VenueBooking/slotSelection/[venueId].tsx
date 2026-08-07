@@ -3,10 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StatusBar, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { Venue, Sport, SportVariety } from '@/types/booking';
 import { useBookingStore } from '@/store/venueStore';
-import { useVenueSlotsStore } from '@/store/venueSlotsStore';
+import { venueApiService } from '@/services/venue/venue';
 import { useUserBookingStore } from '@/store/bookingStore';
 import CalendarModal from '@/components/CalendarModal';
 
@@ -39,14 +40,12 @@ export default function SlotBookingScreen() {
   const sportVarietyId = params.sportVarietyId as string;
 
   const { getVenueById, fetchVenueById } = useBookingStore();
-  const { fetchSlotsForVenue, getSlots } = useVenueSlotsStore();
   const createBooking = useUserBookingStore((state) => state.createBooking);
 
   const venue = getVenueById(venueId);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const [showCalendar, setShowCalendar] = useState(false);
-  const [loadingSlots, setLoadingSlots] = useState(true);
   const [booking, setBooking] = useState(false);
 
   useEffect(() => {
@@ -61,15 +60,31 @@ export default function SlotBookingScreen() {
   // the device's local calendar fields instead.
   const dateKey = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
 
-  useEffect(() => {
-    setLoadingSlots(true);
-    fetchSlotsForVenue(venueId, dateKey)
-      .catch((err) => Alert.alert('Could not load slots', err.message))
-      .finally(() => setLoadingSlots(false));
-    setSelectedSlots(new Set()); // Clear selections when date changes
-  }, [venueId, dateKey]);
+  // Keyed by [venueId, dateKey] — re-selecting a date already viewed this
+  // session (within staleTime) serves from cache instead of refetching, and
+  // switching dates dedupes/cancels in-flight requests for you.
+  const {
+    data: slotsResponse,
+    isLoading: loadingSlots,
+    error: slotsError,
+    refetch: refetchSlots,
+  } = useQuery({
+    queryKey: ['slots', venueId, dateKey],
+    queryFn: () => venueApiService.getSlots(venueId, dateKey),
+    staleTime: 30_000,
+  });
 
-  const rawSlots = getSlots(venueId, dateKey).filter(
+  useEffect(() => {
+    if (slotsError) {
+      Alert.alert('Could not load slots', (slotsError as Error).message);
+    }
+  }, [slotsError]);
+
+  useEffect(() => {
+    setSelectedSlots(new Set()); // Clear selections when date changes
+  }, [dateKey]);
+
+  const rawSlots = (slotsResponse?.data ?? []).filter(
     (s) => s.varietyId === sportVarietyId || !sportVarietyId
   );
 
@@ -175,11 +190,11 @@ export default function SlotBookingScreen() {
                 await createBooking({ venueId, slotId });
               }
               Alert.alert('Success!', 'Your slots have been booked.');
-              fetchSlotsForVenue(venueId, dateKey);
+              refetchSlots();
               router.back();
             } catch (err: any) {
               Alert.alert('Booking Failed', err.message || 'Please try again.');
-              fetchSlotsForVenue(venueId, dateKey);
+              refetchSlots();
             } finally {
               setBooking(false);
             }

@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useMatchExecutionStore } from '@/store/footballMatchEventStore';
-import { useFootballStore } from '@/store/footballTeamStore';
+import { useQuery } from '@tanstack/react-query';
+import { footballService } from '@/services/football';
 import { FootballMatch, FootballProfile } from '@/types/football';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -21,32 +21,44 @@ function computeTeamStats(events: FootballMatch['events'], teamId: number) {
 
 export default function MatchDetailScreen() {
   const router = useRouter();
-  const { matchId } = useLocalSearchParams();
-  const { fetchMatchById } = useMatchExecutionStore();
-  const { getTeamById, fetchTeamById } = useFootballStore();
+  const { matchId } = useLocalSearchParams<{ matchId: string }>();
 
-  const [match, setMatch] = useState<FootballMatch | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Broadcasting: this screen has no scoring controls (read-only by
+  // construction), so a live match is kept fresh purely by polling — no
+  // push/real-time infra exists in this codebase. `refetchInterval` handles
+  // starting/stopping the poll based on the match's own status, and
+  // `refetchIntervalInBackground` defaults to false, so this also stops
+  // polling while the app is backgrounded (the old hand-rolled setInterval
+  // had no such guard) and resumes with an immediate refetch on foreground.
+  const { data: match, isLoading } = useQuery({
+    queryKey: ['match', matchId],
+    queryFn: () => footballService.fetchMatchById(matchId),
+    enabled: !!matchId,
+    refetchInterval: (query) => (query.state.data?.status === 'live' ? 5000 : false),
+  });
 
-  useEffect(() => {
-    if (!matchId) return;
-    fetchMatchById(matchId as string)
-      .then(async (m) => {
-        setMatch(m);
-        if (m) {
-          await Promise.all([fetchTeamById(m.homeTeamId), fetchTeamById(m.awayTeamId)]);
-        }
-      })
-      .finally(() => setIsLoading(false));
-  }, [matchId]);
+  // Team rosters change far less often than a live match — a much longer
+  // staleTime means revisiting a match (or another match involving the same
+  // teams) within the same session skips the network entirely.
+  const homeTeamQuery = useQuery({
+    queryKey: ['team', match?.homeTeamId],
+    queryFn: () => footballService.fetchTeamById(match!.homeTeamId),
+    enabled: !!match?.homeTeamId,
+    staleTime: 5 * 60_000,
+  });
+  const awayTeamQuery = useQuery({
+    queryKey: ['team', match?.awayTeamId],
+    queryFn: () => footballService.fetchTeamById(match!.awayTeamId),
+    enabled: !!match?.awayTeamId,
+    staleTime: 5 * 60_000,
+  });
 
   const allRosterPlayers = useMemo(() => {
     const map = new Map<number, FootballProfile>();
-    if (!match) return map;
-    getTeamById(match.homeTeamId)?.members.forEach((m) => map.set(m.footballProfile.id, m.footballProfile));
-    getTeamById(match.awayTeamId)?.members.forEach((m) => map.set(m.footballProfile.id, m.footballProfile));
+    homeTeamQuery.data?.members.forEach((m) => map.set(m.footballProfile.id, m.footballProfile));
+    awayTeamQuery.data?.members.forEach((m) => map.set(m.footballProfile.id, m.footballProfile));
     return map;
-  }, [match, getTeamById]);
+  }, [homeTeamQuery.data, awayTeamQuery.data]);
 
   const result = useMemo(() => {
     if (!match) return { text: '', color: '', bgColor: '' };
@@ -142,11 +154,17 @@ export default function MatchDetailScreen() {
                   <Text className="text-blue-500 text-3xl font-black mx-3">-</Text>
                   <Text className="text-white text-5xl font-black italic">{match.awayScore}</Text>
                 </View>
-                <View className="bg-blue-600 px-3 py-1 rounded-full mt-2 shadow-sm">
+                <View className={`px-3 py-1 rounded-full mt-2 shadow-sm ${match.status === 'live' ? 'bg-red-600' : 'bg-blue-600'}`}>
                   <Text className="text-white font-black text-[9px] uppercase tracking-tighter">
-                    {match.status === 'completed' ? 'Full Time' : match.status}
+                    {match.status === 'completed' ? 'Full Time' : match.status === 'live' ? 'Live' : match.status === 'scheduled' ? 'Upcoming' : match.status}
                   </Text>
                 </View>
+                {match.status === 'scheduled' && match.scheduledAt && (
+                  <Text className="text-white/70 text-[10px] font-bold mt-2 text-center">
+                    {new Date(match.scheduledAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} ·{' '}
+                    {new Date(match.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                )}
               </View>
 
               <View className="items-center flex-1">

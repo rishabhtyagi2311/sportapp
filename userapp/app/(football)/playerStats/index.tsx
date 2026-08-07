@@ -6,6 +6,7 @@ import { FootballProfile, FootballTeam, FootballMatch, PlayerCareerStats } from 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { queryClient } from '@/lib/queryClient';
 
 // ============ TYPES ============
 
@@ -52,7 +53,10 @@ export default function PlayerStatsScreen() {
         const [stats, teams, myMatches] = await Promise.all([
           footballService.fetchPlayerStats(p.id),
           footballService.fetchMyTeams(),
-          footballService.fetchMyMatches(),
+          // Reads through the same ['myMatches'] React Query cache the matches
+          // list/landing/home screens use, instead of firing an independent
+          // network call every time this screen mounts.
+          queryClient.ensureQueryData({ queryKey: ['myMatches'], queryFn: () => footballService.fetchMyMatches(), staleTime: 15_000 }),
         ]);
         setCareerStats(stats);
         setMyTeams(teams);
@@ -63,7 +67,8 @@ export default function PlayerStatsScreen() {
         const mapped: RecentMatchDisplay[] = details
           .filter((m): m is FootballMatch => !!m)
           .map((match) => {
-            const isHome = match.homeRoster.startingXI.includes(p.id) || match.homeRoster.bench.includes(p.id);
+            // A completed match always has its roster finalized before it could ever go live.
+            const isHome = match.homeRoster!.startingXI.includes(p.id) || match.homeRoster!.bench.includes(p.id);
             const teamScore = isHome ? match.homeScore : match.awayScore;
             const opponentScore = isHome ? match.awayScore : match.homeScore;
             const opponent = (isHome ? match.awayTeam?.name : match.homeTeam?.name) ?? 'Unknown';

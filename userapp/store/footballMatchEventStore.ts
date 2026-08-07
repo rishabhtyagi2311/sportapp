@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { footballService } from '@/services/football';
 import { MatchCreationData } from './footballMatchCreationStore';
 import { FootballMatch } from '@/types/football';
+import { queryClient } from '@/lib/queryClient';
 
 /** Tracks which players are currently on the pitch vs. benched during a live
  *  match. The server only keeps the starting roster snapshot + a chronological
@@ -18,19 +19,62 @@ export interface LiveRosterState {
   awaySubsUsed: number;
 }
 
+/** Replays a match's substitution events on top of its starting roster
+ *  snapshot to derive who's currently on the pitch — used when a creator
+ *  resumes scoring a live match they didn't just start in this app session
+ *  (e.g. tapping it from the Live Matches list after navigating away). */
+function reconstructRosterState(match: FootballMatch): LiveRosterState {
+  const home = match.homeRoster!;
+  const away = match.awayRoster!;
+  const state: LiveRosterState = {
+    homeOnPitch: [...home.startingXI],
+    homeBench: [...home.bench],
+    awayOnPitch: [...away.startingXI],
+    awayBench: [...away.bench],
+    homeSubsUsed: 0,
+    awaySubsUsed: 0,
+  };
+
+  const subEvents = (match.events ?? [])
+    .filter((e) => e.eventType === 'substitution')
+    .sort((a, b) => (a.minute === b.minute ? a.seconds - b.seconds : a.minute - b.minute));
+
+  for (const event of subEvents) {
+    const playerIn = event.playerId;
+    const playerOut = event.relatedPlayerId;
+    if (playerIn == null || playerOut == null) continue;
+
+    if (event.teamId === match.homeTeamId) {
+      state.homeOnPitch = [...state.homeOnPitch.filter((id) => id !== playerOut), playerIn];
+      state.homeBench = [...state.homeBench.filter((id) => id !== playerIn), playerOut];
+      state.homeSubsUsed += 1;
+    } else {
+      state.awayOnPitch = [...state.awayOnPitch.filter((id) => id !== playerOut), playerIn];
+      state.awayBench = [...state.awayBench.filter((id) => id !== playerIn), playerOut];
+      state.awaySubsUsed += 1;
+    }
+  }
+
+  return state;
+}
+
 interface MatchExecutionState {
   activeMatch: FootballMatch | null;
   roster: LiveRosterState | null;
-  myMatches: FootballMatch[];
   isLoading: boolean;
   error: string | null;
 
   startMatch: (matchSetup: MatchCreationData) => Promise<FootballMatch>;
+  scheduleMatch: (data: { homeTeamId: number; awayTeamId: number; scheduledAt: string; venueName?: string }) => Promise<FootballMatch>;
   /** Loads an already-created + already-started match directly into
    *  "active match" state — used by the tournament flow, which creates the
    *  match via a different endpoint (tied to a fixture) but then hands off
    *  to the exact same live-scoring UI as a friendly match. */
   loadActiveMatch: (match: FootballMatch, roster: LiveRosterState) => void;
+  /** Loads a live match the creator is resuming from the Live Matches list
+   *  (not one they just started this session) — fetches the full match with
+   *  its event log and reconstructs current on-pitch state from it. */
+  resumeAsCreator: (matchId: string) => Promise<void>;
   addEvent: (data: {
     teamId: number;
     playerId?: number;
@@ -42,13 +86,14 @@ interface MatchExecutionState {
     notes?: string;
   }) => Promise<void>;
   performSubstitution: (teamId: number, playerOutId: number, playerInId: number, minute: number, seconds: number) => Promise<void>;
-  togglePossession: (teamId: number, currentSeconds: number) => Promise<void>;
+  togglePossession: (teamId: number) => Promise<void>;
+  pausePossessionSync: () => Promise<void>;
+  resumePossessionSync: () => Promise<void>;
   endMatch: (data?: { penaltyHomeScore?: number; penaltyAwayScore?: number; notes?: string }) => Promise<FootballMatch>;
   abandonMatch: (reason?: string) => Promise<void>;
   clearActiveMatch: () => void;
 
   fetchMatchById: (id: string) => Promise<FootballMatch | null>;
-  fetchMyMatches: () => Promise<void>;
 
   getTeamScore: (teamId: number) => number;
   getElapsedSeconds: () => number;
@@ -58,37 +103,59 @@ interface MatchExecutionState {
 export const useMatchExecutionStore = create<MatchExecutionState>((set, get) => ({
   activeMatch: null,
   roster: null,
-  myMatches: [],
   isLoading: false,
   error: null,
 
   startMatch: async (matchSetup) => {
     set({ isLoading: true, error: null });
     try {
-      const created = await footballService.createMatch({
-        homeTeamId: matchSetup.myTeam.teamId,
-        awayTeamId: matchSetup.opponentTeam.teamId,
-        venueName: matchSetup.venue?.name,
-        playersPerTeam: matchSetup.playersPerTeam,
-        allowedSubs: matchSetup.matchSettings?.maxSubstitutions ?? 0,
-        extraTimeAllowed: matchSetup.matchSettings?.extraTimeAllowed ?? false,
-        duration: matchSetup.matchSettings?.duration ?? 90,
-        homeRoster: {
-          startingXI: matchSetup.myTeam.selectedPlayers,
-          bench: matchSetup.myTeam.substitutes,
-          captainId: matchSetup.myTeam.captain!,
-          subsUsed: 0,
-        },
-        awayRoster: {
-          startingXI: matchSetup.opponentTeam.selectedPlayers,
-          bench: matchSetup.opponentTeam.substitutes,
-          captainId: matchSetup.opponentTeam.captain!,
-          subsUsed: 0,
-        },
-        referees: matchSetup.referees.map((r) => r.name),
-      });
+      const homeRoster = {
+        startingXI: matchSetup.myTeam.selectedPlayers,
+        bench: matchSetup.myTeam.substitutes,
+        captainId: matchSetup.myTeam.captain!,
+        subsUsed: 0,
+      };
+      const awayRoster = {
+        startingXI: matchSetup.opponentTeam.selectedPlayers,
+        bench: matchSetup.opponentTeam.substitutes,
+        captainId: matchSetup.opponentTeam.captain!,
+        subsUsed: 0,
+      };
+      const referees = matchSetup.referees.map((r) => r.name);
 
-      const started = await footballService.startMatch(created.id);
+      let started: FootballMatch;
+      if (matchSetup.existingMatchId) {
+        // Finalizing a match that was already created via `scheduleMatch` —
+        // teams/venue are already set, this call supplies the deferred
+        // lineup/settings and flips it to live in one step.
+        started = await footballService.startMatch(matchSetup.existingMatchId, {
+          playersPerTeam: matchSetup.playersPerTeam,
+          allowedSubs: matchSetup.matchSettings?.maxSubstitutions ?? 0,
+          extraTimeAllowed: matchSetup.matchSettings?.extraTimeAllowed ?? false,
+          duration: matchSetup.matchSettings?.duration ?? 90,
+          homeRoster,
+          awayRoster,
+          referees,
+        });
+      } else {
+        const created = await footballService.createMatch({
+          homeTeamId: matchSetup.myTeam.teamId,
+          awayTeamId: matchSetup.opponentTeam.teamId,
+          venueName: matchSetup.venue?.name,
+          playersPerTeam: matchSetup.playersPerTeam,
+          allowedSubs: matchSetup.matchSettings?.maxSubstitutions ?? 0,
+          extraTimeAllowed: matchSetup.matchSettings?.extraTimeAllowed ?? false,
+          duration: matchSetup.matchSettings?.duration ?? 90,
+          homeRoster,
+          awayRoster,
+          referees,
+        });
+
+        started = await footballService.startMatch(created.id);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['myMatches'] });
+      queryClient.invalidateQueries({ queryKey: ['match', started.id] });
 
       set({
         activeMatch: started,
@@ -111,7 +178,31 @@ export const useMatchExecutionStore = create<MatchExecutionState>((set, get) => 
     }
   },
 
+  scheduleMatch: async (data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const match = await footballService.scheduleMatch(data);
+      queryClient.invalidateQueries({ queryKey: ['myMatches'] });
+      set({ isLoading: false });
+      return match;
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not schedule match';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
+
   loadActiveMatch: (match, roster) => set({ activeMatch: match, roster, error: null }),
+
+  resumeAsCreator: async (matchId) => {
+    set({ isLoading: true, error: null });
+    const match = await footballService.fetchMatchById(matchId);
+    if (!match) {
+      set({ isLoading: false, error: 'Match not found' });
+      throw new Error('Match not found');
+    }
+    set({ activeMatch: match, roster: reconstructRosterState(match), isLoading: false });
+  },
 
   addEvent: async (data) => {
     const { activeMatch } = get();
@@ -134,7 +225,8 @@ export const useMatchExecutionStore = create<MatchExecutionState>((set, get) => 
     if (!activeMatch || !roster) return;
 
     const isHome = teamId === activeMatch.homeTeamId;
-    const limit = activeMatch.allowedSubs;
+    // A live match always has its settings finalized before it could go live.
+    const limit = activeMatch.allowedSubs!;
     const used = isHome ? roster.homeSubsUsed : roster.awaySubsUsed;
 
     if (used >= limit) {
@@ -174,16 +266,44 @@ export const useMatchExecutionStore = create<MatchExecutionState>((set, get) => 
     });
   },
 
-  togglePossession: async (teamId, currentSeconds) => {
+  togglePossession: async (teamId) => {
     const { activeMatch } = get();
     if (!activeMatch) return;
 
     set({ error: null });
     try {
-      const updated = await footballService.updatePossession(activeMatch.id, teamId, currentSeconds);
+      const updated = await footballService.updatePossession(activeMatch.id, teamId);
       set({ activeMatch: updated });
     } catch (err: any) {
       const message = err.response?.data?.message || 'Could not update possession';
+      set({ error: message });
+      throw new Error(message);
+    }
+  },
+
+  pausePossessionSync: async () => {
+    const { activeMatch } = get();
+    if (!activeMatch) return;
+
+    try {
+      const updated = await footballService.pausePossession(activeMatch.id);
+      set({ activeMatch: updated });
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not pause possession tracking';
+      set({ error: message });
+      throw new Error(message);
+    }
+  },
+
+  resumePossessionSync: async () => {
+    const { activeMatch } = get();
+    if (!activeMatch) return;
+
+    try {
+      const updated = await footballService.resumePossession(activeMatch.id);
+      set({ activeMatch: updated });
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not resume possession tracking';
       set({ error: message });
       throw new Error(message);
     }
@@ -196,12 +316,9 @@ export const useMatchExecutionStore = create<MatchExecutionState>((set, get) => 
     set({ isLoading: true, error: null });
     try {
       const completed = await footballService.endMatch(activeMatch.id, data);
-      set((state) => ({
-        activeMatch: null,
-        roster: null,
-        myMatches: [completed, ...state.myMatches],
-        isLoading: false,
-      }));
+      queryClient.invalidateQueries({ queryKey: ['myMatches'] });
+      queryClient.invalidateQueries({ queryKey: ['match', activeMatch.id] });
+      set({ activeMatch: null, roster: null, isLoading: false });
       return completed;
     } catch (err: any) {
       const message = err.response?.data?.message || 'Could not end match';
@@ -217,6 +334,8 @@ export const useMatchExecutionStore = create<MatchExecutionState>((set, get) => 
     set({ isLoading: true, error: null });
     try {
       await footballService.abandonMatch(activeMatch.id, reason);
+      queryClient.invalidateQueries({ queryKey: ['myMatches'] });
+      queryClient.invalidateQueries({ queryKey: ['match', activeMatch.id] });
       set({ activeMatch: null, roster: null, isLoading: false });
     } catch (err: any) {
       const message = err.response?.data?.message || 'Could not abandon match';
@@ -230,12 +349,6 @@ export const useMatchExecutionStore = create<MatchExecutionState>((set, get) => 
   fetchMatchById: async (id) => {
     const match = await footballService.fetchMatchById(id);
     return match;
-  },
-
-  fetchMyMatches: async () => {
-    set({ isLoading: true, error: null });
-    const myMatches = await footballService.fetchMyMatches();
-    set({ myMatches, isLoading: false });
   },
 
   getTeamScore: (teamId) => {

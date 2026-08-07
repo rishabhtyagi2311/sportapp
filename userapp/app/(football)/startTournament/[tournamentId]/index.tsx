@@ -1,10 +1,14 @@
 // app/(football)/tournaments/[tournamentId].tsx
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTournamentStore } from '@/store/tournamentStore';
+import { useAuthStore } from '@/store/authStore';
+import { useDebouncedFocusFetch } from '@/hooks/useDebouncedFocusFetch';
+import SetFixtureScheduleModal from '@/components/football/SetFixtureScheduleModal';
+import { TournamentFixture } from '@/types/football';
 
 type TabType = 'fixtures' | 'standings' | 'matches';
 
@@ -12,17 +16,21 @@ export default function TournamentDashboardScreen() {
   const router = useRouter();
   const { tournamentId } = useLocalSearchParams<{ tournamentId: string }>();
 
-  const { getTournament, getStandings, fetchTournamentById, startTournament, isLoading } = useTournamentStore();
+  const { getTournament, getStandings, fetchTournamentById, startTournament, setFixtureSchedule, isLoading } = useTournamentStore();
+  const currentUser = useAuthStore((state) => state.user);
 
   const [activeTab, setActiveTab] = useState<TabType>('fixtures');
+  const [schedulingFixture, setSchedulingFixture] = useState<TournamentFixture | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (tournamentId) fetchTournamentById(tournamentId);
-    }, [tournamentId])
-  );
+  // Debounced against the same screen instance re-focusing (e.g. navigating
+  // back from starting a fixture match); switching to a different
+  // tournamentId always fetches immediately since it's passed as the key.
+  useDebouncedFocusFetch(() => {
+    if (tournamentId) fetchTournamentById(tournamentId);
+  }, 15_000, tournamentId);
 
   const tournament = getTournament(tournamentId);
+  const isCreator = !!currentUser && tournament?.creatorId === currentUser.id;
   const standings = useMemo(() => (tournamentId ? getStandings(tournamentId) : []), [tournamentId, tournament]);
 
   const upcomingFixtures = useMemo(
@@ -239,11 +247,34 @@ export default function TournamentDashboardScreen() {
                       </View>
                     </View>
 
-                    {tournament.status === 'ongoing' && fixture.homeTeamId && fixture.awayTeamId && (
-                      <TouchableOpacity onPress={() => handlePlayMatch(fixture.id)} className="bg-blue-600 rounded-lg py-3 items-center">
-                        <Text className="text-white font-semibold text-sm">Play Match</Text>
-                      </TouchableOpacity>
+                    {fixture.scheduledAt && (
+                      <View className="flex-row items-center mb-3">
+                        <Ionicons name="calendar-outline" size={14} color="#64748b" />
+                        <Text className="text-slate-500 text-xs ml-1">
+                          {new Date(fixture.scheduledAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} ·{' '}
+                          {new Date(fixture.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {(fixture.venueName || tournament.venueName) && ` · ${fixture.venueName || tournament.venueName}`}
+                        </Text>
+                      </View>
                     )}
+
+                    <View className="flex-row" style={{ gap: 8 }}>
+                      {isCreator && tournament.status === 'ongoing' && fixture.homeTeamId && fixture.awayTeamId && (
+                        <TouchableOpacity onPress={() => handlePlayMatch(fixture.id)} className="flex-1 bg-blue-600 rounded-lg py-3 items-center">
+                          <Text className="text-white font-semibold text-sm">Play Match</Text>
+                        </TouchableOpacity>
+                      )}
+                      {isCreator && (
+                        <TouchableOpacity
+                          onPress={() => setSchedulingFixture(fixture)}
+                          className="flex-1 bg-amber-100 rounded-lg py-3 items-center"
+                        >
+                          <Text className="text-amber-700 font-semibold text-sm">
+                            {fixture.scheduledAt ? 'Edit Schedule' : 'Set Schedule'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 ))}
               </View>
@@ -366,7 +397,7 @@ export default function TournamentDashboardScreen() {
       </ScrollView>
 
       {/* Tournament Control Buttons */}
-      {tournament.status === 'draft' && (
+      {tournament.status === 'draft' && isCreator && (
         <View className="bg-white px-4 py-4 border-t border-slate-200">
           <TouchableOpacity onPress={handleStartTournament} className="bg-green-600 rounded-xl py-4 items-center">
             <View className="flex-row items-center">
@@ -376,6 +407,13 @@ export default function TournamentDashboardScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      <SetFixtureScheduleModal
+        visible={!!schedulingFixture}
+        onClose={() => setSchedulingFixture(null)}
+        defaultVenueName={schedulingFixture?.venueName ?? tournament.venueName}
+        onSubmit={(data) => setFixtureSchedule(tournamentId, schedulingFixture!.id, data)}
+      />
     </SafeAreaView>
   );
 }

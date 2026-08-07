@@ -1,22 +1,23 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 
 import { useTournamentStore } from '@/store/tournamentStore';
+import { useAuthStore } from '@/store/authStore';
+import { useDebouncedFocusFetch } from '@/hooks/useDebouncedFocusFetch';
 import { Tournament } from '@/types/football';
 
 export default function TournamentsScreen() {
   const router = useRouter();
 
   const { tournaments, isLoading, fetchMyTournaments, deleteTournament } = useTournamentStore();
+  const currentUser = useAuthStore((state) => state.user);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchMyTournaments();
-    }, [])
-  );
+  // Was an unconditional useFocusEffect firing a fresh GET on every single
+  // tab-return; now only refetches if the last fetch was more than 15s ago.
+  useDebouncedFocusFetch(fetchMyTournaments);
 
   const handleCreateTournament = () => {
     router.push('/(football)/startTournament/formatSelectionScreen');
@@ -75,6 +76,7 @@ export default function TournamentsScreen() {
     const progress = getProgressPercentage(tournament);
     const completedMatches = tournament.fixtures.filter((f) => f.status === 'completed').length;
     const isDraft = tournament.status === 'draft';
+    const isCreator = !!currentUser && tournament.creatorId === currentUser.id;
     const isKnockout = tournament.format === 'knockout';
     const winnerEntry = tournament.status === 'completed' ? tournament.entries.find((e) => e.status === 'winner') : undefined;
 
@@ -119,7 +121,7 @@ export default function TournamentsScreen() {
                 color={isKnockout ? '#ea580c' : '#2563eb'}
               />
             </View>
-            {isDraft && (
+            {isDraft && isCreator && (
               <TouchableOpacity
                 onPress={(e) => {
                   e.stopPropagation();

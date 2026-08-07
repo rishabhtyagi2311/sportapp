@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { prisma as globalClient } from "../../../index";
 import { MatchService } from "../matchManagement/match";
 
@@ -121,37 +122,50 @@ export class TournamentService {
           })),
         });
       } else {
+        // Pre-generate every fixture's id up front (Node's built-in
+        // crypto.randomUUID — no need for a new dependency) so each round's
+        // nextFixtureId can be set directly while building the array,
+        // instead of creating fixtures one at a time and reading their ids
+        // back to wire up the bracket with individual update calls.
         const totalRounds = Math.log2(data.teamIds.length);
+        const allFixtures: {
+          id: string;
+          tournamentId: string;
+          round: number;
+          homeTeamId: number | null;
+          awayTeamId: number | null;
+          status: string;
+          nextFixtureId: string | null;
+        }[] = [];
         let previousRoundIds: string[] = [];
 
         for (let round = 1; round <= totalRounds; round++) {
           const fixtureCount = round === 1 ? data.teamIds.length / 2 : previousRoundIds.length / 2;
-          const createdIds: string[] = [];
-
-          for (let i = 0; i < fixtureCount; i++) {
-            const created = await tx.tournamentFixture.create({
-              data: {
-                tournamentId: tournament.id,
-                round,
-                homeTeamId: round === 1 ? data.teamIds[i * 2] : null,
-                awayTeamId: round === 1 ? data.teamIds[i * 2 + 1] : null,
-                status: round === 1 ? "ready" : "pending",
-              },
-            });
-            createdIds.push(created.id);
-          }
+          const roundIds = Array.from({ length: fixtureCount }, () => randomUUID());
 
           if (round > 1) {
-            for (let i = 0; i < previousRoundIds.length; i++) {
-              await tx.tournamentFixture.update({
-                where: { id: previousRoundIds[i] },
-                data: { nextFixtureId: createdIds[Math.floor(i / 2)] },
-              });
-            }
+            previousRoundIds.forEach((id, i) => {
+              const fixture = allFixtures.find((f) => f.id === id)!;
+              fixture.nextFixtureId = roundIds[Math.floor(i / 2)];
+            });
           }
 
-          previousRoundIds = createdIds;
+          roundIds.forEach((id, i) => {
+            allFixtures.push({
+              id,
+              tournamentId: tournament.id,
+              round,
+              homeTeamId: round === 1 ? data.teamIds[i * 2] : null,
+              awayTeamId: round === 1 ? data.teamIds[i * 2 + 1] : null,
+              status: round === 1 ? "ready" : "pending",
+              nextFixtureId: null,
+            });
+          });
+
+          previousRoundIds = roundIds;
         }
+
+        await tx.tournamentFixture.createMany({ data: allFixtures });
       }
 
       const full = await tx.tournament.findUnique({ where: { id: tournament.id }, include: tournamentInclude });
@@ -224,6 +238,44 @@ export class TournamentService {
     return started;
   }
 
+  static async setFixtureSchedule(
+    userId: number,
+    tournamentId: string,
+    fixtureId: string,
+    data: { scheduledAt: string; venueName?: string }
+  ) {
+    const tournament = await globalClient.tournament.findFirst({ where: { id: tournamentId, creatorId: userId } });
+
+    if (!tournament) {
+      throw new Error("Tournament not found or not owned by you");
+    }
+
+    const fixture = await globalClient.tournamentFixture.findFirst({ where: { id: fixtureId, tournamentId } });
+
+    if (!fixture) {
+      throw new Error("Fixture not found");
+    }
+
+    if (fixture.status === "completed" || fixture.matchId) {
+      throw new Error("Cannot set a schedule for a fixture whose match has already started or finished");
+    }
+
+    const updated = await globalClient.tournament.update({
+      where: { id: tournamentId },
+      data: {
+        fixtures: {
+          update: {
+            where: { id: fixtureId },
+            data: { scheduledAt: new Date(data.scheduledAt), venueName: data.venueName },
+          },
+        },
+      },
+      include: tournamentInclude,
+    });
+
+    return mapTournamentForClient(updated);
+  }
+
   static async getTournamentById(id: string) {
     const tournament = await globalClient.tournament.findUnique({ where: { id }, include: tournamentInclude });
 
@@ -231,8 +283,19 @@ export class TournamentService {
   }
 
   static async getMyTournaments(userId: number) {
+    const profile = await globalClient.footballProfile.findUnique({ where: { userId }, select: { id: true } });
+
+    const ownedTeamIds = profile
+      ? (
+          await globalClient.footballTeam.findMany({
+            where: { OR: [{ createdById: profile.id }, { members: { some: { footballProfileId: profile.id } } }] },
+            select: { id: true },
+          })
+        ).map((t) => t.id)
+      : [];
+
     const tournaments = await globalClient.tournament.findMany({
-      where: { creatorId: userId },
+      where: { OR: [{ creatorId: userId }, { entries: { some: { teamId: { in: ownedTeamIds } } } }] },
       include: tournamentInclude,
       orderBy: { createdAt: "desc" },
     });

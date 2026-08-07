@@ -1,12 +1,13 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import {
   View, Text, TouchableOpacity, ScrollView, Modal, TextInput, StatusBar, ActivityIndicator, Alert
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons'
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { format, addDays, isSameDay } from 'date-fns'
 import { useSlotStore } from '@/store/venueSlotsStore'
+import { useDebouncedFocusFetch } from '@/hooks/useDebouncedFocusFetch'
 
 // Stores
 import { useVenueStore } from '@/store/venueStore'
@@ -68,23 +69,19 @@ export default function SlotManagerView() {
 
   // 4. FETCH SLOTS + BOOKINGS ON DATE CHANGE, SESSIONS ON VENUE CHANGE — and
   // on every focus, so returning from blocking/creating a session shows fresh data
-  useFocusEffect(
-    useCallback(() => {
-      if (venueId) {
-        const dateStr = format(selectedDate, 'yyyy-MM-dd')
-        loadSlots(venueId, dateStr)
-        fetchBookings(venueId, dateStr)
-      }
-    }, [venueId, selectedDate])
-  )
+  const selectedDateStr = format(selectedDate, 'yyyy-MM-dd')
+  useDebouncedFocusFetch(() => {
+    if (venueId) {
+      loadSlots(venueId, selectedDateStr)
+      fetchBookings(venueId, selectedDateStr)
+    }
+  }, 15_000, `${venueId}:${selectedDateStr}`)
 
-  useFocusEffect(
-    useCallback(() => {
-      if (venueId) {
-        fetchSessions(venueId)
-      }
-    }, [venueId])
-  )
+  useDebouncedFocusFetch(() => {
+    if (venueId) {
+      fetchSessions(venueId)
+    }
+  }, 15_000, venueId)
 
   // 5. DATA MERGING LOGIC — the backend's slot.status is the source of truth;
   // bookings/sessions are only consulted for extra display detail.

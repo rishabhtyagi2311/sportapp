@@ -1,6 +1,7 @@
 // hooks/useFootballMatches.ts
-import { useEffect, useMemo } from 'react';
-import { useMatchExecutionStore } from '@/store/footballMatchEventStore';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { footballService } from '@/services/football';
 
 // Common interface for match types to display in lists
 export interface DisplayMatch {
@@ -15,15 +16,21 @@ export interface DisplayMatch {
   status: string;
   date: Date;
   venue?: string;
-  duration: number;
+  duration?: number;
+  scheduledAt?: string | null;
+  creatorId: number;
 }
 
 export function useFootballMatches() {
-  const { myMatches, isLoading, fetchMyMatches } = useMatchExecutionStore();
-
-  useEffect(() => {
-    fetchMyMatches();
-  }, []);
+  // Previously a mount-only fetch that never refreshed for the lifetime of
+  // the screen — refetch-on-focus (the default) plus a real staleTime means
+  // this now actually picks up new/updated matches on return visits, while
+  // still not spamming the network on every render.
+  const { data: myMatches = [], isLoading, isRefetching, refetch } = useQuery({
+    queryKey: ['myMatches'],
+    queryFn: () => footballService.fetchMyMatches(),
+    staleTime: 15_000,
+  });
 
   const transformed = useMemo<DisplayMatch[]>(() => {
     return myMatches.map((match) => ({
@@ -36,9 +43,11 @@ export function useFootballMatches() {
       homeTeamScore: match.homeScore,
       awayTeamScore: match.awayScore,
       status: match.status,
-      date: new Date(match.startedAt ?? match.createdAt),
+      date: new Date(match.scheduledAt ?? match.startedAt ?? match.createdAt),
       venue: match.venueName,
       duration: match.duration,
+      scheduledAt: match.scheduledAt,
+      creatorId: match.creatorId,
     }));
   }, [myMatches]);
 
@@ -47,5 +56,7 @@ export function useFootballMatches() {
     live: transformed.filter((m) => m.type === 'live'),
     upcoming: transformed.filter((m) => m.type === 'scheduled'),
     isLoading,
+    isRefetching,
+    refetch,
   };
 }

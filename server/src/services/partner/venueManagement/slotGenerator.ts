@@ -61,19 +61,32 @@ export async function repriceAvailableSlots(
     select: { id: true, varietyId: true, startTime: true, price: true },
   });
 
-  let updatedCount = 0;
+  const changedSlots: { id: string; newPrice: number }[] = [];
   for (const slot of slots) {
     const basePrice = varietyBasePriceById.get(slot.varietyId);
     if (basePrice === undefined) continue; // variety no longer exists on the venue — leave its old slots alone
 
     const newPrice = priceForSlot(timeToMins(slot.startTime), basePrice, params.peakPricing);
     if (newPrice !== slot.price) {
-      await client.timeSlot.update({ where: { id: slot.id }, data: { price: newPrice } });
-      updatedCount += 1;
+      changedSlots.push({ id: slot.id, newPrice });
     }
   }
 
-  return updatedCount;
+  // Same number of round trips as updating one at a time, but concurrent
+  // instead of serial — a venue with a full rolling window of slots across
+  // several varieties can have hundreds of these, and awaiting them one by
+  // one was the actual wall-clock cost. Chunked (rather than one big
+  // Promise.all) to avoid opening an unbounded number of simultaneous
+  // connections against the pool for a very large venue.
+  const CHUNK_SIZE = 20;
+  for (let i = 0; i < changedSlots.length; i += CHUNK_SIZE) {
+    const chunk = changedSlots.slice(i, i + CHUNK_SIZE);
+    await Promise.all(
+      chunk.map(({ id, newPrice }) => client.timeSlot.update({ where: { id }, data: { price: newPrice } }))
+    );
+  }
+
+  return changedSlots.length;
 }
 
 /**

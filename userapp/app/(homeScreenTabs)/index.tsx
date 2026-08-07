@@ -14,8 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFootballStore } from '@/store/footballTeamStore';
-import { useMatchExecutionStore } from '@/store/footballMatchEventStore';
 import { useUserBookingStore } from '@/store/bookingStore';
+import { useFootballMatches } from '@/hooks/useFootballMatches';
 
 const { width } = Dimensions.get('window');
 
@@ -60,19 +60,21 @@ export default function HomeScreen() {
   const router = useRouter();
 
   const { myTeams, fetchMyTeams } = useFootballStore();
-  const { myMatches, fetchMyMatches } = useMatchExecutionStore();
   const { bookings, fetchMyBookings } = useUserBookingStore();
+  // Shares the ['myMatches'] React Query cache with the matches list/landing
+  // screens instead of firing its own independent fetch on every app open.
+  const { live, upcoming, completed } = useFootballMatches();
+  const totalMatches = live.length + upcoming.length + completed.length;
 
   useEffect(() => {
     fetchMyTeams().catch(() => {});
-    fetchMyMatches().catch(() => {});
     fetchMyBookings().catch(() => {});
   }, []);
 
   const upcomingBookings = bookings.filter((b) => b.status !== 'cancelled' && new Date(b.date) >= new Date()).length;
 
   const insights = [
-    { label: 'My Matches', val: String(myMatches.length), icon: 'football-outline' },
+    { label: 'My Matches', val: String(totalMatches), icon: 'football-outline' },
     { label: 'My Teams', val: String(myTeams.length), icon: 'people-outline' },
     { label: 'Upcoming Bookings', val: String(upcomingBookings), icon: 'calendar-outline' },
   ];

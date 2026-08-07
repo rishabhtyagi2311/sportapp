@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { useAcademyStore } from "@/store/academyStore";
 import { usechildStore } from "@/store/academyChildProfile";
 import { useEnrollmentStore } from "@/store/academyEnrollmentStore";
@@ -41,12 +42,20 @@ export default function DetailsScreen() {
 
   const academy = getAcademyById(academyId);
 
-  useEffect(() => {
-    fetchAcademyById(academyId);
-    fetchMyChildProfiles();
-    fetchMyEnrollments();
-    fetchMyDemoBookings();
-  }, [academyId]);
+  // Each push of this screen (even for the same academy, e.g. list -> back
+  // -> tap again) previously created a fresh mount that unconditionally
+  // refetched all four in parallel every time. React Query's cache lives
+  // outside the component tree, so it survives that remount — a staleTime
+  // window means revisiting shortly after skips the network entirely. The
+  // store actions themselves are unchanged (still populate academyStore /
+  // childStore / enrollmentStore / demoBookingStore as before), so
+  // `isChildEnrolled`/`isDemoBooked` and friends keep working exactly as
+  // they did — useQuery here is purely a caching scheduler, not a new data
+  // source.
+  useQuery({ queryKey: ['academy', academyId], queryFn: () => fetchAcademyById(academyId), staleTime: 30_000 });
+  useQuery({ queryKey: ['myChildProfiles'], queryFn: () => fetchMyChildProfiles(), staleTime: 30_000 });
+  useQuery({ queryKey: ['myEnrollments'], queryFn: () => fetchMyEnrollments(), staleTime: 30_000 });
+  useQuery({ queryKey: ['myDemoBookings'], queryFn: () => fetchMyDemoBookings(), staleTime: 30_000 });
 
   if (!academy) {
     return (

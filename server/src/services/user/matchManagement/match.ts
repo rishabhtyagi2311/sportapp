@@ -1,9 +1,13 @@
 import { prisma as globalClient } from "../../../index";
+import { withCache, invalidateCache } from "../../../utils/simpleCache";
 
 const matchInclude = {
   homeTeam: { select: { id: true, name: true, location: true } },
   awayTeam: { select: { id: true, name: true, location: true } },
 };
+
+const MATCH_CACHE_TTL_MS = 2000;
+const matchCacheKey = (matchId: string) => `match:${matchId}`;
 
 function mapMatchForClient(match: any) {
   return {
@@ -170,6 +174,30 @@ async function applyFixtureResult(tx: any, fixture: any, match: any) {
   }
 }
 
+/** Flushes the currently-accruing possession segment (if any) into the two
+ *  banked totals, using a server wall-clock timestamp rather than any
+ *  client-supplied elapsed-seconds value. `now` is injectable for tests.
+ *  Returns the flushed totals only — callers decide what else to persist
+ *  alongside them (new holder + fresh baseline, a paused/null baseline, or
+ *  nothing further when finalizing a match). */
+function accruePossession(match: { homeTeamId: number; currentPossessionTeamId: number | null; possessionStartedAt: Date | null; homePossessionSeconds: number; awayPossessionSeconds: number }, now: Date = new Date()) {
+  let home = match.homePossessionSeconds;
+  let away = match.awayPossessionSeconds;
+
+  if (match.currentPossessionTeamId && match.possessionStartedAt) {
+    const elapsed = Math.floor((now.getTime() - match.possessionStartedAt.getTime()) / 1000);
+    if (elapsed > 0) {
+      if (match.currentPossessionTeamId === match.homeTeamId) {
+        home += elapsed;
+      } else {
+        away += elapsed;
+      }
+    }
+  }
+
+  return { home, away };
+}
+
 export class MatchService {
   static async createMatch(
     userId: number,
@@ -215,7 +243,47 @@ export class MatchService {
     return mapMatchForClient(match);
   }
 
-  static async startMatch(userId: number, matchId: string) {
+  static async scheduleMatch(
+    userId: number,
+    data: { homeTeamId: number; awayTeamId: number; scheduledAt: string; venueName?: string }
+  ) {
+    const [homeTeam, awayTeam] = await Promise.all([
+      globalClient.footballTeam.findUnique({ where: { id: data.homeTeamId } }),
+      globalClient.footballTeam.findUnique({ where: { id: data.awayTeamId } }),
+    ]);
+
+    if (!homeTeam || !awayTeam) {
+      throw new Error("One or both teams could not be found");
+    }
+
+    const match = await globalClient.match.create({
+      data: {
+        creatorId: userId,
+        homeTeamId: data.homeTeamId,
+        awayTeamId: data.awayTeamId,
+        venueName: data.venueName,
+        scheduledAt: new Date(data.scheduledAt),
+        referees: [],
+      },
+      include: matchInclude,
+    });
+
+    return mapMatchForClient(match);
+  }
+
+  static async startMatch(
+    userId: number,
+    matchId: string,
+    data?: {
+      playersPerTeam?: number;
+      allowedSubs?: number;
+      extraTimeAllowed?: boolean;
+      duration?: number;
+      homeRoster?: Roster;
+      awayRoster?: Roster;
+      referees?: string[];
+    }
+  ) {
     const match = await globalClient.match.findFirst({ where: { id: matchId, creatorId: userId } });
 
     if (!match) {
@@ -226,12 +294,33 @@ export class MatchService {
       throw new Error(`Cannot start a match that is '${match.status}'`);
     }
 
+    // A match created via `scheduleMatch` has no lineup/settings yet — the
+    // organizer must supply them now, at kickoff. A match created via the
+    // original all-at-once `createMatch` already has them, so `data` (if
+    // any) is ignored and the match starts exactly as it always has.
+    let finalizeData = {};
+    if (!match.homeRoster || !match.awayRoster || match.playersPerTeam == null || match.allowedSubs == null || match.duration == null) {
+      if (!data || data.playersPerTeam == null || data.allowedSubs == null || data.duration == null || !data.homeRoster || !data.awayRoster) {
+        throw new Error("This match needs its lineup and settings before it can start");
+      }
+      finalizeData = {
+        playersPerTeam: data.playersPerTeam,
+        allowedSubs: data.allowedSubs,
+        extraTimeAllowed: data.extraTimeAllowed ?? false,
+        duration: data.duration,
+        homeRoster: data.homeRoster,
+        awayRoster: data.awayRoster,
+        referees: data.referees ?? [],
+      };
+    }
+
     const updated = await globalClient.match.update({
       where: { id: matchId },
-      data: { status: "live", startedAt: new Date() },
+      data: { status: "live", startedAt: new Date(), ...finalizeData },
       include: matchInclude,
     });
 
+    invalidateCache(matchCacheKey(matchId));
     return mapMatchForClient(updated);
   }
 
@@ -246,12 +335,22 @@ export class MatchService {
       throw new Error(`Cannot abandon a match that is already '${match.status}'`);
     }
 
+    const { home: finalHomePossession, away: finalAwayPossession } = accruePossession(match);
+
     const updated = await globalClient.match.update({
       where: { id: matchId },
-      data: { status: "abandoned", endedAt: new Date(), notes: reason },
+      data: {
+        status: "abandoned",
+        endedAt: new Date(),
+        notes: reason,
+        homePossessionSeconds: finalHomePossession,
+        awayPossessionSeconds: finalAwayPossession,
+        possessionStartedAt: null,
+      },
       include: matchInclude,
     });
 
+    invalidateCache(matchCacheKey(matchId));
     return mapMatchForClient(updated);
   }
 
@@ -279,8 +378,8 @@ export class MatchService {
       throw new Error(`Cannot add events to a match that is '${match.status}'`);
     }
 
-    return globalClient.$transaction(async (tx) => {
-      const event = await tx.matchEvent.create({ data: { matchId, ...data } });
+    const event = await globalClient.$transaction(async (tx) => {
+      const created = await tx.matchEvent.create({ data: { matchId, ...data } });
 
       if (data.eventType === "goal") {
         const scoringField = data.teamId === match.homeTeamId ? "homeScore" : "awayScore";
@@ -290,11 +389,14 @@ export class MatchService {
         await tx.match.update({ where: { id: matchId }, data: { [scoringField]: { increment: 1 } } });
       }
 
-      return mapMatchEventForClient(event);
+      return mapMatchEventForClient(created);
     });
+
+    invalidateCache(matchCacheKey(matchId));
+    return event;
   }
 
-  static async updatePossession(userId: number, matchId: string, data: { teamId: number; currentSeconds: number }) {
+  static async updatePossession(userId: number, matchId: string, data: { teamId: number }) {
     const match = await globalClient.match.findFirst({ where: { id: matchId, creatorId: userId } });
 
     if (!match) {
@@ -305,34 +407,84 @@ export class MatchService {
       throw new Error(`Cannot update possession on a match that is '${match.status}'`);
     }
 
-    return globalClient.$transaction(async (tx) => {
-      let homeAccrued = match.homePossessionSeconds;
-      let awayAccrued = match.awayPossessionSeconds;
+    if (data.teamId !== match.homeTeamId && data.teamId !== match.awayTeamId) {
+      throw new Error("teamId must be one of the match's two teams");
+    }
 
-      if (match.currentPossessionTeamId) {
-        const elapsed = data.currentSeconds - match.lastPossessionChangeSeconds;
-        if (elapsed > 0) {
-          if (match.currentPossessionTeamId === match.homeTeamId) {
-            homeAccrued += elapsed;
-          } else {
-            awayAccrued += elapsed;
-          }
-        }
-      }
+    const now = new Date();
+    const { home, away } = accruePossession(match, now);
 
-      const updated = await tx.match.update({
-        where: { id: matchId },
-        data: {
-          homePossessionSeconds: homeAccrued,
-          awayPossessionSeconds: awayAccrued,
-          currentPossessionTeamId: data.teamId,
-          lastPossessionChangeSeconds: data.currentSeconds,
-        },
-        include: matchInclude,
-      });
-
-      return mapMatchForClient(updated);
+    const updated = await globalClient.match.update({
+      where: { id: matchId },
+      data: {
+        homePossessionSeconds: home,
+        awayPossessionSeconds: away,
+        currentPossessionTeamId: data.teamId,
+        possessionStartedAt: now,
+      },
+      include: matchInclude,
     });
+
+    invalidateCache(matchCacheKey(matchId));
+    return mapMatchForClient(updated);
+  }
+
+  static async pausePossession(userId: number, matchId: string) {
+    const match = await globalClient.match.findFirst({ where: { id: matchId, creatorId: userId } });
+
+    if (!match) {
+      throw new Error("Match not found or not owned by you");
+    }
+
+    if (match.status !== "live") {
+      throw new Error(`Cannot pause possession on a match that is '${match.status}'`);
+    }
+
+    if (!match.currentPossessionTeamId || !match.possessionStartedAt) {
+      const current = await globalClient.match.findUnique({ where: { id: matchId }, include: matchInclude });
+      return mapMatchForClient(current);
+    }
+
+    const { home, away } = accruePossession(match);
+
+    const updated = await globalClient.match.update({
+      where: { id: matchId },
+      data: {
+        homePossessionSeconds: home,
+        awayPossessionSeconds: away,
+        possessionStartedAt: null,
+      },
+      include: matchInclude,
+    });
+
+    invalidateCache(matchCacheKey(matchId));
+    return mapMatchForClient(updated);
+  }
+
+  static async resumePossession(userId: number, matchId: string) {
+    const match = await globalClient.match.findFirst({ where: { id: matchId, creatorId: userId } });
+
+    if (!match) {
+      throw new Error("Match not found or not owned by you");
+    }
+
+    if (match.status !== "live") {
+      throw new Error(`Cannot resume possession on a match that is '${match.status}'`);
+    }
+
+    if (!match.currentPossessionTeamId) {
+      const current = await globalClient.match.findUnique({ where: { id: matchId }, include: matchInclude });
+      return mapMatchForClient(current);
+    }
+
+    const updated = await globalClient.match.update({
+      where: { id: matchId },
+      data: { possessionStartedAt: new Date() },
+      include: matchInclude,
+    });
+
+    invalidateCache(matchCacheKey(matchId));
+    return mapMatchForClient(updated);
   }
 
   static async endMatch(userId: number, matchId: string, data: { penaltyHomeScore?: number; penaltyAwayScore?: number; notes?: string }) {
@@ -360,12 +512,21 @@ export class MatchService {
       throw new Error("This knockout match is tied — penalty scores are required to determine a winner");
     }
 
-    return globalClient.$transaction(async (tx) => {
-      const events = await tx.matchEvent.findMany({ where: { matchId } });
-      const homeRoster = match.homeRoster as unknown as Roster;
-      const awayRoster = match.awayRoster as unknown as Roster;
-      const playerStats = computePlayerStats(homeRoster, awayRoster, match.homeTeamId, match.awayTeamId, events, match.duration);
+    // Fetched and computed outside the transaction — this is a read plus
+    // pure CPU-bound JS work (iterates every event and both full rosters),
+    // and neither needs transactional consistency with the writes below.
+    // Doing it before the transaction opens keeps the held DB connection
+    // limited to just the writes, instead of blocking the event loop while
+    // a pooled connection sits open underneath it.
+    const events = await globalClient.matchEvent.findMany({ where: { matchId } });
+    const homeRoster = match.homeRoster as unknown as Roster;
+    const awayRoster = match.awayRoster as unknown as Roster;
+    // A 'live' match always has `duration` set — either from `createMatch`
+    // directly, or filled in by `startMatch`'s finalize step for a
+    // previously-scheduled match — so this is safe to assert non-null.
+    const playerStats = computePlayerStats(homeRoster, awayRoster, match.homeTeamId, match.awayTeamId, events, match.duration!);
 
+    return globalClient.$transaction(async (tx) => {
       if (playerStats.length > 0) {
         await tx.matchPlayerStat.createMany({
           data: playerStats.map((s) => ({
@@ -404,6 +565,8 @@ export class MatchService {
         },
       });
 
+      const { home: finalHomePossession, away: finalAwayPossession } = accruePossession(match);
+
       const updated = await tx.match.update({
         where: { id: matchId },
         data: {
@@ -412,6 +575,9 @@ export class MatchService {
           penaltyHomeScore: data.penaltyHomeScore,
           penaltyAwayScore: data.penaltyAwayScore,
           notes: data.notes,
+          homePossessionSeconds: finalHomePossession,
+          awayPossessionSeconds: finalAwayPossession,
+          possessionStartedAt: null,
         },
         include: matchInclude,
       });
@@ -421,21 +587,32 @@ export class MatchService {
       }
 
       return mapMatchForClient(updated);
+    }).then((result) => {
+      invalidateCache(matchCacheKey(matchId));
+      return result;
     });
   }
 
   static async getMatchById(id: string) {
-    const match = await globalClient.match.findUnique({
-      where: { id },
-      include: { ...matchInclude, events: { orderBy: { minute: "asc" } }, stats: true },
+    // Polled every 5s by every live-match viewer, unauthenticated, with an
+    // individually cheap query — the short cache absorbs repeated identical
+    // polls across viewers of the same match rather than hitting Postgres
+    // for each one. Invalidated immediately by every mutating call below,
+    // so a viewer's own action is never masked by stale cache — only other
+    // viewers' polls within the 2s window ever see a cached response.
+    return withCache(matchCacheKey(id), MATCH_CACHE_TTL_MS, async () => {
+      const match = await globalClient.match.findUnique({
+        where: { id },
+        include: { ...matchInclude, events: { orderBy: { minute: "asc" } }, stats: true },
+      });
+
+      if (!match) return null;
+
+      return {
+        ...mapMatchForClient(match),
+        events: match.events.map(mapMatchEventForClient),
+      };
     });
-
-    if (!match) return null;
-
-    return {
-      ...mapMatchForClient(match),
-      events: match.events.map(mapMatchEventForClient),
-    };
   }
 
   static async getMyMatches(userId: number) {

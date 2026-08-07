@@ -49,6 +49,8 @@ function fakeMatch(overrides: Partial<any> = {}) {
     awayScore: 1,
     homeRoster: fakeRoster(),
     awayRoster: fakeRoster({ startingXI: [4, 5], bench: [6], captainId: 4 }),
+    playersPerTeam: 7,
+    allowedSubs: 3,
     duration: 60,
     penaltyHomeScore: null,
     penaltyAwayScore: null,
@@ -116,7 +118,7 @@ describe('POST /api/v1/user/football/tournaments', () => {
     expect(rounds).toEqual(new Set([1, 2, 3])); // n-1 rounds, no team plays twice per round
   });
 
-  it('creates a knockout tournament with a chained bracket for 4 teams', async () => {
+  it('creates a knockout tournament with a chained bracket for 4 teams, batched in one createMany call', async () => {
     prismaMock.footballTeam.findMany.mockResolvedValue([
       fakeTeam({ id: 10 }),
       fakeTeam({ id: 20 }),
@@ -126,13 +128,7 @@ describe('POST /api/v1/user/football/tournaments', () => {
     prismaMock.$transaction.mockImplementation((cb: any) => cb(prismaMock));
     prismaMock.tournament.create.mockResolvedValue(fakeTournament({ format: 'knockout' }) as any);
     prismaMock.tournamentEntry.createMany.mockResolvedValue({ count: 4 } as any);
-
-    let counter = 0;
-    (prismaMock.tournamentFixture.create as jest.Mock).mockImplementation(({ data }: any) => {
-      counter++;
-      return Promise.resolve({ id: `fixture-${counter}`, ...data });
-    });
-    prismaMock.tournamentFixture.update.mockResolvedValue({} as any);
+    prismaMock.tournamentFixture.createMany.mockResolvedValue({ count: 3 } as any);
     prismaMock.tournament.findUnique.mockResolvedValue(fakeTournament({ format: 'knockout' }) as any);
 
     const res = await request(app)
@@ -148,15 +144,36 @@ describe('POST /api/v1/user/football/tournaments', () => {
       });
 
     expect(res.status).toBe(201);
-    expect(prismaMock.tournamentFixture.create).toHaveBeenCalledTimes(3); // 2 round-1 + 1 final
-    expect(prismaMock.tournamentFixture.update).toHaveBeenCalledWith({
-      where: { id: 'fixture-1' },
-      data: { nextFixtureId: 'fixture-3' },
+    // The whole bracket (round-1 pairs + the final) is created in a single
+    // batched call — no more one-fixture-at-a-time create/update round trips.
+    expect(prismaMock.tournamentFixture.create).not.toHaveBeenCalled();
+    expect(prismaMock.tournamentFixture.update).not.toHaveBeenCalled();
+    expect(prismaMock.tournamentFixture.createMany).toHaveBeenCalledTimes(1);
+
+    const fixtures = (prismaMock.tournamentFixture.createMany as jest.Mock).mock.calls[0][0].data;
+    expect(fixtures).toHaveLength(3); // 2 round-1 + 1 final
+
+    const round1 = fixtures.filter((f: any) => f.round === 1);
+    const round2 = fixtures.filter((f: any) => f.round === 2);
+    expect(round1).toHaveLength(2);
+    expect(round2).toHaveLength(1);
+
+    // Both round-1 fixtures have real teams and feed into the same final.
+    const finalId = round2[0].id;
+    expect(round2[0].nextFixtureId).toBeNull();
+    expect(round2[0].homeTeamId).toBeNull();
+    expect(round2[0].awayTeamId).toBeNull();
+    round1.forEach((f: any) => {
+      expect(f.status).toBe('ready');
+      expect(f.nextFixtureId).toBe(finalId);
+      expect([10, 20, 30, 40]).toContain(f.homeTeamId);
+      expect([10, 20, 30, 40]).toContain(f.awayTeamId);
     });
-    expect(prismaMock.tournamentFixture.update).toHaveBeenCalledWith({
-      where: { id: 'fixture-2' },
-      data: { nextFixtureId: 'fixture-3' },
-    });
+
+    // All fixture ids are distinct, valid UUIDs.
+    const ids = fixtures.map((f: any) => f.id);
+    expect(new Set(ids).size).toBe(3);
+    ids.forEach((id: string) => expect(id).toMatch(/^[0-9a-f-]{36}$/));
   });
 });
 
@@ -219,6 +236,109 @@ describe('POST /api/v1/user/football/tournaments/:id/fixtures/:fixtureId/start-m
       where: { id: 'fixture-1' },
       data: { matchId: 'match-1' },
     });
+  });
+});
+
+describe('PATCH /api/v1/user/football/tournaments/:id/fixtures/:fixtureId/schedule', () => {
+  it('requires authentication', async () => {
+    const res = await request(app)
+      .patch('/api/v1/user/football/tournaments/tourney-1/fixtures/fixture-1/schedule')
+      .send({ scheduledAt: '2026-09-01T10:00:00.000Z' });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects setting a schedule on a tournament not owned by the requester', async () => {
+    prismaMock.tournament.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/tournaments/tourney-1/fixtures/fixture-1/schedule')
+      .set(userAuthHeader(2))
+      .send({ scheduledAt: '2026-09-01T10:00:00.000Z' });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a fixture that is not found', async () => {
+    prismaMock.tournament.findFirst.mockResolvedValue(fakeTournament() as any);
+    prismaMock.tournamentFixture.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/tournaments/tourney-1/fixtures/fixture-1/schedule')
+      .set(userAuthHeader(1))
+      .send({ scheduledAt: '2026-09-01T10:00:00.000Z' });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects setting a schedule once the fixture already has a match', async () => {
+    prismaMock.tournament.findFirst.mockResolvedValue(fakeTournament() as any);
+    prismaMock.tournamentFixture.findFirst.mockResolvedValue({ id: 'fixture-1', status: 'ready', matchId: 'match-1' } as any);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/tournaments/tourney-1/fixtures/fixture-1/schedule')
+      .set(userAuthHeader(1))
+      .send({ scheduledAt: '2026-09-01T10:00:00.000Z' });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects setting a schedule on a completed fixture', async () => {
+    prismaMock.tournament.findFirst.mockResolvedValue(fakeTournament() as any);
+    prismaMock.tournamentFixture.findFirst.mockResolvedValue({ id: 'fixture-1', status: 'completed', matchId: null } as any);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/tournaments/tourney-1/fixtures/fixture-1/schedule')
+      .set(userAuthHeader(1))
+      .send({ scheduledAt: '2026-09-01T10:00:00.000Z' });
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('sets the date and venue on a not-yet-started fixture', async () => {
+    prismaMock.tournament.findFirst.mockResolvedValue(fakeTournament() as any);
+    prismaMock.tournamentFixture.findFirst.mockResolvedValue({ id: 'fixture-1', status: 'ready', matchId: null } as any);
+    prismaMock.tournament.update.mockResolvedValue(fakeTournament() as any);
+
+    const res = await request(app)
+      .patch('/api/v1/user/football/tournaments/tourney-1/fixtures/fixture-1/schedule')
+      .set(userAuthHeader(1))
+      .send({ scheduledAt: '2026-09-01T10:00:00.000Z', venueName: 'Community Ground' });
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.tournament.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'tourney-1' },
+        data: {
+          fixtures: {
+            update: {
+              where: { id: 'fixture-1' },
+              data: { scheduledAt: new Date('2026-09-01T10:00:00.000Z'), venueName: 'Community Ground' },
+            },
+          },
+        },
+      })
+    );
+  });
+});
+
+describe('GET /api/v1/user/football/tournaments/mine', () => {
+  it('includes tournaments the user did not create but has a team entered in', async () => {
+    prismaMock.footballProfile.findUnique.mockResolvedValue({ id: 10 } as any);
+    prismaMock.footballTeam.findMany.mockResolvedValue([{ id: 10 }] as any);
+    prismaMock.tournament.findMany.mockResolvedValue([fakeTournament({ creatorId: 99 })] as any);
+
+    const res = await request(app).get('/api/v1/user/football/tournaments/mine').set(userAuthHeader(1));
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.tournament.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { OR: [{ creatorId: 1 }, { entries: { some: { teamId: { in: [10] } } } }] },
+      })
+    );
   });
 });
 

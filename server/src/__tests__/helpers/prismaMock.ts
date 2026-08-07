@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { mockDeep, mockReset, DeepMockProxy } from 'jest-mock-extended';
+import { clearAllCache } from '../../utils/simpleCache';
 
 // Every service in this codebase reaches for its Prisma client via
 // `import { prisma as globalClient } from '.../index'`, so mocking that one
@@ -15,4 +16,5 @@ export const prismaMock = require('../../index').prisma as DeepMockProxy<PrismaC
 
 export function resetPrismaMock() {
   mockReset(prismaMock);
+  clearAllCache();
 }
