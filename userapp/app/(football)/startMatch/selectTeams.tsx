@@ -194,6 +194,28 @@ export default function SelectTeamsScreen() {
     safeNav
   ]);
 
+  const handleScheduleForLater = useCallback(() => {
+    if (!navigationReady) {
+      Alert.alert('Please Wait', 'Navigation is not ready. Please try again in a moment.');
+      return;
+    }
+    if (!selectedMyTeam || !selectedOpponentTeam) {
+      Alert.alert('Selection Required', 'Please select both teams before proceeding.');
+      return;
+    }
+    if (selectedMyTeam.id === selectedOpponentTeam.id) {
+      Alert.alert('Invalid Selection', 'My team and opponent team must be different.');
+      return;
+    }
+
+    const url = `/(football)/startMatch/scheduleMatch?myTeamId=${selectedMyTeam.id}&opponentTeamId=${selectedOpponentTeam.id}`;
+    try {
+      contextRouter.push(url);
+    } catch (contextError) {
+      safeNav.push(url);
+    }
+  }, [navigationReady, selectedMyTeam, selectedOpponentTeam, contextRouter, safeNav]);
+
   // Memoized team card renderer
   const renderTeamCard = useCallback((
     team: Team,
@@ -478,7 +500,19 @@ export default function SelectTeamsScreen() {
             </>
           )}
         </TouchableOpacity>
-        
+
+        <TouchableOpacity
+          onPress={handleScheduleForLater}
+          disabled={!canProceed}
+          className="rounded-2xl py-3 flex-row items-center justify-center mt-3 border border-gray-300"
+          activeOpacity={0.8}
+        >
+          <Text className={`font-semibold text-base mr-2 ${canProceed ? 'text-gray-900' : 'text-gray-400'}`}>
+            Schedule for Later
+          </Text>
+          <Ionicons name="calendar-outline" size={18} color={canProceed ? '#111827' : '#9ca3af'} />
+        </TouchableOpacity>
+
         {/* Error Messages */}
         {!navigationReady && (
           <Text className="text-orange-500 text-sm text-center mt-2">

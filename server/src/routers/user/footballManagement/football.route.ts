@@ -20,12 +20,15 @@ router.get("/football/players", FootballTeamController.players);
 router.get("/football/players/:profileId/stats", MatchController.playerStats);
 
 router.post("/football/matches", authenticateUser, MatchController.create);
+router.post("/football/matches/schedule", authenticateUser, MatchController.schedule);
 router.get("/football/matches/mine", authenticateUser, MatchController.mine);
 router.get("/football/matches/:id", MatchController.getById);
 router.post("/football/matches/:id/start", authenticateUser, MatchController.start);
 router.post("/football/matches/:id/abandon", authenticateUser, MatchController.abandon);
 router.post("/football/matches/:id/events", authenticateUser, MatchController.addEvent);
 router.patch("/football/matches/:id/possession", authenticateUser, MatchController.updatePossession);
+router.patch("/football/matches/:id/possession/pause", authenticateUser, MatchController.pausePossession);
+router.patch("/football/matches/:id/possession/resume", authenticateUser, MatchController.resumePossession);
 router.post("/football/matches/:id/end", authenticateUser, MatchController.end);
 router.get("/football/teams/:teamId/matches", MatchController.teamMatches);
 
@@ -34,6 +37,7 @@ router.get("/football/tournaments/mine", authenticateUser, TournamentController.
 router.get("/football/tournaments/:id", TournamentController.getById);
 router.post("/football/tournaments/:id/start", authenticateUser, TournamentController.start);
 router.post("/football/tournaments/:id/fixtures/:fixtureId/start-match", authenticateUser, TournamentController.startFixtureMatch);
+router.patch("/football/tournaments/:id/fixtures/:fixtureId/schedule", authenticateUser, TournamentController.setFixtureSchedule);
 router.delete("/football/tournaments/:id", authenticateUser, TournamentController.remove);
 
 export default router;

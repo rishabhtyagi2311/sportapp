@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { UserAuthRequest } from "../../../middlewares/auth.middleware";
 import { TournamentService } from "../../../services/user/tournamentManagement/tournament";
-import { createTournamentSchema, startFixtureMatchSchema } from "../../../types/user/tournament";
+import { createTournamentSchema, startFixtureMatchSchema, setFixtureScheduleSchema } from "../../../types/user/tournament";
 
 export class TournamentController {
   static async create(req: UserAuthRequest, res: Response) {
@@ -58,6 +58,27 @@ export class TournamentController {
       return res.status(201).json({ success: true, message: "Fixture match started", data: match });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message || "Error starting fixture match" });
+    }
+  }
+
+  static async setFixtureSchedule(req: UserAuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      const { id, fixtureId } = req.params;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const parsed = setFixtureScheduleSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ success: false, message: "Invalid fixture schedule data", error: parsed.error.issues });
+      }
+
+      const tournament = await TournamentService.setFixtureSchedule(userId, id, fixtureId, parsed.data);
+
+      return res.status(200).json({ success: true, message: "Fixture schedule updated", data: tournament });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message || "Error setting fixture schedule" });
     }
   }
 

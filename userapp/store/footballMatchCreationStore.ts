@@ -40,6 +40,12 @@ export interface MatchSettings {
 }
 
 export interface MatchCreationData {
+  // Set only when finalizing a match that was already created via
+  // `scheduleMatch` — teams/venue are already fixed, so the wizard starts
+  // at 'match-details' instead of 'team-selection', and the final submit
+  // calls `startMatch(existingMatchId, config)` instead of create+start.
+  existingMatchId?: string;
+
   // Team Selection (from first screen)
   myTeam: MatchTeam;
   opponentTeam: MatchTeam;
@@ -71,6 +77,17 @@ export interface MatchCreationState {
 
   // Actions
   initializeMatch: (myTeamId: number, myTeamName: string, opponentTeamId: number, opponentTeamName: string) => void;
+  // Resumes a previously-scheduled match (created via `scheduleMatch`) into
+  // the wizard, seeding teams + venue and skipping straight to the
+  // 'match-details' step since the teams are already fixed.
+  initializeFromScheduledMatch: (match: {
+    id: string;
+    homeTeamId: number;
+    awayTeamId: number;
+    homeTeam?: { name: string };
+    awayTeam?: { name: string };
+    venueName?: string;
+  }) => void;
   updateMatchDetails: (venue: MatchVenue, playersPerTeam: number, referees: MatchReferee[]) => void;
   updateReferees: (referees: MatchReferee[]) => void;
   updateMyTeamPlayers: (playerIds: number[]) => void;
@@ -132,6 +149,23 @@ export const useMatchCreationStore = create<MatchCreationState>()(
         state.matchData.myTeam.teamName = myTeamName;
         state.matchData.opponentTeam.teamId = opponentTeamId;
         state.matchData.opponentTeam.teamName = opponentTeamName;
+        state.matchData.currentStep = 'match-details';
+        state.error = null;
+      }),
+
+      // "myTeam"/"opponentTeam" simply mirror the match's already-fixed
+      // home/away assignment here — home/away was decided once, at
+      // scheduling time, and can't be changed while finalizing.
+      initializeFromScheduledMatch: (match) => set((state) => {
+        state.matchData = { ...initialMatchData };
+        state.matchData.existingMatchId = match.id;
+        state.matchData.myTeam.teamId = match.homeTeamId;
+        state.matchData.myTeam.teamName = match.homeTeam?.name ?? '';
+        state.matchData.opponentTeam.teamId = match.awayTeamId;
+        state.matchData.opponentTeam.teamName = match.awayTeam?.name ?? '';
+        if (match.venueName) {
+          state.matchData.venue = { name: match.venueName, isCustom: true };
+        }
         state.matchData.currentStep = 'match-details';
         state.error = null;
       }),

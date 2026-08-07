@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { UserAuthRequest } from "../../../middlewares/auth.middleware";
 import { MatchService } from "../../../services/user/matchManagement/match";
-import { createMatchSchema, addMatchEventSchema, updatePossessionSchema, endMatchSchema } from "../../../types/user/match";
+import { createMatchSchema, scheduleMatchSchema, startMatchSchema, addMatchEventSchema, updatePossessionSchema, endMatchSchema } from "../../../types/user/match";
 
 export class MatchController {
   static async create(req: UserAuthRequest, res: Response) {
@@ -24,6 +24,26 @@ export class MatchController {
     }
   }
 
+  static async schedule(req: UserAuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const parsed = scheduleMatchSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ success: false, message: "Invalid schedule data", error: parsed.error.issues });
+      }
+
+      const match = await MatchService.scheduleMatch(userId, parsed.data);
+
+      return res.status(201).json({ success: true, message: "Match scheduled", data: match });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message || "Error scheduling match" });
+    }
+  }
+
   static async start(req: UserAuthRequest, res: Response) {
     try {
       const userId = req.user?.id;
@@ -32,7 +52,12 @@ export class MatchController {
         return res.status(401).json({ success: false, message: "Unauthorized" });
       }
 
-      const match = await MatchService.startMatch(userId, id);
+      const parsed = startMatchSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ success: false, message: "Invalid match start data", error: parsed.error.issues });
+      }
+
+      const match = await MatchService.startMatch(userId, id, parsed.data);
 
       return res.status(200).json({ success: true, message: "Match started", data: match });
     } catch (error: any) {
@@ -95,6 +120,38 @@ export class MatchController {
       return res.status(200).json({ success: true, data: match });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message || "Error updating possession" });
+    }
+  }
+
+  static async pausePossession(req: UserAuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      const { id } = req.params;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const match = await MatchService.pausePossession(userId, id);
+
+      return res.status(200).json({ success: true, data: match });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message || "Error pausing possession" });
+    }
+  }
+
+  static async resumePossession(req: UserAuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      const { id } = req.params;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
+
+      const match = await MatchService.resumePossession(userId, id);
+
+      return res.status(200).json({ success: true, data: match });
+    } catch (error: any) {
+      return res.status(400).json({ success: false, message: error.message || "Error resuming possession" });
     }
   }
 

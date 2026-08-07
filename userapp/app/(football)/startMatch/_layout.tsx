@@ -25,8 +25,15 @@ export default function MatchesLayout() {
           headerShown: false,
         }}
       />
-    
-    
+      <Stack.Screen
+        name="scheduleMatch"
+        options={{
+          title: 'Schedule Match',
+          headerShown: false,
+        }}
+      />
+
+
     </Stack>
   );
 }

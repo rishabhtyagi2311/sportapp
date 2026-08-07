@@ -506,21 +506,22 @@ model Match {
   awayTeamId              Int
   matchType               String    @default("friendly") // 'friendly' | 'tournament'
   venueName               String?
-  playersPerTeam          Int
-  allowedSubs             Int
+  playersPerTeam          Int?
+  allowedSubs             Int?
   extraTimeAllowed        Boolean   @default(false)
-  duration                Int       // minutes, regulation time
-  homeRoster              Json      // snapshot: {startingXI:number[], bench:number[], captainId, subsUsed}
-  awayRoster              Json      // same shape
+  duration                Int?      // minutes, regulation time
+  homeRoster              Json?     // snapshot: {startingXI:number[], bench:number[], captainId, subsUsed}
+  awayRoster              Json?     // same shape
   referees                Json      // string[] snapshot
   status                  String    @default("scheduled") // scheduled | live | completed | abandoned
+  scheduledAt             DateTime? // organizer-set kickoff date/time for a scheduled-ahead-of-time match
   homeScore               Int       @default(0)
   awayScore               Int       @default(0)
   penaltyHomeScore        Int?
   penaltyAwayScore        Int?      // set only when a tie must be broken (knockout fixtures)
   currentMinute           Int       @default(0)
   currentPossessionTeamId Int?
-  lastPossessionChangeSeconds Int   @default(0)
+  possessionStartedAt     DateTime?
   homePossessionSeconds   Int       @default(0)
   awayPossessionSeconds   Int       @default(0)
   startedAt               DateTime?
@@ -634,6 +635,8 @@ model TournamentFixture {
   nextFixtureId String?                 // knockout bracket progression; multiple fixtures (e.g. both semis) can advance into the same next fixture
   matchId       String?  @unique         // set once played
   status        String   @default("pending")  // pending | ready | completed
+  scheduledAt   DateTime?               // organizer-set kickoff date/time, settable any time before the fixture's match is created
+  venueName     String?                 // per-fixture venue override; falls back to the tournament's venueName when unset
   createdAt     DateTime @default(now())
 
   tournament       Tournament          @relation(fields: [tournamentId], references: [id], onDelete: Cascade)

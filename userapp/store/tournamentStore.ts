@@ -51,6 +51,7 @@ interface TournamentState {
     data: { duration: number; homeRoster: MatchRoster; awayRoster: MatchRoster; referees: string[] }
   ) => Promise<FootballMatch>;
   deleteTournament: (id: string) => Promise<void>;
+  setFixtureSchedule: (tournamentId: string, fixtureId: string, data: { scheduledAt: string; venueName?: string }) => Promise<void>;
 
   fetchMyTournaments: () => Promise<void>;
   fetchTournamentById: (id: string) => Promise<Tournament | null>;
@@ -147,6 +148,22 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
       return match;
     } catch (err: any) {
       const message = err.response?.data?.message || 'Could not start fixture match';
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
+
+  setFixtureSchedule: async (tournamentId, fixtureId, data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const tournament = await footballService.setFixtureSchedule(tournamentId, fixtureId, data);
+      set((state) => ({
+        tournaments: upsertTournament(state.tournaments, tournament),
+        activeTournament: state.activeTournament?.id === tournamentId ? tournament : state.activeTournament,
+        isLoading: false,
+      }));
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Could not set fixture schedule';
       set({ error: message, isLoading: false });
       throw new Error(message);
     }

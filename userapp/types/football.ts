@@ -76,12 +76,14 @@ export interface FootballMatch {
   awayTeam?: { id: number; name: string; location: string };
   matchType: 'friendly' | 'tournament';
   venueName?: string;
-  playersPerTeam: number;
-  allowedSubs: number;
+  // Deferred until kickoff for a match created via `scheduleMatch` — only
+  // set once the organizer finalizes the lineup/settings via `startMatch`.
+  playersPerTeam?: number;
+  allowedSubs?: number;
   extraTimeAllowed: boolean;
-  duration: number;
-  homeRoster: MatchRoster;
-  awayRoster: MatchRoster;
+  duration?: number;
+  homeRoster?: MatchRoster;
+  awayRoster?: MatchRoster;
   referees: string[];
   status: MatchStatus;
   homeScore: number;
@@ -90,9 +92,10 @@ export interface FootballMatch {
   penaltyAwayScore?: number;
   currentMinute: number;
   currentPossessionTeamId?: number;
-  lastPossessionChangeSeconds: number;
+  possessionStartedAt?: string | null;
   homePossessionSeconds: number;
   awayPossessionSeconds: number;
+  scheduledAt?: string | null;
   startedAt?: string;
   endedAt?: string;
   notes?: string;
@@ -145,6 +148,8 @@ export interface TournamentFixture {
   nextFixtureId?: string;
   matchId?: string;
   status: TournamentFixtureStatus;
+  scheduledAt?: string | null;
+  venueName?: string | null;
   createdAt: string;
 }
 

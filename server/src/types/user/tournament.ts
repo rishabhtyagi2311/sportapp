@@ -28,3 +28,8 @@ export const startFixtureMatchSchema = z.object({
   awayRoster: rosterSchema,
   referees: z.array(z.string()).default([]),
 });
+
+export const setFixtureScheduleSchema = z.object({
+  scheduledAt: z.string().min(1),
+  venueName: z.string().optional(),
+});

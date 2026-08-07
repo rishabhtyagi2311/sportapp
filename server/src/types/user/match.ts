@@ -20,6 +20,27 @@ export const createMatchSchema = z.object({
   referees: z.array(z.string()).default([]),
 });
 
+export const scheduleMatchSchema = z.object({
+  homeTeamId: z.number().int().positive(),
+  awayTeamId: z.number().int().positive(),
+  scheduledAt: z.string().min(1),
+  venueName: z.string().optional(),
+});
+
+// Optional at parse time — a match created via `createMatch` already has a
+// lineup/settings and needs none of this; a match created via
+// `scheduleMatch` needs all of it, which `MatchService.startMatch` enforces
+// itself (business-state validation, not shape validation).
+export const startMatchSchema = z.object({
+  playersPerTeam: z.number().int().positive().optional(),
+  allowedSubs: z.number().int().nonnegative().optional(),
+  extraTimeAllowed: z.boolean().optional(),
+  duration: z.number().int().positive().optional(),
+  homeRoster: rosterSchema.optional(),
+  awayRoster: rosterSchema.optional(),
+  referees: z.array(z.string()).optional(),
+});
+
 export const addMatchEventSchema = z.object({
   teamId: z.number().int().positive(),
   playerId: z.number().int().positive().optional(),
@@ -36,7 +57,6 @@ export const addMatchEventSchema = z.object({
 
 export const updatePossessionSchema = z.object({
   teamId: z.number().int().positive(),
-  currentSeconds: z.number().int().nonnegative(),
 });
 
 export const endMatchSchema = z.object({

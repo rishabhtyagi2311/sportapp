@@ -27,6 +27,23 @@ interface CreateMatchPayload {
   referees: string[];
 }
 
+interface ScheduleMatchPayload {
+  homeTeamId: number;
+  awayTeamId: number;
+  scheduledAt: string;
+  venueName?: string;
+}
+
+interface FinalizeMatchPayload {
+  playersPerTeam: number;
+  allowedSubs: number;
+  extraTimeAllowed: boolean;
+  duration: number;
+  homeRoster: MatchRoster;
+  awayRoster: MatchRoster;
+  referees: string[];
+}
+
 class FootballService {
   async profileRegister(data: FootballProfileData): Promise<{ success: boolean; data: FootballProfile } | null> {
     try {
@@ -153,8 +170,13 @@ class FootballService {
     return response.data.data;
   }
 
-  async startMatch(matchId: string): Promise<FootballMatch> {
-    const response = await apiClient.post(`/user/football/matches/${matchId}/start`);
+  async scheduleMatch(payload: ScheduleMatchPayload): Promise<FootballMatch> {
+    const response = await apiClient.post(`/user/football/matches/schedule`, payload);
+    return response.data.data;
+  }
+
+  async startMatch(matchId: string, finalize?: FinalizeMatchPayload): Promise<FootballMatch> {
+    const response = await apiClient.post(`/user/football/matches/${matchId}/start`, finalize ?? {});
     return response.data.data;
   }
 
@@ -180,8 +202,18 @@ class FootballService {
     return response.data.data;
   }
 
-  async updatePossession(matchId: string, teamId: number, currentSeconds: number): Promise<FootballMatch> {
-    const response = await apiClient.patch(`/user/football/matches/${matchId}/possession`, { teamId, currentSeconds });
+  async updatePossession(matchId: string, teamId: number): Promise<FootballMatch> {
+    const response = await apiClient.patch(`/user/football/matches/${matchId}/possession`, { teamId });
+    return response.data.data;
+  }
+
+  async pausePossession(matchId: string): Promise<FootballMatch> {
+    const response = await apiClient.patch(`/user/football/matches/${matchId}/possession/pause`);
+    return response.data.data;
+  }
+
+  async resumePossession(matchId: string): Promise<FootballMatch> {
+    const response = await apiClient.patch(`/user/football/matches/${matchId}/possession/resume`);
     return response.data.data;
   }
 
@@ -240,6 +272,18 @@ class FootballService {
   ): Promise<FootballMatch> {
     const response = await apiClient.post(
       `/user/football/tournaments/${tournamentId}/fixtures/${fixtureId}/start-match`,
+      data
+    );
+    return response.data.data;
+  }
+
+  async setFixtureSchedule(
+    tournamentId: string,
+    fixtureId: string,
+    data: { scheduledAt: string; venueName?: string }
+  ): Promise<Tournament> {
+    const response = await apiClient.patch(
+      `/user/football/tournaments/${tournamentId}/fixtures/${fixtureId}/schedule`,
       data
     );
     return response.data.data;

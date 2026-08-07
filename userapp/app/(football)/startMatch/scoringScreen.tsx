@@ -10,6 +10,7 @@ import {
   ImageBackground,
   KeyboardAvoidingView,
   Platform,
+  AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -122,7 +123,9 @@ export default function MatchScoringScreen() {
     addEvent,
     endMatch,
     performSubstitution,
-    togglePossession
+    togglePossession,
+    pausePossessionSync,
+    resumePossessionSync,
   } = useMatchExecutionStore();
 
   const extraTimeAllowed = matchData?.matchSettings?.extraTimeAllowed;
@@ -163,6 +166,56 @@ export default function MatchScoringScreen() {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
   }, [isTimerRunning]);
+
+  // Mirrors isTimerRunning for the AppState listener below, which needs the
+  // latest value without re-subscribing on every play/pause toggle.
+  const isTimerRunningRef = useRef(isTimerRunning);
+  useEffect(() => {
+    isTimerRunningRef.current = isTimerRunning;
+  }, [isTimerRunning]);
+
+  // Possession accrual is server-timestamp-driven (see MatchService), so the
+  // app must explicitly tell the server when it stops actively tracking —
+  // otherwise the whole backgrounded duration would get silently credited to
+  // whichever team held the ball when the app was last in the foreground.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        pausePossessionSync().catch(() => {});
+      } else if (nextState === 'active' && isTimerRunningRef.current) {
+        resumePossessionSync().catch(() => {});
+      }
+    });
+    return () => subscription.remove();
+  }, [pausePossessionSync, resumePossessionSync]);
+
+  // Ticks once a second purely to re-render the live possession bar between
+  // real syncs — never sent to the server, just a smooth local estimate.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const possessionSplit = useMemo(() => {
+    if (!activeMatch) return { homePct: 50, awayPct: 50 };
+    let home = activeMatch.homePossessionSeconds;
+    let away = activeMatch.awayPossessionSeconds;
+    if (activeMatch.currentPossessionTeamId && activeMatch.possessionStartedAt) {
+      const elapsed = Math.max(0, Math.floor((nowTick - new Date(activeMatch.possessionStartedAt).getTime()) / 1000));
+      if (activeMatch.currentPossessionTeamId === activeMatch.homeTeamId) home += elapsed;
+      else away += elapsed;
+    }
+    const total = home + away || 1;
+    return { homePct: Math.round((home / total) * 100), awayPct: Math.round((away / total) * 100) };
+  }, [
+    activeMatch?.homePossessionSeconds,
+    activeMatch?.awayPossessionSeconds,
+    activeMatch?.currentPossessionTeamId,
+    activeMatch?.possessionStartedAt,
+    activeMatch?.homeTeamId,
+    nowTick,
+  ]);
 
   const formattedTimer = useMemo(() => {
     const minutes = Math.floor(timer / 60);
@@ -230,8 +283,16 @@ export default function MatchScoringScreen() {
   }, [formattedTimer]);
 
   const handlePlayPause = useCallback(() => {
-    setIsTimerRunning((prev) => !prev);
-  }, []);
+    setIsTimerRunning((prev) => {
+      const next = !prev;
+      if (next) {
+        resumePossessionSync().catch((err: any) => Alert.alert('Error', err.message || 'Could not resume possession tracking'));
+      } else {
+        pausePossessionSync().catch((err: any) => Alert.alert('Error', err.message || 'Could not pause possession tracking'));
+      }
+      return next;
+    });
+  }, [pausePossessionSync, resumePossessionSync]);
 
   const handleCreateEvent = useCallback(async () => {
     if (!selectedEventType || !selectedPlayer || !eventMinute.trim() || !selectedTeam || !matchData || !activeMatch) {
@@ -358,10 +419,10 @@ export default function MatchScoringScreen() {
   const handleTogglePossession = useCallback((team: 'my' | 'opponent') => {
     if (!matchData) return;
     const teamId = team === 'my' ? matchData.myTeam.teamId : matchData.opponentTeam.teamId;
-    togglePossession(teamId, timer).catch((err: any) => {
+    togglePossession(teamId).catch((err: any) => {
       Alert.alert('Error', err.message || 'Could not update possession');
     });
-  }, [matchData, timer, togglePossession]);
+  }, [matchData, togglePossession]);
 
   // Helpers for the modal UI
   const getCurrentPlayersOnPitch = useCallback((): FootballProfile[] => {
@@ -443,6 +504,9 @@ export default function MatchScoringScreen() {
     );
   }
 
+  const isHomePossessing = activeMatch?.currentPossessionTeamId === matchData.myTeam.teamId;
+  const isAwayPossessing = activeMatch?.currentPossessionTeamId === matchData.opponentTeam.teamId;
+
   return (
     <SafeAreaView className="flex-1 bg-slate-100">
       <ImageBackground
@@ -472,7 +536,11 @@ export default function MatchScoringScreen() {
                   <Text className="text-white text-sm font-medium text-center mb-1">{matchData.myTeam.teamName}</Text>
                   <Text className="text-white text-4xl font-bold">{myTeamScore}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleTogglePossession('my')} className="mt-3 bg-black/40 px-3 py-1 rounded-full border border-white/20">
+                <TouchableOpacity
+                  onPress={() => handleTogglePossession('my')}
+                  disabled={isHomePossessing}
+                  className={`mt-3 px-3 py-1 rounded-full border ${isHomePossessing ? 'bg-black/10 border-white/10 opacity-40' : 'bg-black/40 border-white/20'}`}
+                >
                   <Text className="text-white text-xs">Set Possession</Text>
                 </TouchableOpacity>
               </View>
@@ -490,9 +558,26 @@ export default function MatchScoringScreen() {
                   <Text className="text-white text-sm font-medium text-center mb-1">{matchData.opponentTeam.teamName}</Text>
                   <Text className="text-white text-4xl font-bold">{opponentTeamScore}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleTogglePossession('opponent')} className="mt-3 bg-black/40 px-3 py-1 rounded-full border border-white/20">
+                <TouchableOpacity
+                  onPress={() => handleTogglePossession('opponent')}
+                  disabled={isAwayPossessing}
+                  className={`mt-3 px-3 py-1 rounded-full border ${isAwayPossessing ? 'bg-black/10 border-white/10 opacity-40' : 'bg-black/40 border-white/20'}`}
+                >
                   <Text className="text-white text-xs">Set Possession</Text>
                 </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Live Possession Bar */}
+            <View className="mt-6 px-2">
+              <View className="flex-row justify-between mb-1">
+                <Text className="text-white text-xs font-bold">{possessionSplit.homePct}%</Text>
+                <Text className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Possession</Text>
+                <Text className="text-white text-xs font-bold">{possessionSplit.awayPct}%</Text>
+              </View>
+              <View className="h-1.5 bg-white/20 rounded-full flex-row overflow-hidden">
+                <View style={{ width: `${possessionSplit.homePct}%` }} className="bg-blue-400 h-full" />
+                <View className="flex-1 bg-red-400 h-full" />
               </View>
             </View>
           </View>
